@@ -72,7 +72,18 @@ public static class WebGLBuilder
     /// <summary>供命令行调用（-executeMethod WebGLBuilder.Build）</summary>
     public static void Build()
     {
-        bool ok = BuildInternal();
+        bool ok = false;
+        try
+        {
+            ok = BuildInternal();
+        }
+        catch (Exception e)
+        {
+            // 未捕获异常会让 Unity 以非 0 退出，但调用方拿不到明确原因。
+            // 这里显式记下来，保证失败一定会被看见。
+            Debug.LogError($"[WebGLBuilder] 构建抛出异常，失败：\n{e}");
+            ok = false;
+        }
 
         // 批处理模式下需要显式退出码，CI/脚本才能判断成败
         if (Application.isBatchMode)
@@ -82,6 +93,12 @@ public static class WebGLBuilder
     static bool BuildInternal()
     {
         if (!SanityCheck()) return false;
+
+        // 字体图集必须在构建前确保是最新的。
+        // 不能只依赖 HanziFontFixer 的 [InitializeOnLoad] + delayCall：
+        // 在 -batchmode -quit 下构建结束得比 delayCall 早，字体不会被重烘焙，
+        // 结果就是图集参数改了却完全不生效（构建悄悄用了旧图集）。
+        HanziFontFixer.EnsureBaked(false);
 
         ApplySettings();
 
@@ -96,7 +113,7 @@ public static class WebGLBuilder
             scenes = Scenes,
             locationPathName = outputDir,
             target = BuildTarget.WebGL,
-            options = BuildOptions.None
+            options = BuildOptions.DetailedBuildReport
         };
 
         Debug.Log($"[WebGLBuilder] 项目根目录: {projectRoot}");
@@ -191,8 +208,21 @@ public static class WebGLBuilder
         PlayerSettings.runInBackground = true;
         PlayerSettings.defaultWebScreenWidth = 1280;
         PlayerSettings.defaultWebScreenHeight = 720;
+
+        // --- 减小 wasm 体积（首屏下载量的大头）---
+
+        // 托管代码剥离：High 会砍掉未使用的托管代码。
+        // 注意：若项目里有用反射/字符串动态访问的类型，可能被误剥离，
+        // 所以 link.xml 里对需要保留的程序集做了声明（见 Assets/link.xml）。
         PlayerSettings.SetManagedStrippingLevel(
-            UnityEditor.Build.NamedBuildTarget.WebGL, ManagedStrippingLevel.Medium);
+            UnityEditor.Build.NamedBuildTarget.WebGL, ManagedStrippingLevel.High);
+
+        // 剥离未使用的引擎代码（引擎模块级裁剪）
+        PlayerSettings.stripEngineCode = true;
+
+        // IL2CPP 用 Master 配置编译，产出更小更快（发布构建本来就该这样）
+        PlayerSettings.SetIl2CppCompilerConfiguration(
+            UnityEditor.Build.NamedBuildTarget.WebGL, Il2CppCompilerConfiguration.Master);
 
         // --- 关掉 Unity 启动画面 ---
         PlayerSettings.SplashScreen.show = false;

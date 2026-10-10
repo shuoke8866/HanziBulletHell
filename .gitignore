@@ -62,3 +62,7 @@ Thumbs.db
 
 # Unity 构建日志
 /_build*.log
+
+# Unity 构建报告
+/[Bb]uildReports/
+/Library/LastBuild.buildreport
