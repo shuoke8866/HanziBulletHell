@@ -160,21 +160,30 @@ Assets/
 
 ## 构建 WebGL
 
-仓库已配置 [GameCI](https://game.ci/) 工作流（[`.github/workflows/build-webgl.yml`](.github/workflows/build-webgl.yml)）：
-推送到 `main` 分支后，GitHub 会自动在云端构建 WebGL 并发布到 GitHub Pages，本机无需安装 WebGL 模块。
+构建产物输出到 `docs/` 目录，GitHub Pages 直接从 `main` 分支的 `/docs` 发布 ——
+不需要额外的 `gh-pages` 分支，也不需要 GitHub Actions。
 
-<details>
-<summary>需要在仓库里配置的 Secrets</summary>
+**前提**：Unity Hub → Installs → 对应版本 → Add modules → 勾选 **WebGL Build Support**。
 
-| Secret | 说明 |
-|---|---|
-| `UNITY_LICENSE` | Unity 个人版许可证文件内容 |
-| `UNITY_EMAIL` | Unity 账号邮箱 |
-| `UNITY_PASSWORD` | Unity 账号密码 |
+**方式一（编辑器内一键构建）**：菜单栏 → **Build → 构建 WebGL 到 docs/**
 
-获取方式见 [GameCI 激活文档](https://game.ci/docs/github/activation)。
+**方式二（命令行）**：
 
-</details>
+```powershell
+& "F:\2022.3.62f3c1\Editor\Unity.exe" -quit -batchmode -nographics `
+  -projectPath "F:\HanziBulletHell" `
+  -executeMethod WebGLBuilder.Build `
+  -logFile -
+```
+
+构建脚本（[`Assets/Editor/WebGLBuilder.cs`](Assets/Editor/WebGLBuilder.cs)）会自动：
+
+- 强制使用 **GZip** 压缩 —— GitHub Pages 无法为 `.br` 发送 `Content-Encoding: br`，
+  Unity 默认的 Brotli 会导致页面加载失败
+- 关闭 Unity 启动画面、设置 1280×720、开启数据缓存
+- 构建前自检（WebGL 模块是否安装、场景是否存在），缺什么就打印可读的报错
+
+构建完成后提交并推送 `docs/` 即可更新线上版本。
 
 ## 第三方资源与许可
 

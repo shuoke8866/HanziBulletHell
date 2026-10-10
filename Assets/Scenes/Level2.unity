@@ -185,40 +185,6 @@ MonoBehaviour:
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 1
   m_PresetInfoIsWorld: 0
---- !u!114 &3000000010
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 13449658}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d40661975c2a85906e81092afabc363d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  displayDuration: 1.8
-  fadeDuration: 0.35
-  verticalOffset: -120
-  fontSize: 34
-
---- !u!114 &3000000011
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 13449658}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fc3a4400b50fc8fae0435aedf5650888, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  slotSize: 56
-  slotGap: 8
-  bottomOffset: 18
-  fontSize: 20
-
 --- !u!223 &13449661
 Canvas:
   m_ObjectHideFlags: 0
@@ -294,6 +260,9 @@ MonoBehaviour:
   infoText: {fileID: 1463335940}
   inventory: {fileID: 1319587814}
   hanzi: {fileID: 1319587812}
+  slotSize: 150
+  slotGap: 14
+  columns: 3
 --- !u!1 &17733352
 GameObject:
   m_ObjectHideFlags: 0
@@ -697,8 +666,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u5F53\u524D\u6C49\u5B57\uFF1A\u4E00"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 5a7a7014a487ca54b862588f94224b42, type: 2}
-  m_sharedMaterial: {fileID: -5534491909634370454, guid: 5a7a7014a487ca54b862588f94224b42, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: a98d9a49b27e83b4eb5392a1a069b483, type: 2}
+  m_sharedMaterial: {fileID: -4587036098517900623, guid: a98d9a49b27e83b4eb5392a1a069b483, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -1602,10 +1571,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9626d0948766f64cafbad6e6d2be138, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  roomType: 1
   doors:
   - {fileID: 1666194946}
   - {fileID: 1953849525}
   - {fileID: 453549890}
+  useDatabasePool: 1
+  singleDefId: 
   enemyPrefabs:
   - {fileID: 7344781935549740770, guid: 99b040dba8e811d44bbfd5a4e1e1acdc, type: 3}
   - {fileID: 7344781935549740770, guid: 2ee94dc29e5267f40b8a9fdfeb95a11c, type: 3}
@@ -1615,12 +1587,9 @@ MonoBehaviour:
   - {fileID: 1556374435}
   - {fileID: 65782700}
   - {fileID: 1786085436}
-  enemyHealthOverride: -1
-  roomType: 1
-  useDatabasePool: 1
-  singleDefId: 
   waveCount: 1
   waveInterval: 1.2
+  enemyHealthOverride: -1
   extraEnemiesPerWave: 0
   grantBoonOnClear: 1
   spawnStrokeOnClear: 0
@@ -2362,16 +2331,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9626d0948766f64cafbad6e6d2be138, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  roomType: 1
   doors:
   - {fileID: 453549890}
-  enemyPrefabs: []
-  enemySpawnPoints: []
-  enemyHealthOverride: -1
-  roomType: 1
   useDatabasePool: 1
   singleDefId: 
+  enemyPrefabs: []
+  enemySpawnPoints: []
   waveCount: 1
   waveInterval: 1.2
+  enemyHealthOverride: -1
   extraEnemiesPerWave: 0
   grantBoonOnClear: 1
   spawnStrokeOnClear: 0
@@ -2618,18 +2587,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9626d0948766f64cafbad6e6d2be138, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  roomType: 1
   doors:
   - {fileID: 849504940}
+  useDatabasePool: 1
+  singleDefId: 
   enemyPrefabs:
   - {fileID: 5860914716362875413, guid: 32a029e01437f214aa9ba183a8297b4d, type: 3}
   enemySpawnPoints:
   - {fileID: 484907809}
-  enemyHealthOverride: -1
-  roomType: 1
-  useDatabasePool: 1
-  singleDefId: 
   waveCount: 1
   waveInterval: 1.2
+  enemyHealthOverride: -1
   extraEnemiesPerWave: 0
   grantBoonOnClear: 1
   spawnStrokeOnClear: 0
@@ -3234,17 +3203,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9626d0948766f64cafbad6e6d2be138, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  roomType: 1
   doors:
   - {fileID: 2115811503}
   - {fileID: 849504940}
-  enemyPrefabs: []
-  enemySpawnPoints: []
-  enemyHealthOverride: -1
-  roomType: 1
   useDatabasePool: 1
   singleDefId: 
+  enemyPrefabs: []
+  enemySpawnPoints: []
   waveCount: 1
   waveInterval: 1.2
+  enemyHealthOverride: -1
   extraEnemiesPerWave: 0
   grantBoonOnClear: 1
   spawnStrokeOnClear: 0
@@ -3672,16 +3641,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9626d0948766f64cafbad6e6d2be138, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  roomType: 1
   doors:
   - {fileID: 1666194946}
-  enemyPrefabs: []
-  enemySpawnPoints: []
-  enemyHealthOverride: -1
-  roomType: 1
   useDatabasePool: 1
   singleDefId: 
+  enemyPrefabs: []
+  enemySpawnPoints: []
   waveCount: 1
   waveInterval: 1.2
+  enemyHealthOverride: -1
   extraEnemiesPerWave: 0
   grantBoonOnClear: 1
   spawnStrokeOnClear: 0
@@ -4059,7 +4028,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   strokePickupPrefab: {fileID: 945719665988460050, guid: cb57931be0e26244ea873f4e489d1da6, type: 3}
   portalPrefab: {fileID: 258644837196506244, guid: bf3b2426c934ec24382c71b136695344, type: 3}
+  enemyTemplatePrefab: {fileID: 0}
   currentFloor: 2
+  healthGrowthPerFloor: 0.3
+  speedGrowthPerFloor: 0.06
+  extraEnemyPerFloor: 1
+  maxExtraEnemies: 4
+  logFloorInfo: 1
 --- !u!1 &1592492930
 GameObject:
   m_ObjectHideFlags: 0
@@ -5042,9 +5017,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9626d0948766f64cafbad6e6d2be138, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  roomType: 1
   doors:
   - {fileID: 1953849525}
   - {fileID: 2115811503}
+  useDatabasePool: 1
+  singleDefId: 
   enemyPrefabs:
   - {fileID: 7344781935549740770, guid: 99b040dba8e811d44bbfd5a4e1e1acdc, type: 3}
   - {fileID: 7344781935549740770, guid: 2ee94dc29e5267f40b8a9fdfeb95a11c, type: 3}
@@ -5053,12 +5031,9 @@ MonoBehaviour:
   - {fileID: 471867003}
   - {fileID: 2051377800}
   - {fileID: 2129442611}
-  enemyHealthOverride: -1
-  roomType: 1
-  useDatabasePool: 1
-  singleDefId: 
   waveCount: 1
   waveInterval: 1.2
+  enemyHealthOverride: -1
   extraEnemiesPerWave: 0
   grantBoonOnClear: 1
   spawnStrokeOnClear: 0
@@ -5321,6 +5296,38 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1849720828}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3000000010
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 13449658}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d40661975c2a85906e81092afabc363d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  displayDuration: 1.8
+  fadeDuration: 0.35
+  verticalOffset: -120
+  fontSize: 34
+--- !u!114 &3000000011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 13449658}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fc3a4400b50fc8fae0435aedf5650888, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  slotSize: 56
+  slotGap: 8
+  bottomOffset: 18
+  fontSize: 20
 --- !u!1001 &8445279354795273898
 PrefabInstance:
   m_ObjectHideFlags: 0
