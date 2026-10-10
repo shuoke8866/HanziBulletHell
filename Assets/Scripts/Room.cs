@@ -364,6 +364,8 @@ public class Room : MonoBehaviour
         roomCleared = true;
         ReleaseDoors();
 
+        Sfx.Play(Sfx.Id.RoomClear, 0.5f);
+
         GameLog.Info($"「{name}」已清理！");
         GameToast.Show($"房间清理完成！", new Color(0.6f, 1f, 0.7f));
 
@@ -377,6 +379,7 @@ public class Room : MonoBehaviour
         {
             BoonDef boon = BoonPool.Random();
             PlayerStats.Apply(boon);
+            Sfx.Play(Sfx.Id.Boon, 0.5f);
             GameToast.Show($"获得词条：{boon.displayName} —— {boon.description}", boon.color);
         }
 

@@ -88,6 +88,7 @@ public class StrokePickup : MonoBehaviour
         {
             collected = true;
             GameData.strokesCollected++;
+            Sfx.Play(Sfx.Id.Combine, 0.5f);
             Destroy(gameObject);
         }
         // 合成失败 → 进背包
@@ -95,12 +96,14 @@ public class StrokePickup : MonoBehaviour
         {
             collected = true;
             GameData.strokesCollected++;
+            Sfx.PlayVaried(Sfx.Id.Pickup, 0.45f);
             GameToast.Show($"拾取 {StrokeUtil.NameOf(strokeType)}（存背包）", StrokeUtil.ColorOf(strokeType));
             Destroy(gameObject);
         }
         // 背包也满了 → 不拾取，笔画留在原地（可按 F 重试）
         else if (inv != null)
         {
+            Sfx.Play(Sfx.Id.Error, 0.35f);
             GameToast.Show($"背包已满，「{StrokeUtil.NameOf(strokeType)}」留在地上", new Color(1f, 0.6f, 0.5f));
         }
     }

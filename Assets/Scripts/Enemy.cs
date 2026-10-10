@@ -415,6 +415,7 @@ public class Enemy : MonoBehaviour
     public void TakeDamage(int damage)
     {
         currentHealth -= damage;
+        Sfx.PlayVaried(Sfx.Id.Hit, 0.22f, 0.12f);
         if (currentHealth <= 0) Die();
     }
 
@@ -450,6 +451,7 @@ public class Enemy : MonoBehaviour
 
     void Die()
     {
+        Sfx.PlayVaried(Sfx.Id.EnemyDie, 0.30f, 0.10f);
         if (currentRoom != null)
             currentRoom.OnEnemyDied(gameObject);
         GameManager.Instance?.OnEnemyKilled(transform.position);

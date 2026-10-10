@@ -46,6 +46,8 @@ public class PlayerHealth : MonoBehaviour
         invincibleTimer = invincibleDuration;
         SaveHealthToGameData();
 
+        Sfx.Play(Sfx.Id.PlayerHurt, 0.45f);
+
         // 受伤闪红
         SpriteRenderer sr = GetComponent<SpriteRenderer>();
         if (sr != null)
@@ -93,6 +95,7 @@ public class PlayerHealth : MonoBehaviour
 
     void Die()
     {
+        Sfx.Play(Sfx.Id.PlayerHurt, 1f);
         GameLog.Info($"玩家死亡！本轮成绩：{GameData.RunSummary()}");
 
         // 真肉鸽：清空所有笔画、层数归 1，由 GameManager 负责重开

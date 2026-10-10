@@ -73,6 +73,9 @@ public class PlayerController : MonoBehaviour
         {
             hanzi.FireBulletPattern(firePoint != null ? firePoint.position : transform.position, dir);
             nextFireTime = Time.time + fireRate;
+
+            // 射击音效：轻音量 + 音高抖动，密集连射时不会吵
+            Sfx.PlayVaried(Sfx.Id.Shoot, 0.35f, 0.10f);
         }
     }
 

@@ -3992,6 +3992,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1572429172}
   - component: {fileID: 1572429173}
+  - component: {fileID: 3000000100}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -5417,3 +5418,17 @@ SceneRoots:
   - {fileID: 2066170861}
   - {fileID: 1974742022}
   - {fileID: 1319587811}
+--- !u!114 &3000000100
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1572429171}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9d21454d40a492441b0d8bfda2979c51, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  backgroundMusic: {fileID: 8300000, guid: 3a9f9a74c66422f47ac54fc3fb961d4b, type: 3}
+  volume: 0.4
