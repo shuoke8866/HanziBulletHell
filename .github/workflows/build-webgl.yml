@@ -1,0 +1,82 @@
+name: Build WebGL & Deploy to GitHub Pages
+
+# 触发条件：
+#  - 推送到 main 或 master 分支（GitHub 默认分支叫哪个都行）
+#  - 也可以在 Actions 页面手动点 "Run workflow"
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+# 允许部署到 GitHub Pages
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  # ------------------------------------------------------------------
+  # 1) 用 GameCI 在云端构建 WebGL（本机不需要装 Unity WebGL 模块）
+  # ------------------------------------------------------------------
+  build:
+    name: Build WebGL
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      # 缓存 Unity Library 目录，后续构建会快很多
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-
+
+      - name: Build for WebGL
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: WebGL
+          unityVersion: 2022.3.62f3c1
+          # 自定义构建脚本：强制 GZip 压缩（GitHub Pages 无法服务 Brotli）
+          buildMethod: WebGLBuilder.Build
+          # 构建过程中字体图集会重新烘焙，会产生文件改动
+          allowDirtyBuild: true
+          buildsPath: build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebGL-Build
+          path: build
+          retention-days: 14
+
+  # ------------------------------------------------------------------
+  # 2) 把构建产物发布到 GitHub Pages
+  # ------------------------------------------------------------------
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: WebGL-Build
+          path: build
+
+      - name: Deploy to gh-pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          # 必须指向真正含 index.html 的那一层
+          # （WebGLBuilder.Build 输出到 build/WebGL/HanziBulletHell）
+          folder: build/WebGL/HanziBulletHell
+          clean: true

@@ -1,0 +1,29 @@
+# GitHub Actions 工作流必须是 LF 换行，CRLF 会导致 YAML 解析异常
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+
+# Unity 场景 / 预制体 / 资源：按 YAML 文本差异显示，但不要做行尾/编码转换
+*.unity   text merge=unityyamlmerge eol=lf
+*.prefab  text merge=unityyamlmerge eol=lf
+*.asset   text merge=unityyamlmerge eol=lf
+*.meta    text merge=unityyamlmerge eol=lf
+*.controller text merge=unityyamlmerge eol=lf
+*.mat     text merge=unityyamlmerge eol=lf
+*.anim    text merge=unityyamlmerge eol=lf
+
+# 二进制资源：交给 Git LFS（如已启用）或原样存储
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.psd     binary
+*.ttf     binary
+*.otf     binary
+*.ttc     binary
+*.fbx     binary
+*.mp3     binary
+*.ogg     binary
+*.wav     binary
+*.dll     binary
+*.so      binary

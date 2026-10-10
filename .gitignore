@@ -1,0 +1,57 @@
+# ===== Unity 生成目录（不要进仓库）=====
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Unity 自动生成的工程文件
+/*.csproj
+/*.sln
+/*.unityproj
+/*.suo
+/*.user
+/*.userprefs
+/*.pidb
+/*.booproj
+/*.svd
+/*.pdb
+/*.mdb
+/*.opendb
+/*.VC.db
+/.vs/
+
+# 构建产物
+*.apk
+*.aab
+*.unitypackage
+*.app
+/[Ee]xported[Oo]bj/
+*.unitypackage
+
+# 崩溃报告
+sysinfo.txt
+crashlytics-build.properties
+
+# ===== 本项目的临时/备份文件 =====
+# 开发过程中的手动备份（体积大且不需要公开）
+/_backup_*/
+# 文件权限诊断报告
+/_acl_report/
+# 临时文件
+/Temp.txt
+
+# ===== 编辑器杂项 =====
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# 开发过程中的临时文件
+/_*.txt
+/_*.dll
+/_*.json

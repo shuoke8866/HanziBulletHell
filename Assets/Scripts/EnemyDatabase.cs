@@ -1,0 +1,310 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+// ============ 敌人行为 ============
+public enum EnemyBehavior
+{
+    Chase,      // 直线追击
+    ChaseShoot, // 追击 + 保持距离
+    Orbit,      // 环绕玩家（不远不近）
+    Charge,     // 冲刺撞击
+    Turret      // 固定不动，只射击
+}
+
+// ============ 弹幕形态 ============
+public enum EnemyShotPattern
+{
+    None,
+    Aimed,      // 朝玩家单发
+    DoubleAimed,// 朝玩家双发（带夹角）
+    Fan,        // 扇形散射
+    Ring,       // 环形
+    Spiral,     // 螺旋（每次旋转一个固定角度）
+    Wall,       // 弹幕墙（一排平行弹）
+    Twin,       // 上下对射
+    Burst       // 朝玩家三连点射
+}
+
+// ============ 敌人定义（数据驱动）============
+[System.Serializable]
+public class EnemyDef
+{
+    public string id;                       // 唯一标识，用于生成
+    public string displayName;              // 中文显示名
+    public EnemyBehavior behavior;
+    public EnemyShotPattern shotPattern;
+
+    public int health = 3;
+    public float moveSpeed = 2f;
+    public float shootInterval = 2f;
+    public float bulletSpeed = 7f;
+    public int bulletDamage = 1;
+
+    public float meleeDamage = 0f;          // >0 表示接触伤害
+
+    public Vector3 bodyScale = new Vector3(0.8f, 0.8f, 1f);
+    public Color bodyColor = new Color(1f, 1f, 1f, 1f);
+
+    public int scoreWeight = 1;             // 权重（用于随机抽取）
+    public bool isElite = false;
+    public bool canSummon = false;          // 召唤小怪
+    public string summonId;                 // 召唤的目标 id
+    public float summonInterval = 8f;
+
+    public string glyph = "一";             // 身上显示的汉字
+}
+
+/// <summary>
+/// 敌人数据库：所有敌人类型集中定义，不再硬编码在 Enemy.cs 里。
+/// 想加新怪只需在 Build() 里加一条，或调用 Register() 注册（含精英/变异倍率）。
+/// </summary>
+public static class EnemyDatabase
+{
+    static List<EnemyDef> all;
+    static Dictionary<string, EnemyDef> byId;
+
+    public static IReadOnlyList<EnemyDef> All
+    {
+        get { EnsureBuilt(); return all; }
+    }
+
+    public static void EnsureBuilt()
+    {
+        if (all != null) return;
+        all = new List<EnemyDef>();
+        byId = new Dictionary<string, EnemyDef>();
+        Build();
+    }
+
+    public static void Register(EnemyDef def)
+    {
+        EnsureBuilt();
+        if (string.IsNullOrEmpty(def.id)) def.id = def.displayName;
+        if (byId.ContainsKey(def.id))
+        {
+            // 覆盖旧定义（方便热改）
+            int i = all.FindIndex(d => d.id == def.id);
+            if (i >= 0) all[i] = def;
+            byId[def.id] = def;
+            return;
+        }
+        all.Add(def);
+        byId[def.id] = def;
+    }
+
+    public static EnemyDef Get(string id)
+    {
+        EnsureBuilt();
+        EnemyDef d;
+        if (byId.TryGetValue(id, out d)) return d;
+        Debug.LogWarning($"EnemyDatabase: 找不到敌人定义「{id}」，回退到第一个。");
+        return all.Count > 0 ? all[0] : null;
+    }
+
+    // 按权重随机抽一个（可排除精英）
+    public static EnemyDef PickRandom(bool allowElite, float eliteChance = 0.15f)
+    {
+        EnsureBuilt();
+
+        if (allowElite && UnityEngine.Random.value < eliteChance)
+        {
+            var elites = all.FindAll(d => d.isElite);
+            if (elites.Count > 0) return elites[UnityEngine.Random.Range(0, elites.Count)];
+        }
+
+        var pool = all.FindAll(d => !d.isElite);
+        if (pool.Count == 0) pool = all;
+
+        int total = 0;
+        foreach (var d in pool) total += Mathf.Max(1, d.scoreWeight);
+
+        int pick = UnityEngine.Random.Range(0, total);
+        foreach (var d in pool)
+        {
+            pick -= Mathf.Max(1, d.scoreWeight);
+            if (pick < 0) return d;
+        }
+        return pool[pool.Count - 1];
+    }
+
+    // ---------- 定义区 ----------
+    static void Build()
+    {
+        // ===== 基础怪 =====
+
+        // 一：横线怪，直线追击 + 单发瞄准
+        Register(new EnemyDef
+        {
+            id = "yi",
+            displayName = "横线怪",
+            glyph = "二",
+            behavior = EnemyBehavior.Chase,
+            shotPattern = EnemyShotPattern.Aimed,
+            health = 7, moveSpeed = 2f, shootInterval = 2f,
+            bulletSpeed = 7f, bulletDamage = 1,
+            bodyScale = new Vector3(2f, 0.5f, 1f),
+            bodyColor = new Color(0.9f, 0.9f, 0.9f),
+            scoreWeight = 4
+        });
+
+        // 丨：竖线怪，追击 + 上下对射
+        Register(new EnemyDef
+        {
+            id = "shu",
+            displayName = "竖线怪",
+            glyph = "川",
+            behavior = EnemyBehavior.Chase,
+            shotPattern = EnemyShotPattern.Twin,
+            health = 8, moveSpeed = 2f, shootInterval = 2.2f,
+            bulletSpeed = 7f, bulletDamage = 1,
+            bodyScale = new Vector3(0.5f, 2f, 1f),
+            bodyColor = new Color(0.7f, 0.95f, 1f),
+            scoreWeight = 4
+        });
+
+        // 口：方块怪，慢速逼近 + 环形弹幕
+        Register(new EnemyDef
+        {
+            id = "kou",
+            displayName = "方块怪",
+            glyph = "口",
+            behavior = EnemyBehavior.ChaseShoot,
+            shotPattern = EnemyShotPattern.Ring,
+            health = 18, moveSpeed = 1f, shootInterval = 3f,
+            bulletSpeed = 6f, bulletDamage = 1,
+            bodyScale = new Vector3(1.5f, 1.5f, 1f),
+            bodyColor = new Color(1f, 0.85f, 0.4f),
+            scoreWeight = 3
+        });
+
+        // 人：快速怪，冲刺撞击
+        Register(new EnemyDef
+        {
+            id = "ren",
+            displayName = "冲刺怪",
+            glyph = "人",
+            behavior = EnemyBehavior.Charge,
+            shotPattern = EnemyShotPattern.None,
+            health = 5, moveSpeed = 4f, shootInterval = 1.5f,
+            bulletSpeed = 8f, bulletDamage = 1,
+            meleeDamage = 1f,
+            bodyScale = new Vector3(0.8f, 0.8f, 1f),
+            bodyColor = new Color(1f, 0.6f, 0.3f),
+            scoreWeight = 4
+        });
+
+        // 十：炮台怪，固定不动 + 十字弹幕
+        Register(new EnemyDef
+        {
+            id = "shi",
+            displayName = "炮台怪",
+            glyph = "丁",
+            behavior = EnemyBehavior.Turret,
+            shotPattern = EnemyShotPattern.Fan,
+            health = 15, moveSpeed = 0f, shootInterval = 2.4f,
+            bulletSpeed = 8f, bulletDamage = 1,
+            bodyScale = new Vector3(1.1f, 1.1f, 1f),
+            bodyColor = new Color(0.85f, 0.5f, 1f),
+            scoreWeight = 2
+        });
+
+        // 木：环绕怪，保持中距离 + 螺旋弹幕
+        Register(new EnemyDef
+        {
+            id = "mu",
+            displayName = "环绕怪",
+            glyph = "木",
+            behavior = EnemyBehavior.Orbit,
+            shotPattern = EnemyShotPattern.Spiral,
+            health = 14, moveSpeed = 2.4f, shootInterval = 0.45f,
+            bulletSpeed = 5.5f, bulletDamage = 1,
+            bodyScale = new Vector3(1f, 1f, 1f),
+            bodyColor = new Color(0.5f, 0.9f, 0.5f),
+            scoreWeight = 2
+        });
+
+        // 田：弹幕墙怪，慢速 + 一排平行弹
+        Register(new EnemyDef
+        {
+            id = "tian",
+            displayName = "弹幕墙怪",
+            glyph = "田",
+            behavior = EnemyBehavior.ChaseShoot,
+            shotPattern = EnemyShotPattern.Wall,
+            health = 24, moveSpeed = 0.8f, shootInterval = 3.2f,
+            bulletSpeed = 5f, bulletDamage = 1,
+            bodyScale = new Vector3(1.6f, 1.6f, 1f),
+            bodyColor = new Color(0.6f, 1f, 0.85f),
+            scoreWeight = 2
+        });
+
+        // ===== 精英怪（同一套行为 + 强化数值）=====
+
+        // 王：精英方块怪，召唤小怪
+        Register(new EnemyDef
+        {
+            id = "elite_wang",
+            displayName = "精英·王",
+            glyph = "王",
+            behavior = EnemyBehavior.ChaseShoot,
+            shotPattern = EnemyShotPattern.Ring,
+            health = 60, moveSpeed = 1.3f, shootInterval = 2.2f,
+            bulletSpeed = 6.5f, bulletDamage = 1,
+            bodyScale = new Vector3(2f, 2f, 1f),
+            bodyColor = new Color(1f, 0.4f, 0.4f),
+            isElite = true, canSummon = true, summonId = "ren", summonInterval = 6f,
+            scoreWeight = 1
+        });
+
+        // 火：精英冲刺怪，三连点射
+        Register(new EnemyDef
+        {
+            id = "elite_huo",
+            displayName = "精英·火",
+            glyph = "圭",
+            behavior = EnemyBehavior.Charge,
+            shotPattern = EnemyShotPattern.Burst,
+            health = 45, moveSpeed = 4.5f, shootInterval = 2.5f,
+            bulletSpeed = 9f, bulletDamage = 1,
+            meleeDamage = 2f,
+            bodyScale = new Vector3(1.1f, 1.1f, 1f),
+            bodyColor = new Color(1f, 0.45f, 0.2f),
+            isElite = true,
+            scoreWeight = 1
+        });
+
+        // 水：精英环绕怪，双瞄准
+        Register(new EnemyDef
+        {
+            id = "elite_shui",
+            displayName = "精英·水",
+            glyph = "水",
+            behavior = EnemyBehavior.Orbit,
+            shotPattern = EnemyShotPattern.DoubleAimed,
+            health = 40, moveSpeed = 3f, shootInterval = 1.6f,
+            bulletSpeed = 7.5f, bulletDamage = 1,
+            bodyScale = new Vector3(1.2f, 1.2f, 1f),
+            bodyColor = new Color(0.4f, 0.7f, 1f),
+            isElite = true,
+            scoreWeight = 1
+        });
+
+        // ===== 第三层：皇 的士兵 =====
+
+        // 兵：被"皇"召唤出来的士兵，列队缓慢推进，只做近战接触伤害
+        Register(new EnemyDef
+        {
+            id = "bing",
+            displayName = "兵",
+            glyph = "兵",
+            behavior = EnemyBehavior.Chase,
+            shotPattern = EnemyShotPattern.Aimed,
+            health = 10, moveSpeed = 2.2f, shootInterval = 2.8f,
+            bulletSpeed = 5.5f, bulletDamage = 1,
+            meleeDamage = 1f,
+            bodyScale = new Vector3(1f, 1f, 1f),
+            bodyColor = new Color(0.85f, 0.85f, 0.95f),
+            scoreWeight = 0            // 0 = 不会被随机池抽到，只能被召唤
+        });
+    }
+}
