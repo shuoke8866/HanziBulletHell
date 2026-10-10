@@ -59,3 +59,6 @@ Thumbs.db
 # Unity 许可证（敏感凭据，绝不入库）
 /UNITY_LICENSE_*.txt
 *.ulf
+
+# Unity 构建日志
+/_build*.log

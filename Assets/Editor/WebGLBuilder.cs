@@ -28,10 +28,10 @@ public static class WebGLBuilder
         "Assets/Scenes/Level3.unity"
     };
 
-    /// <summary>构建输出目录（相对项目根目录）</summary>
+    /// <summary>构建输出目录（相对项目根目录11）</summary>
     const string OutputFolder = "docs";
 
-    [MenuItem("Build/构建 WebGL 到 docs/")]
+    [MenuItem("Build/构建 WebGL 到 docs/", false, 1000)]
     public static void BuildFromMenu()
     {
         if (BuildInternal()) EditorUtility.DisplayDialog("构建完成",
@@ -39,6 +39,34 @@ public static class WebGLBuilder
             "接下来：把 docs/ 目录提交并推送到 GitHub，\n" +
             "然后在仓库 Settings → Pages 选择 main 分支的 /docs 目录。",
             "好的");
+    }
+
+    /// <summary>
+    /// 在原生「File → Build Settings」窗口底部插一个按钮。
+    /// 中文版 Unity 的主菜单会被本地化，自定义顶级菜单不易找到，
+    /// 所以这里额外提供一个一定看得见的入口。
+    /// </summary>
+    public class BuildSettingsButton
+    {
+        [InitializeOnLoadMethod]
+        static void Init()
+        {
+            BuildPlayerWindow.RegisterBuildPlayerHandler(OnBuildClicked);
+        }
+
+        static void OnBuildClicked(BuildPlayerOptions options)
+        {
+            // 如果用户选的目标就是 WebGL，走我们的构建流程
+            if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.WebGL)
+            {
+                if (BuildInternal()) EditorUtility.DisplayDialog("构建完成",
+                    $"WebGL 构建成功！\n\n产物位置：{OutputFolder}/", "好的");
+                return;
+            }
+
+            // 其他平台交给 Unity 默认流程
+            BuildPlayerWindow.DefaultBuildMethods.BuildPlayer(options);
+        }
     }
 
     /// <summary>供命令行调用（-executeMethod WebGLBuilder.Build）</summary>
