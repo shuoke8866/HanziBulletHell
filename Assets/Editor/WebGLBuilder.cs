@@ -26,8 +26,12 @@ public static class WebGLBuilder
     public static void Build()
     {
         ApplySettings();
+        SanityCheck();
 
-        string outputDir = "build/WebGL/HanziBulletHell";
+        // 用绝对路径，避免在 CI 的 Docker 容器里因工作目录不同而输出到错误位置。
+        // Application.dataPath = <项目根>/Assets，所以上一级就是项目根。
+        string projectRoot = System.IO.Directory.GetParent(Application.dataPath).FullName;
+        string outputDir = System.IO.Path.Combine(projectRoot, "build", "WebGL", "HanziBulletHell");
         System.IO.Directory.CreateDirectory(outputDir);
 
         var options = new BuildPlayerOptions
@@ -38,7 +42,10 @@ public static class WebGLBuilder
             options = BuildOptions.None
         };
 
-        Debug.Log($"[WebGLBuilder] 开始构建 → {outputDir}");
+        Debug.Log($"[WebGLBuilder] 项目根目录: {projectRoot}");
+        Debug.Log($"[WebGLBuilder] 输出目录  : {outputDir}");
+        Debug.Log($"[WebGLBuilder] 构建场景  : {string.Join(", ", Scenes)}");
+
         BuildReport report = BuildPipeline.BuildPlayer(options);
         BuildSummary summary = report.summary;
 
@@ -46,12 +53,43 @@ public static class WebGLBuilder
         {
             Debug.Log($"[WebGLBuilder] 构建成功，大小 {summary.totalSize / 1048576.0:0.0} MB，" +
                       $"耗时 {summary.totalTime.TotalSeconds:0} 秒");
+
+            // 打印产物，便于在 CI 日志里确认路径正确
+            foreach (string f in System.IO.Directory.GetFiles(outputDir))
+                Debug.Log($"[WebGLBuilder] 产物: {System.IO.Path.GetFileName(f)} " +
+                          $"({new System.IO.FileInfo(f).Length / 1024} KB)");
         }
         else
         {
             Debug.LogError($"[WebGLBuilder] 构建失败：{summary.result}，" +
                            $"错误 {summary.totalErrors} 个");
             EditorApplication.Exit(1);
+        }
+    }
+
+    /// <summary>构建前的自检：场景缺失、未加入 Build Settings 等都提前报错，便于排查</summary>
+    static void SanityCheck()
+    {
+        var missing = new System.Collections.Generic.List<string>();
+        foreach (string s in Scenes)
+            if (!System.IO.File.Exists(s)) missing.Add(s);
+
+        if (missing.Count > 0)
+        {
+            Debug.LogError($"[WebGLBuilder] 以下场景文件不存在，无法构建：\n  " +
+                           string.Join("\n  ", missing));
+            EditorApplication.Exit(1);
+        }
+
+        foreach (string s in Scenes)
+        {
+            bool inBuild = false;
+            foreach (var bs in EditorBuildSettings.scenes)
+                if (bs.path == s && bs.enabled) { inBuild = true; break; }
+
+            if (!inBuild)
+                Debug.LogWarning($"[WebGLBuilder] 场景 {s} 不在 Build Settings 的启用列表里" +
+                                 "（本脚本会显式传入场景列表，所以仍会构建，但建议补上）");
         }
     }
 
