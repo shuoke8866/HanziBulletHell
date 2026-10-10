@@ -181,9 +181,67 @@ public static class HanziFontFixer
             UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
         }
 
+        // --- 步骤 3：兜底 —— 直接改场景文件里指向"已删除字体资产"的引用 ---
+        //
+        // 步骤 2 依赖 FindObjectsOfType，而它跳过当前打开的场景，
+        // 所以被打开的那个场景（通常是 Level1）会被漏掉。
+        // 这里直接读场景文件文本，把任何"指向已不存在资产"的字体引用换成新字体，幂等且不依赖场景状态。
+        replaced += RewriteStaleFontGuids(font);
+
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log($"[HanziFontFixer] 已修正 {replaced} 个文本组件的字体。");
+        Debug.Log($"[HanziFontFixer] 已修正 {replaced} 处字体引用。");
+    }
+
+    /// <summary>
+    /// 扫描构建设置里的场景文件，把指向已删除字体资产的 GUID 替换为新字体的 GUID。
+    /// 直接操作文件的文本内容，因此不受"场景是否打开"影响。
+    /// </summary>
+    static int RewriteStaleFontGuids(TMP_FontAsset font)
+    {
+        string newGuid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(font));
+        if (string.IsNullOrEmpty(newGuid))
+        {
+            Debug.LogWarning("[HanziFontFixer] 取不到新字体的 GUID，跳过兜底修复。");
+            return 0;
+        }
+
+        int total = 0;
+        foreach (EditorBuildSettingsScene s in EditorBuildSettings.scenes)
+        {
+            if (!s.enabled || string.IsNullOrEmpty(s.path)) continue;
+            if (!File.Exists(s.path)) continue;
+
+            string text = File.ReadAllText(s.path, Encoding.UTF8);
+            int changed = 0;
+
+            // 匹配所有 m_fontAsset 引用，逐个判断资产是否还存在
+            text = Regex.Replace(text,
+                @"m_fontAsset: \{fileID: (-?\d+), guid: ([0-9a-fA-F]{32}), type: \d+\}",
+                m =>
+                {
+                    string guid = m.Groups[2].Value;
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+
+                    // 资产存在就保留
+                    if (!string.IsNullOrEmpty(path)) return m.Value;
+
+                    // 资产已删除 → 换成新字体
+                    changed++;
+                    return $"m_fontAsset: {{fileID: {m.Groups[1].Value}, guid: {newGuid}, type: 3}}";
+                });
+
+            if (changed > 0)
+            {
+                File.WriteAllText(s.path, text, new UTF8Encoding(false));
+                Debug.Log($"[HanziFontFixer] {System.IO.Path.GetFileName(s.path)}: " +
+                          $"修复 {changed} 处指向已删除字体的引用。");
+                total += changed;
+            }
+        }
+
+        if (total > 0) AssetDatabase.Refresh();
+        return total;
     }
 
     static int ReplaceInOpenScenes(TMP_FontAsset font)
