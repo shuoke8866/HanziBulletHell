@@ -171,9 +171,17 @@ public static class WebGLBuilder
 
     static void ApplySettings()
     {
-        // --- 关键：GZip 压缩。GitHub Pages 无法为 .br 发送 Content-Encoding，
-        //     用 Brotli 会导致页面加载失败 ---
-        PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
+        // --- 关键：关闭压缩 ---
+        //
+        // 原因：Unity 的 WebGL 加载器是用 <script> 标签直接注入 framework 文件的，
+        // 而浏览器不会自动解压 <script> 加载的 gzip/brotli 内容 —— 它依赖服务器
+        // 发送 Content-Encoding: br / gzip 响应头。
+        // GitHub Pages 对静态文件不会发送这类响应头，所以用 Brotli 或 GZip 都会报：
+        //   "Unable to parse Build/xxx.framework.js.gz!"
+        //
+        // 关闭压缩后产出普通的 .js/.wasm/.data 文件，任何静态服务器都能直接跑。
+        // 代价是体积变大（约 30-35 MB），但换来的是零服务器配置要求。
+        PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
         PlayerSettings.WebGL.decompressionFallback = false;
 
         // --- 网页端友好设置 ---
@@ -190,7 +198,7 @@ public static class WebGLBuilder
         PlayerSettings.SplashScreen.show = false;
 
         AssetDatabase.SaveAssets();
-        Debug.Log("[WebGLBuilder] 已应用设置：GZip 压缩 / 1280x720 / 关闭启动画面");
+        Debug.Log("[WebGLBuilder] 已应用设置：不压缩（兼容 GitHub Pages）/ 1280x720 / 关闭启动画面");
     }
 }
 #endif
