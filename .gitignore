@@ -55,3 +55,7 @@ Thumbs.db
 /_*.txt
 /_*.dll
 /_*.json
+
+# Unity 许可证（敏感凭据，绝不入库）
+/UNITY_LICENSE_*.txt
+*.ulf

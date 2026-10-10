@@ -4,7 +4,7 @@
 
 **用汉字笔画拼出你的武器 —— 一款以「造字」为核心机制的 2D 肉鸽弹幕游戏**
 
-[![Play Now](https://img.shields.io/badge/▶_在线试玩-GitHub_Pages-2ea44f?style=for-the-badge)](https://YOUR_USERNAME.github.io/HanziBulletHell/)
+[![Play Now](https://img.shields.io/badge/▶_在线试玩-GitHub_Pages-2ea44f?style=for-the-badge)](https://shuoke8866.github.io/HanziBulletHell/)
 ![Unity](https://img.shields.io/badge/Unity-2022.3.62f3c1-000000?style=for-the-badge&logo=unity)
 ![C#](https://img.shields.io/badge/C%23-100%25-239120?style=for-the-badge&logo=csharp)
 
@@ -24,7 +24,7 @@
 
 ## 🎮 在线试玩
 
-> **https://YOUR_USERNAME.github.io/HanziBulletHell/**
+> **https://shuoke8866.github.io/HanziBulletHell/**
 >
 > 纯浏览器运行（WebGL），无需下载安装。建议用 Chrome / Edge。
 

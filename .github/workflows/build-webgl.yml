@@ -44,7 +44,10 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           targetPlatform: WebGL
-          unityVersion: 2022.3.62f3c1
+          # 必须用国际版版本号（f1 后缀）。
+          # 项目原本是 Unity 中国版 2022.3.62f3c1，GameCI 没有 c1 后缀的镜像，
+          # 会导致构建在 10 秒内失败。
+          unityVersion: 2022.3.62f1
           # 自定义构建脚本：强制 GZip 压缩（GitHub Pages 无法服务 Brotli）
           buildMethod: WebGLBuilder.Build
           # 构建过程中字体图集会重新烘焙，会产生文件改动
