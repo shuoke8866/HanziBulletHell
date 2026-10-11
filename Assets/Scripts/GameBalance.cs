@@ -35,6 +35,15 @@ public static class GameBalance
     /// <summary>额外敌人数量上限</summary>
     public const int MaxExtraEnemies = 4;
 
+    // ---------- BOSS 调试 ----------
+    /// <summary>
+    /// BOSS 血量总倍率（调试用）。
+    ///
+    /// 0.35 = 测试模式，便于快速打到关底验证流程；
+    /// 1.0  = 正式数值，改这一行就能一键切换，不必去翻 Room.cs。
+    /// </summary>
+    public const float BossHealthMultiplier = 0.35f;
+
     // ---------- 玩家 ----------
     /// <summary>玩家基础移速</summary>
     public const float PlayerMoveSpeed = 6f;

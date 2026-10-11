@@ -351,6 +351,11 @@ public class Room : MonoBehaviour
         // 目标时长已包含层数倍率（HealthForFight 内部会除掉倍率），
         // 所以这里只做一次乘法，不要再把倍率也喂给 HealthForFight，
         // 否则倍率会被平方放大 —— 曾经就是这么写出 170 秒 BOSS 战的。
+        //
+        // 最后统一乘 GameBalance.BossHealthMultiplier：测试期调小便于快速打到关底，
+        // 正式数值把它改回 1.0 即可，不用动这里的代码。
+
+        float bossMul = Mathf.Max(0.01f, GameBalance.BossHealthMultiplier);
 
         BossShi bossScript = enemy.GetComponent<BossShi>();
         if (bossScript != null)
@@ -359,18 +364,17 @@ public class Room : MonoBehaviour
             bossScript.maxHealth = Mathf.Max(1, Mathf.RoundToInt(
                 PlayerPower.HealthForFight(bossScript.maxHealth, 14f,
                     GameManager.FloorHealthMultiplier)
-                * GameManager.FloorHealthMultiplier));
+                * GameManager.FloorHealthMultiplier * bossMul));
         }
 
         BossGuan bossGuan = enemy.GetComponent<BossGuan>();
         if (bossGuan != null)
         {
             bossGuan.SetRoom(this);
-            // 目标时长 16s：按玩家要求把第二关 BOSS 血量调低（原 22s 偏长）
             bossGuan.maxHealth = Mathf.Max(1, Mathf.RoundToInt(
                 PlayerPower.HealthForFight(bossGuan.maxHealth, 16f,
                     GameManager.FloorHealthMultiplier)
-                * GameManager.FloorHealthMultiplier));
+                * GameManager.FloorHealthMultiplier * bossMul));
         }
 
         // 第三层关底 BOSS「皇」：最长的战斗，但也要有上限
@@ -381,7 +385,7 @@ public class Room : MonoBehaviour
             bossHuang.maxHealth = Mathf.Max(1, Mathf.RoundToInt(
                 PlayerPower.HealthForFight(bossHuang.maxHealth, 30f,
                     GameManager.FloorHealthMultiplier)
-                * GameManager.FloorHealthMultiplier));
+                * GameManager.FloorHealthMultiplier * bossMul));
         }
     }
 

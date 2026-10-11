@@ -3,13 +3,13 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 死亡结算页。
+/// 死亡结算页（极简版）。
 ///
-/// 为什么需要：原来 PlayerHealth.Die() 直接 LoadScene 重开，玩家看不到任何
-/// "这轮做了什么"的反馈，缺少完成感；对作品集来说也浪费了一次展示数据的机会。
+/// 只保留：正在结束的提示 + 重开按钮。
+/// 不再展示层数/击杀/笔画等长串统计，也不放"真肉鸽"之类的说明文案。
 ///
-/// 现在死亡流程：Die() → 显示结算（暂停）→ 玩家点重开 → 清空进度回到第 1 层。
-/// 结算数据来自 GameData 的本轮统计。
+/// 死亡流程：PlayerHealth.Die() → 显示本页（暂停）→ 点重开 → 
+/// 清空进度回到第 1 层。暂停是必要的，否则怪物会继续打已经死掉的玩家。
 /// </summary>
 public class GameOverUI : MonoBehaviour
 {
@@ -31,58 +31,28 @@ public class GameOverUI : MonoBehaviour
 
     void Build(System.Action restartAction)
     {
-        // 结算时暂停，避免怪物继续打
         Time.timeScale = 0f;
         waiting = true;
 
-        // 允许背包 UI 的暂停状态被复位，否则界面会互相压住
+        // 背包可能还开着，先收掉，否则两个界面会互相压住
         if (BackpackUI.IsOpen)
         {
             var bp = FindObjectOfType<BackpackUI>();
             if (bp != null) bp.Close();
         }
+
         Canvas canvas = UIBuild.GetOrCreateCanvas();
 
         RectTransform full = UIBuild.FullScreen(canvas.transform, "GameOver");
         root = full.gameObject;
-        UIBuild.Background(full, new Color(0.10f, 0.02f, 0.03f, 0.90f));
+        UIBuild.Background(full, new Color(0.08f, 0.02f, 0.03f, 0.88f));
 
         var g = root.AddComponent<CanvasGroup>();
         g.blocksRaycasts = true;
 
-        // ---- 标题 ----
-        var title = UIBuild.Text(full, "Title", "本 轮 结 束",
-            86f, TextAlignmentOptions.Center, new Color(1f, 0.55f, 0.5f));
-        UIBuild.AnchorTop(title.rectTransform, -140f, 1400f, 120f);
-
-        // ---- 成绩 ----
-        int floor = GameData.currentFloor;
-        string stats =
-            $"到达层数      <color=#ffd97a>{floor}</color>\n" +
-            $"击杀小怪      <color=#ffd97a>{GameData.enemiesKilled}</color>\n" +
-            $"击败 BOSS     <color=#ffd97a>{GameData.bossesKilled}</color>\n" +
-            $"收集笔画      <color=#ffd97a>{GameData.strokesCollected}</color>\n" +
-            $"最终汉字      <color=#9fe8a0>{CurrentHanziName()}</color>";
-
-        var statText = UIBuild.Text(full, "Stats", stats,
-            40f, TextAlignmentOptions.Left, Color.white);
-        UIBuild.AnchorTop(statText.rectTransform, -320f, 860f, 340f);
-        statText.lineSpacing = 22f;
-
-        // ---- 最终字形展示 ----
-        Sprite sp = HanziRenderer.CreateSpriteFor(CurrentHanziName(), 128);
-        if (sp != null)
-        {
-            var img = UIBuild.GlyphImage(full, "FinalGlyph", sp, 190f,
-                new Color(1f, 0.92f, 0.72f));
-            img.rectTransform.anchoredPosition = new Vector2(340f, 10f);
-        }
-
-        // ---- 提示 ----
-        var hint = UIBuild.Text(full, "Hint",
-            "真肉鸽：所有笔画已清空，将从第 1 层重新开始",
-            32f, TextAlignmentOptions.Center, new Color(0.75f, 0.78f, 0.88f));
-        UIBuild.AnchorBottom(hint.rectTransform, 210f, 1400f, 50f);
+        var title = UIBuild.Text(full, "Title", "游 戏 结 束",
+            88f, TextAlignmentOptions.Center, new Color(1f, 0.6f, 0.55f));
+        UIBuild.AnchorTop(title.rectTransform, -300f, 1400f, 130f);
 
         MakeRestartButton(full, restartAction);
 
@@ -90,37 +60,26 @@ public class GameOverUI : MonoBehaviour
         Fx.Shake(0.9f);
     }
 
-    static string CurrentHanziName()
-    {
-        // 死亡时玩家身上的汉字存在 GameData.currentStrokes 里
-        var hs = Object.FindObjectOfType<HanziSystem>();
-        if (hs != null && !string.IsNullOrEmpty(hs.currentHanziName))
-            return hs.currentHanziName;
-
-        return GameData.currentStrokes != null && GameData.currentStrokes.Count > 0
-            ? "一" : "—";
-    }
-
     void MakeRestartButton(RectTransform parent, System.Action restartAction)
     {
         var go = new GameObject("RestartButton");
         go.transform.SetParent(parent, false);
         var rt = go.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.5f, 0f);
-        rt.anchorMax = new Vector2(0.5f, 0f);
-        rt.pivot = new Vector2(0.5f, 0f);
-        rt.anchoredPosition = new Vector2(0f, 300f);
-        rt.sizeDelta = new Vector2(460f, 100f);
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(0f, -80f);
+        rt.sizeDelta = new Vector2(400f, 96f);
 
         var img = go.AddComponent<Image>();
-        img.color = new Color(0.45f, 0.16f, 0.18f, 0.96f);
+        img.color = new Color(0.42f, 0.15f, 0.17f, 0.96f);
 
         var btn = go.AddComponent<Button>();
         btn.targetGraphic = img;
         btn.onClick.AddListener(() => Restart(restartAction));
 
         var label = UIBuild.Text(go.transform, "Label", "重 新 开 始",
-            42f, TextAlignmentOptions.Center, new Color(1f, 0.92f, 0.9f));
+            40f, TextAlignmentOptions.Center, new Color(1f, 0.93f, 0.9f));
         var lrt = label.rectTransform;
         lrt.anchorMin = Vector2.zero;
         lrt.anchorMax = Vector2.one;
@@ -132,11 +91,10 @@ public class GameOverUI : MonoBehaviour
     {
         if (!waiting) return;
 
-        // 键盘也能重开（结算时 timeScale = 0，所以用 unscaledTime 无关，这里只要按键）
+        // 键盘也能重开。结算时 timeScale = 0，所以只响应按下事件即可
         if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space) ||
             Input.GetKeyDown(KeyCode.R) || Input.GetKeyDown(KeyCode.Escape))
         {
-            // Escape 也用来重开：结算状态下没有别的含义
             var btn = root != null ? root.GetComponentInChildren<Button>() : null;
             if (btn != null) btn.onClick.Invoke();
         }
@@ -155,6 +113,11 @@ public class GameOverUI : MonoBehaviour
         if (root != null) Destroy(root);
         instance = null;
         Destroy(gameObject);
+
+        // 重开后回到第 1 层，让开始页再出现一次 ——
+        // 否则"首次启动有开始页、重开却直接进游戏"，行为不一致。
+        // StartScreen 自带 0.35s 输入防抖，不会因为玩家还按着键就立刻被关掉。
+        StartScreen.ResetForNewRun();
 
         if (restartAction != null) restartAction();
     }
