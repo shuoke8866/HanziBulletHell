@@ -283,4 +283,20 @@ public class Fx : MonoBehaviour
         EmitBurst(pos, 20, ProcTex.Dot, new Color(1f, 0.9f, 0.45f, 1f),
             3.5f, 8f, 0.12f, 0.34f, 0.65f);
     }
+
+    /// <summary>
+    /// 敌人生成预警：红色向内收拢的光点。
+    ///
+    /// 作用：原本下一波敌人是凭空出现的，玩家没有反应时间。
+    /// 在生成点先闪一下预警，玩家就能提前走位 —— 这是弹幕游戏的基本礼貌。
+    /// 速度设为负值让粒子"从外向内收"，暗示"有什么东西要在这里出现"。
+    /// </summary>
+    public static void SpawnTelegraph(Vector3 pos, float duration = 0.7f)
+    {
+        // 向内收：用负速度会往外飞，所以改用短寿命 + 大尺寸来表现"聚集"
+        EmitBurst(pos, 10, ProcTex.Dot, new Color(1f, 0.35f, 0.3f, 1f),
+            0f, 0.35f, 0.28f, 0.5f, duration);
+        EmitBurst(pos, 4, ProcTex.Streak, new Color(1f, 0.6f, 0.5f, 0.9f),
+            0.3f, 1.2f, 0.1f, 0.22f, duration);
+    }
 }

@@ -183,11 +183,39 @@ public class Room : MonoBehaviour
 
         int count = baseCount + extra;
 
+        // 第 1 波在进门瞬间生成（此时玩家正在跨门，没有反应时间也没关系）；
+        // 后续波次先给预警，避免敌人在玩家毫无准备时凭空出现。
+        bool telegraph = currentWave > 1 && waveTelegraph > 0.01f;
+
+        if (telegraph)
+        {
+            for (int i = 0; i < count; i++)
+                Fx.SpawnTelegraph(GetSpawnPosition(i), waveTelegraph);
+
+            Sfx.Play(Sfx.Id.Error, 0.28f);
+            StartCoroutine(SpawnAfterDelay(count, waveTelegraph));
+        }
+        else
+        {
+            for (int i = 0; i < count; i++)
+                SpawnOne(i);
+        }
+
+        GameLog.Info($"「{name}」第 {currentWave}/{Mathf.Max(1, waveCount)} 波" +
+                     $"{(telegraph ? $"（预警 {waveTelegraph:0.0}s 后）" : "")}，生成 {count} 只");
+    }
+
+    System.Collections.IEnumerator SpawnAfterDelay(int count, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+
+        // 房间可能在等待期间被清掉（例如玩家死亡重开）
         for (int i = 0; i < count; i++)
             SpawnOne(i);
-
-        GameLog.Info($"「{name}」第 {currentWave}/{Mathf.Max(1, waveCount)} 波，生成 {count} 只");
     }
+
+    /// <summary>下一波的预警时长（秒）。0 = 不预警</summary>
+    public float waveTelegraph = 0.7f;
 
     int GetBaseEnemyCount()
     {
@@ -314,12 +342,20 @@ public class Room : MonoBehaviour
             enemyScript.moveSpeed *= GameManager.FloorSpeedMultiplier;
         }
 
+        // ---- BOSS 血量：按玩家战力动态缩放 ----
+        //
+        // 目标时长已包含层数倍率（HealthForFight 内部会除掉倍率），
+        // 所以这里只做一次乘法，不要再把倍率也喂给 HealthForFight，
+        // 否则倍率会被平方放大 —— 曾经就是这么写出 170 秒 BOSS 战的。
+
         BossShi bossScript = enemy.GetComponent<BossShi>();
         if (bossScript != null)
         {
             bossScript.SetRoom(this);
             bossScript.maxHealth = Mathf.Max(1, Mathf.RoundToInt(
-                bossScript.maxHealth * GameManager.FloorHealthMultiplier));
+                PlayerPower.HealthForFight(bossScript.maxHealth, 14f,
+                    GameManager.FloorHealthMultiplier)
+                * GameManager.FloorHealthMultiplier));
         }
 
         BossGuan bossGuan = enemy.GetComponent<BossGuan>();
@@ -327,16 +363,20 @@ public class Room : MonoBehaviour
         {
             bossGuan.SetRoom(this);
             bossGuan.maxHealth = Mathf.Max(1, Mathf.RoundToInt(
-                bossGuan.maxHealth * GameManager.FloorHealthMultiplier));
+                PlayerPower.HealthForFight(bossGuan.maxHealth, 22f,
+                    GameManager.FloorHealthMultiplier)
+                * GameManager.FloorHealthMultiplier));
         }
 
-        // 第三层关底 BOSS「皇」
+        // 第三层关底 BOSS「皇」：最长的战斗，但也要有上限
         BossHuang bossHuang = enemy.GetComponent<BossHuang>();
         if (bossHuang != null)
         {
             bossHuang.SetRoom(this);
             bossHuang.maxHealth = Mathf.Max(1, Mathf.RoundToInt(
-                bossHuang.maxHealth * GameManager.FloorHealthMultiplier));
+                PlayerPower.HealthForFight(bossHuang.maxHealth, 30f,
+                    GameManager.FloorHealthMultiplier)
+                * GameManager.FloorHealthMultiplier));
         }
     }
 
