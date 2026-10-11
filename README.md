@@ -1,10 +1,10 @@
 <div align="center">
 
-# 汉字弹幕地狱 · Hanzi Bullet Hell
+# 相信字 · Trust Hanzi
 
 **用汉字笔画拼出你的武器 —— 一款以「造字」为核心机制的 2D 肉鸽弹幕游戏**
 
-[![Play Now](https://img.shields.io/badge/▶_在线试玩-GitHub_Pages-2ea44f?style=for-the-badge)](https://shuoke8866.github.io/HanziBulletHell/)
+[![Play Now](https://img.shields.io/badge/▶_在线试玩-GitHub_Pages-2ea44f?style=for-the-badge)](https://shuoke8866.github.io/trust-hanzi/)
 ![Unity](https://img.shields.io/badge/Unity-2022.3.62f3c1-000000?style=for-the-badge&logo=unity)
 ![C#](https://img.shields.io/badge/C%23-100%25-239120?style=for-the-badge&logo=csharp)
 
@@ -24,7 +24,7 @@
 
 ## 🎮 在线试玩
 
-> **https://shuoke8866.github.io/HanziBulletHell/**
+> **https://shuoke8866.github.io/trust-hanzi/**
 >
 > 纯浏览器运行（WebGL），无需下载安装。建议用 Chrome / Edge。
 
@@ -170,17 +170,20 @@ Assets/
 **方式二（命令行）**：
 
 ```powershell
-& "F:\2022.3.62f3c1\Editor\Unity.exe" -quit -batchmode -nographics `
-  -projectPath "F:\HanziBulletHell" `
+& "<Unity 安装路径>\Editor\Unity.exe" -quit -batchmode -nographics `
+  -projectPath "<本项目路径>" `
   -executeMethod WebGLBuilder.Build `
   -logFile -
 ```
 
 构建脚本（[`Assets/Editor/WebGLBuilder.cs`](Assets/Editor/WebGLBuilder.cs)）会自动：
 
-- 强制使用 **GZip** 压缩 —— GitHub Pages 无法为 `.br` 发送 `Content-Encoding: br`，
-  Unity 默认的 Brotli 会导致页面加载失败
+- **关闭压缩**。Unity 的 WebGL 加载器用 `<script src>` 注入 framework 文件，
+  而浏览器不会自动解压 `<script>` 加载的 gzip/brotli 内容 —— 它依赖服务器发送
+  `Content-Encoding` 响应头，而 GitHub Pages 对静态文件不发这个头。
+  用 Brotli/GZip 会直接报 `Unable to parse Build/xxx.framework.js.gz!`
 - 关闭 Unity 启动画面、设置 1280×720、开启数据缓存
+- 托管代码剥离 High + 剥离引擎代码 + IL2CPP Master 编译（压缩 wasm）
 - 构建前自检（WebGL 模块是否安装、场景是否存在），缺什么就打印可读的报错
 
 构建完成后提交并推送 `docs/` 即可更新线上版本。

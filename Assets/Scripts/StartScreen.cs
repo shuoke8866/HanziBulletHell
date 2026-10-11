@@ -5,8 +5,8 @@ using UnityEngine.UI;
 /// <summary>
 /// 开始页（极简版）。
 ///
-/// 只有：游戏标题 + 「开始游戏」按钮。
-/// 不放玩法说明、键位表、字形展示、"真肉鸽"之类的说明文案 ——
+/// 只有：游戏标题「相信字」+ 「开始游戏」按钮。
+/// 不放玩法说明、键位表、字形展示之类的说明文案 ——
 /// 那些内容对第一次打开的人反而是噪音，说明放 README 更合适。
 ///
 /// 显示时机：本轮从第 1 层开始时出现一次。死亡重开后不再出现，
@@ -54,8 +54,8 @@ public class StartScreen : MonoBehaviour
         var group = root.AddComponent<CanvasGroup>();
         group.blocksRaycasts = true;
 
-        var title = UIBuild.Text(full, "Title", "汉 字 弹 幕 地 狱",
-            92f, TextAlignmentOptions.Center, new Color(1f, 0.96f, 0.72f));
+        var title = UIBuild.Text(full, "Title", "相 信 字",
+            100f, TextAlignmentOptions.Center, new Color(1f, 0.96f, 0.72f));
         UIBuild.AnchorTop(title.rectTransform, -420f, 1500f, 130f);
 
         MakeStartButton(full);
