@@ -1,4 +1,4 @@
-%YAML 1.1
+  ✓ Room4 : roomType→4, useDatabasePool→0   ✓ Room2-2 : roomType→2, useDatabasePool→1   ✓ Room2-1 : roomType→3, useDatabasePool→0   ✓ Room2 : roomType→1, useDatabasePool→1   ✓ Room1 : roomType→0, useDatabasePool→0 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!29 &1
 OcclusionCullingSettings:
@@ -2331,10 +2331,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9626d0948766f64cafbad6e6d2be138, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  roomType: 1
+  roomType: 3
   doors:
   - {fileID: 453549890}
-  useDatabasePool: 1
+  useDatabasePool: 0
   singleDefId: 
   enemyPrefabs: []
   enemySpawnPoints: []
@@ -2587,10 +2587,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9626d0948766f64cafbad6e6d2be138, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  roomType: 1
+  roomType: 4
   doors:
   - {fileID: 849504940}
-  useDatabasePool: 1
+  useDatabasePool: 0
   singleDefId: 
   enemyPrefabs:
   - {fileID: 5860914716362875413, guid: 32a029e01437f214aa9ba183a8297b4d, type: 3}
@@ -3641,10 +3641,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9626d0948766f64cafbad6e6d2be138, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  roomType: 1
+  roomType: 0
   doors:
   - {fileID: 1666194946}
-  useDatabasePool: 1
+  useDatabasePool: 0
   singleDefId: 
   enemyPrefabs: []
   enemySpawnPoints: []
@@ -5018,7 +5018,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9626d0948766f64cafbad6e6d2be138, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  roomType: 1
+  roomType: 2
   doors:
   - {fileID: 1953849525}
   - {fileID: 2115811503}

@@ -237,7 +237,11 @@ public class Room : MonoBehaviour
         }
 
         // 2) 数据库随机池
-        if (useDatabasePool || enemyPrefabs.Count == 0)
+        //
+        // 条件里加了 enemyPrefabs.Count == 0：只要房间显式配了预制体，就应该用它。
+        // 原来的写法是 (useDatabasePool || 无预制体)，于是"同时勾了数据库池 + 配了 Boss 预制体"
+        // 的房间会先生成随机杂兵并 return，Boss 永远不出现 —— 第二关的 Boss 房就是这么空掉的。
+        if (enemyPrefabs.Count == 0 && useDatabasePool)
         {
             bool allowElite = roomType == RoomType.Elite || roomType == RoomType.Boss || GameData.currentFloor >= 3;
             float eliteChance = roomType == RoomType.Elite ? 0.75f : 0.12f;
@@ -362,8 +366,9 @@ public class Room : MonoBehaviour
         if (bossGuan != null)
         {
             bossGuan.SetRoom(this);
+            // 目标时长 16s：按玩家要求把第二关 BOSS 血量调低（原 22s 偏长）
             bossGuan.maxHealth = Mathf.Max(1, Mathf.RoundToInt(
-                PlayerPower.HealthForFight(bossGuan.maxHealth, 22f,
+                PlayerPower.HealthForFight(bossGuan.maxHealth, 16f,
                     GameManager.FloorHealthMultiplier)
                 * GameManager.FloorHealthMultiplier));
         }

@@ -156,9 +156,6 @@ public class GameOverUI : MonoBehaviour
         instance = null;
         Destroy(gameObject);
 
-        // 让标题页在下一轮重新出现
-        TitleScreen.ResetForNewRun();
-
         if (restartAction != null) restartAction();
     }
 }
