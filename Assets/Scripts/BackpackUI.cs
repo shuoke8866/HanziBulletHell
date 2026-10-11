@@ -405,6 +405,27 @@ public class BackpackUI : MonoBehaviour
     }
 
     // ================= 开关 =================
+
+    /// <summary>
+    /// 关闭背包（供外部调用，例如玩家死亡时弹结算页需要先收掉背包）。
+    /// 与 Toggle 的区别：已经是关闭状态时不会反而打开，且允许设置 timeScale。
+    /// </summary>
+    public void Close(bool restoreTimeScale = false)
+    {
+        if (!isOpen) return;
+
+        isOpen = false;
+        IsOpen = false;
+
+        if (backpackPanel != null) backpackPanel.SetActive(false);
+        if (usingRuntimePanel && runtimePanel != null) runtimePanel.SetActive(false);
+
+        CancelChoice();
+
+        // 结算页会自己把 timeScale 设为 0，所以由调用方决定是否复位
+        if (restoreTimeScale) Time.timeScale = 1f;
+    }
+
     void Toggle()
     {
         isOpen = !isOpen;

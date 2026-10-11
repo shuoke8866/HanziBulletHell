@@ -76,6 +76,8 @@ public class PlayerController : MonoBehaviour
 
             // 射击音效：轻音量 + 音高抖动，密集连射时不会吵
             Sfx.PlayVaried(Sfx.Id.Shoot, 0.35f, 0.10f);
+            // 极轻的镜头回馈：连射时会形成节奏感，但量很小以免累加成晕眩
+            Fx.Shake(0.04f);
         }
     }
 

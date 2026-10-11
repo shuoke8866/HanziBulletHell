@@ -4,7 +4,7 @@ using UnityEngine;
 /// 数据驱动的敌人。所有属性/行为/弹幕形态都来自 EnemyDatabase 里的 EnemyDef，
 /// 不再在这里硬编码类型分支——加新怪只要往 EnemyDatabase 里加定义。
 /// </summary>
-public class Enemy : MonoBehaviour
+public class Enemy : MonoBehaviour, IDamageable
 {
     [Header("数据定义")]
     [Tooltip("EnemyDatabase 里的 id，例如 yi / shu / kou / ren / mu / tian / elite_wang")]
@@ -414,10 +414,24 @@ public class Enemy : MonoBehaviour
 
     public void TakeDamage(int damage)
     {
+        TakeDamage(damage, Vector2.zero);
+    }
+
+    /// <summary>带命中方向的版本：用于火花朝向与屏幕震动的方向感</summary>
+    public void TakeDamage(int damage, Vector2 hitDirection)
+    {
         currentHealth -= damage;
+
+        Fx.HitSpark(transform.position, hitDirection, FxTint);
+        Fx.Shake(0.15f);
+
         Sfx.PlayVaried(Sfx.Id.Hit, 0.22f, 0.12f);
         if (currentHealth <= 0) Die();
     }
+
+    // ---------- IDamageable ----------
+    public Color FxTint { get { return def != null ? def.bodyColor : Color.white; } }
+    public Vector3 FxPosition { get { return transform.position; } }
 
     public void ApplyFire(float dps, float duration)
     {
@@ -451,7 +465,10 @@ public class Enemy : MonoBehaviour
 
     void Die()
     {
+        Fx.DeathBurst(transform.position, FxTint);
+        Fx.Shake(0.28f);
         Sfx.PlayVaried(Sfx.Id.EnemyDie, 0.30f, 0.10f);
+
         if (currentRoom != null)
             currentRoom.OnEnemyDied(gameObject);
         GameManager.Instance?.OnEnemyKilled(transform.position);

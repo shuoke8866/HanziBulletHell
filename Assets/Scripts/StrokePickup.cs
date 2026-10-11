@@ -89,6 +89,9 @@ public class StrokePickup : MonoBehaviour
             collected = true;
             GameData.strokesCollected++;
             Sfx.Play(Sfx.Id.Combine, 0.5f);
+            // 合成演出放在玩家身上：笔画已被消耗，放在笔画原位置会显得脱节
+            Fx.SynthesisBurst(other.transform.position, StrokeUtil.ColorOf(strokeType));
+            Fx.Shake(0.10f);
             Destroy(gameObject);
         }
         // 合成失败 → 进背包
@@ -97,6 +100,7 @@ public class StrokePickup : MonoBehaviour
             collected = true;
             GameData.strokesCollected++;
             Sfx.PlayVaried(Sfx.Id.Pickup, 0.45f);
+            Fx.PickupPop(transform.position, StrokeUtil.ColorOf(strokeType));
             GameToast.Show($"拾取 {StrokeUtil.NameOf(strokeType)}（存背包）", StrokeUtil.ColorOf(strokeType));
             Destroy(gameObject);
         }

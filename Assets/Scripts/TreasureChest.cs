@@ -43,6 +43,7 @@ public class TreasureChest : MonoBehaviour
         isOpened = true;
 
         Sfx.Play(Sfx.Id.Boon, 0.45f);
+        Fx.PickupPop(transform.position, new Color(1f, 0.9f, 0.5f));
         GameLog.Info("宝箱打开！获得笔画：" + dropStrokeType);
 
         // 直接把笔画给玩家；合不上就进背包（和拾取逻辑一致，避免白白浪费）

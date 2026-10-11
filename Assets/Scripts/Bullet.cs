@@ -51,33 +51,26 @@ public class Bullet : MonoBehaviour
         {
             bool hitTarget = false;
 
-            // 先尝试普通敌人
-            Enemy enemy = other.GetComponent<Enemy>();
-            if (enemy != null)
+            // 用接口而不是逐个 GetComponent<BossXxx>()：
+            // 之前是 BossShi / BossGuan 分别判断，结果 BossHuang 被漏掉，
+            // 最终 BOSS「皇」完全打不掉血、第 3 层无法通关。
+            var target = other.GetComponent<IDamageable>();
+            if (target != null)
             {
-                enemy.TakeDamage(damage);
-                if (hasFireBuff)
-                    enemy.ApplyFire(fireDPS, fireDuration);
-                if (hasSlowBuff)
-                    enemy.ApplySlow(slowMultiplier, slowDuration);
+                Vector2 hitDir = moveDirection.sqrMagnitude > 0.0001f
+                    ? moveDirection.normalized
+                    : Vector2.zero;
+
+                target.TakeDamage(damage, hitDir);
+
+                // 附加效果只对普通敌人有意义（BOSS 走自己的逻辑）
+                Enemy enemy = other.GetComponent<Enemy>();
+                if (enemy != null)
+                {
+                    if (hasFireBuff) enemy.ApplyFire(fireDPS, fireDuration);
+                    if (hasSlowBuff) enemy.ApplySlow(slowMultiplier, slowDuration);
+                }
                 hitTarget = true;
-            }
-            else
-            {
-                // BossShi
-                BossShi bossShi = other.GetComponent<BossShi>();
-                if (bossShi != null)
-                {
-                    bossShi.TakeDamage(damage);
-                    hitTarget = true;
-                }
-                // BossGuan，和BossShi逻辑保持一致
-                BossGuan bossGuan = other.GetComponent<BossGuan>();
-                if (bossGuan != null)
-                {
-                    bossGuan.TakeDamage(damage);
-                    hitTarget = true;
-                }
             }
 
             // 命中目标才处理穿透
@@ -99,6 +92,8 @@ public class Bullet : MonoBehaviour
             {
                 ph.TakeDamage(damage);
             }
+            Fx.PlayerHit(other.transform.position);
+            Fx.Shake(0.40f, -moveDirection);
             Destroy(gameObject);
         }
         // 碰到墙壁消失

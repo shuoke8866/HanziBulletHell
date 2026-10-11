@@ -10,7 +10,7 @@ using UnityEngine;
 ///   - 血量低于 50% 后进入「暴怒」：招式更快、召唤更多
 ///   - 击败后掉落大量笔画并生成传送门
 /// </summary>
-public class BossHuang : MonoBehaviour
+public class BossHuang : MonoBehaviour, IDamageable
 {
     [Header("属性")]
     public int maxHealth = 1100;
@@ -55,6 +55,10 @@ public class BossHuang : MonoBehaviour
     {
         currentHealth = maxHealth;
         player = PlayerRef.Transform;
+        // BOSS 入场演出：强烈的镜头震动 + 金色爆发，配合 HP 条的"压迫感"
+        Fx.Shake(0.85f);
+        Fx.RoomClearBurst(transform.position);
+        Sfx.Play(Sfx.Id.RoomClear, 0.8f);
 
         nextRingTime = Time.time + 2f;
         nextFanTime = Time.time + 3f;
@@ -201,7 +205,20 @@ public class BossHuang : MonoBehaviour
 
     // ---------------- 伤害与死亡 ----------------
 
-    public void TakeDamage(int damage)
+    // ---------- IDamageable ----------
+public Color FxTint { get { return new Color(1f, 0.72f, 0.2f); } }
+public Vector3 FxPosition { get { return transform.position; } }
+
+public void TakeDamage(int damage) { TakeDamage(damage, Vector2.zero); }
+
+public void TakeDamage(int damage, Vector2 hitDirection)
+{
+    Fx.HitSpark(transform.position, hitDirection, FxTint);
+    Fx.Shake(0.12f);
+    ApplyDamageInternal(damage);
+}
+
+void ApplyDamageInternal(int damage)
     {
         if (isDead) return;
 

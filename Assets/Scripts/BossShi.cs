@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class BossShi : MonoBehaviour
+public class BossShi : MonoBehaviour, IDamageable
 {
     [Header("属性")]
     public int maxHealth = 400;
@@ -24,6 +24,10 @@ public class BossShi : MonoBehaviour
     {
         currentHealth = maxHealth;
         player = PlayerRef.Transform;
+        // BOSS 入场演出：强烈的镜头震动 + 金色爆发，配合 HP 条的"压迫感"
+        Fx.Shake(0.85f);
+        Fx.RoomClearBurst(transform.position);
+        Sfx.Play(Sfx.Id.RoomClear, 0.8f);
         nextShootTime = Time.time + 1f; // 开局1秒后首次射击
     }
 
@@ -125,7 +129,20 @@ public class BossShi : MonoBehaviour
         }
     }
 
-    public void TakeDamage(int damage)
+    // ---------- IDamageable ----------
+public Color FxTint { get { return new Color(0.7f, 0.7f, 0.75f); } }
+public Vector3 FxPosition { get { return transform.position; } }
+
+public void TakeDamage(int damage) { TakeDamage(damage, Vector2.zero); }
+
+public void TakeDamage(int damage, Vector2 hitDirection)
+{
+    Fx.HitSpark(transform.position, hitDirection, FxTint);
+    Fx.Shake(0.12f);
+    ApplyDamageInternal(damage);
+}
+
+void ApplyDamageInternal(int damage)
     {
         if (isDead) return;
 

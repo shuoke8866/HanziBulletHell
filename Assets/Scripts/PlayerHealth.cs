@@ -95,22 +95,29 @@ public class PlayerHealth : MonoBehaviour
 
     void Die()
     {
+        if (isDead) return;
+        isDead = true;
+
         Sfx.Play(Sfx.Id.PlayerHurt, 1f);
+        Fx.PlayerHit(transform.position);
+        Fx.Shake(0.9f);
+
         GameLog.Info($"玩家死亡！本轮成绩：{GameData.RunSummary()}");
 
-        // 真肉鸽：清空所有笔画、层数归 1，由 GameManager 负责重开
+        // 先显示结算页（暂停），由玩家点击后再真正重开 ——
+        // 否则直接 LoadScene 玩家看不到任何本轮成绩反馈。
         GameManager gm = GameManager.Instance;
-        if (gm != null)
-        {
-            gm.RestartRun();
-        }
-        else
-        {
-            // 兜底：没有 GameManager 也要保证进度被清掉、timeScale 被复位
-            GameData.ResetAll();
-            Time.timeScale = 1f;
-            UnityEngine.SceneManagement.SceneManager.LoadScene(
-                GameManager.SceneForFloor(1));
-        }
+        GameOverUI.Show(gm != null ? (System.Action)gm.RestartRun : FallbackRestart);
+    }
+
+    bool isDead;
+
+    /// <summary>没有 GameManager 时的兜底重开路径</summary>
+    void FallbackRestart()
+    {
+        GameData.ResetAll();
+        Time.timeScale = 1f;
+        UnityEngine.SceneManagement.SceneManager.LoadScene(
+            GameManager.SceneForFloor(1));
     }
 }
