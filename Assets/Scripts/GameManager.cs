@@ -95,6 +95,16 @@ public class GameManager : MonoBehaviour
 
     public void OnBossKilled(Vector3 deathPos)
     {
+        OnBossKilled(deathPos, null);
+    }
+
+    /// <summary>
+    /// BOSS 死亡回调。room 用于把掉落物钳制到房间可达范围内 ——
+    /// BOSS 可能被配在房间边界之外（Level1 的 BossSpawn 就在 x=24，而房间只到 x=22），
+    /// 直接用 bossPos + offset 会把传送门放到墙外，玩家够不到就卡住无法进下一层。
+    /// </summary>
+    public void OnBossKilled(Vector3 deathPos, Room room)
+    {
         GameData.bossesKilled++;
         GameLog.Info($"BOSS 被击败！（第 {GameData.currentFloor} 层）奖励：笔画 + 传送门");
 
@@ -105,10 +115,32 @@ public class GameManager : MonoBehaviour
             StrokeType.Dian, StrokeType.Zhe
         };
         StrokeType randomType = allTypes[Random.Range(0, allTypes.Length)];
-        SpawnStrokePickup(deathPos + new Vector3(2, 0, 0), randomType);
 
-        // 生成传送门
-        SpawnPortal(deathPos + new Vector3(-2, 0, 0));
+        Vector3 strokePos = deathPos + new Vector3(2, 0, 0);
+        Vector3 portalPos = deathPos + new Vector3(-2, 0, 0);
+
+        // 钳制到房间内：优先用 BOSS 死亡位置所在房间的类型/范围信息
+        if (room != null)
+        {
+            Vector3 clampedStroke = room.ClampToRoom(strokePos);
+            Vector3 clampedPortal = room.ClampToRoom(portalPos);
+
+            // 诊断日志：传送门位置算错会导致玩家够不到、卡住无法进下一层，
+            // 所以把原始值与钳制结果都打出来，便于定位坐标问题。
+            GameLog.Info($"[传送门] BOSS死亡于 {deathPos}  房间={room.name}");
+            GameLog.Info($"[传送门] 笔画 {strokePos} -> {clampedStroke}");
+            GameLog.Info($"[传送门] 门   {portalPos} -> {clampedPortal}  {room.RoomBoundsText()}");
+
+            strokePos = clampedStroke;
+            portalPos = clampedPortal;
+        }
+        else
+        {
+            GameLog.Warn($"[传送门] 未拿到 Room 引用，传送门可能落在房间外：{portalPos}");
+        }
+
+        SpawnStrokePickup(strokePos, randomType);
+        SpawnPortal(portalPos);
     }
 
     void SpawnPortal(Vector3 pos)

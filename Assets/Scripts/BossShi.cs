@@ -177,7 +177,7 @@ void ApplyDamageInternal(int damage)
         GameManager gm = GameManager.Instance;
         if (gm != null)
         {
-            gm.OnBossKilled(transform.position);
+            gm.OnBossKilled(transform.position, currentRoom);
         }
 
         // 延迟销毁，让日志显示出来

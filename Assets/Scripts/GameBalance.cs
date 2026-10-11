@@ -83,14 +83,17 @@ public static class GameBalance
 public static class GameLog
 {
     /// <summary>
-    /// 日志总开关。编辑器里默认打开（方便调试），
-    /// 正式构建里默认关闭 —— WebGL 下每条 Debug.Log 都有实打实的开销。
+    /// 日志总开关。
+    ///
+    /// 目前暂时设为 true：线上正在排查"无法传送到第二关"，
+    /// 需要玩家把浏览器 Console 的输出发回来定位。
+    /// 排查结束后改回 false（WebGL 下每条 Debug.Log 都有实打实的开销）。
     /// </summary>
     public static bool Verbose =
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         true;
 #else
-        false;
+        true;   // TODO: 排查完改回 false
 #endif
 
     public static void Info(string msg)

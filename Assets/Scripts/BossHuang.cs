@@ -246,7 +246,7 @@ void ApplyDamageInternal(int damage)
             currentRoom.OnEnemyDied(gameObject);
 
         GameManager gm = GameManager.Instance;
-        if (gm != null) gm.OnBossKilled(transform.position);
+        if (gm != null) gm.OnBossKilled(transform.position, currentRoom);
 
         Destroy(gameObject, 0.6f);
     }

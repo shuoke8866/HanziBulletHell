@@ -137,7 +137,29 @@ public class Room : MonoBehaviour
         GameLog.Info($"玩家进入「{name}」（{roomType}，第 {GameData.currentFloor} 层）");
 
         ClaimDoors();
+        GameLog.Info($"[门] 「{name}」占门后: {DoorInfo()}");
         StartNextWave();
+    }
+
+    /// <summary>本房间门的状态摘要（诊断用：门没开会导致玩家被困在房间里）</summary>
+    public string DoorInfo()
+    {
+        if (doors == null || doors.Count == 0) return "无门";
+
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < doors.Count; i++)
+        {
+            Door d = doors[i];
+            if (d == null) { sb.Append("[空] "); continue; }
+
+            DoorProbe probe = d.GetComponent<DoorProbe>();
+            string claimText = probe != null
+                ? (probe.IsClaimed ? "被占用" : "空闲")
+                : "无Probe";
+
+            sb.Append($"[{d.name} {claimText} isOpen={d.isOpen}] ");
+        }
+        return sb.ToString().Trim();
     }
 
     // 占住本房间的所有门。用引用计数后，共享门不会被另一个房间提前解锁；
@@ -413,6 +435,8 @@ public class Room : MonoBehaviour
         roomCleared = true;
         ReleaseDoors();
 
+        GameLog.Info($"[门] 「{name}」清房释放后: {DoorInfo()}");
+
         Sfx.Play(Sfx.Id.RoomClear, 0.5f);
         Fx.RoomClearBurst(transform.position);
         Fx.Shake(0.20f);
@@ -461,5 +485,51 @@ public class Room : MonoBehaviour
         {
             if (door != null) door.Close();
         }
+    }
+
+    /// <summary>
+    /// 把一个世界坐标钳制到本房间的可达范围内。
+    ///
+    /// 为什么需要：BOSS 掉落的传送门位置是 bossPos + (-2,0) 算出来的，而 BOSS
+    /// 可能被配在房间边界之外。Level1 的 BossSpawn 就在 (24,0)，而 Boss 房的
+    /// 实际范围只到 x=22 —— 传送门正好落在边界上，玩家（本身有碰撞半径）
+    /// 够不到，于是卡在第二关之前无法传送。
+    ///
+    /// 房间触发器的真实中心是「transform 位置 + BoxCollider2D.offset」，
+    /// 尺寸是 BoxCollider2D.size。这里按这个范围做钳制，并留出 inset 余量。
+    /// </summary>
+    public Vector3 ClampToRoom(Vector3 worldPos, float inset = 1.5f)
+    {
+        BoxCollider2D box = GetComponent<BoxCollider2D>();
+        if (box == null) return worldPos;
+
+        Vector2 center = (Vector2)transform.position + box.offset;
+        Vector2 half = box.size * 0.5f;
+
+        // 房间太小时不要把 inset 用满，否则中心会跳位
+        float insetX = Mathf.Min(inset, Mathf.Max(0f, half.x - 0.5f));
+        float insetY = Mathf.Min(inset, Mathf.Max(0f, half.y - 0.5f));
+
+        float minX = center.x - half.x + insetX;
+        float maxX = center.x + half.x - insetX;
+        float minY = center.y - half.y + insetY;
+        float maxY = center.y + half.y - insetY;
+
+        return new Vector3(
+            Mathf.Clamp(worldPos.x, minX, maxX),
+            Mathf.Clamp(worldPos.y, minY, maxY),
+            worldPos.z);
+    }
+
+    /// <summary>房间可达范围的可读描述（诊断日志用）</summary>
+    public string RoomBoundsText()
+    {
+        BoxCollider2D box = GetComponent<BoxCollider2D>();
+        if (box == null) return "（无 BoxCollider2D，无法约束范围）";
+
+        Vector2 center = (Vector2)transform.position + box.offset;
+        Vector2 half = box.size * 0.5f;
+        return $"房间范围 x=[{center.x - half.x:0.#},{center.x + half.x:0.#}] " +
+               $"y=[{center.y - half.y:0.#},{center.y + half.y:0.#}]";
     }
 }
