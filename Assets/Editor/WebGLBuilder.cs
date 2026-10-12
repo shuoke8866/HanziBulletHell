@@ -146,7 +146,74 @@ public static class WebGLBuilder
         return true;
     }
 
-    /// <summary>构建前自检：缺模块、缺场景都提前给出可读的报错</summary>
+    /// <summary>
+    /// 真加载每个场景，确认它们不是"空场景"。
+    ///
+    /// 曾经踩过的坑：场景文件头部被脚本写坏了一行，YAML 解析失败，
+    /// Unity 把场景当成空的打包进去。构建成功、体积正常，一层都看不出来，
+    /// 直到线上"传送到第二关画面空白"才发现。所以这里必须实测。
+    /// </summary>
+    static bool ValidateScenesLoad()
+    {
+        string originalScene = UnityEngine.SceneManagement.SceneManager
+            .GetActiveScene().path;
+
+        bool allOk = true;
+
+        foreach (string s in Scenes)
+        {
+            var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(
+                s, UnityEditor.SceneManagement.OpenSceneMode.Single);
+
+            if (scene.rootCount == 0)
+            {
+                Debug.LogError(
+                    $"[WebGLBuilder] 场景「{s}」加载后没有任何根对象 —— 它很可能已损坏，\n" +
+                    "  构建出来的会是一个空关卡（进去以后画面空白）。\n" +
+                    "  常见原因：场景 YAML 头部被写入了非法内容。\n" +
+                    "  请用 Unity 打开该场景确认能否正常编辑，必要时从版本库恢复。");
+                allOk = false;
+                continue;
+            }
+
+            // 关底场景必须能刷出 BOSS，否则流程会断在传送门之前
+            var rooms = UnityEngine.Object.FindObjectsOfType<Room>();
+            int bossRooms = 0;
+            foreach (var r in rooms)
+                if (r.roomType == RoomType.Boss) bossRooms++;
+
+            bool hasPlayer = PlayerRef.GameObject != null;
+            bool hasGameManager = UnityEngine.Object.FindObjectOfType<GameManager>() != null;
+
+            Debug.Log($"[WebGLBuilder] 场景校验 {s}: 根对象 {scene.rootCount}、" +
+                      $"房间 {rooms.Length}（Boss 房 {bossRooms}）、" +
+                      $"玩家 {(hasPlayer ? "有" : "无")}、GameManager {(hasGameManager ? "有" : "无")}");
+
+            if (!hasGameManager)
+            {
+                Debug.LogError($"[WebGLBuilder] 场景「{s}」里没有 GameManager，" +
+                               "传送门与层数推进都无法工作。");
+                allOk = false;
+            }
+
+            if (!hasPlayer)
+            {
+                Debug.LogError($"[WebGLBuilder] 场景「{s}」里没有 Player，无法游玩。");
+                allOk = false;
+            }
+        }
+
+        // 还原最初打开的场景，避免影响后续构建流程
+        if (!string.IsNullOrEmpty(originalScene) && File.Exists(originalScene))
+        {
+            UnityEditor.SceneManagement.EditorSceneManager.OpenScene(
+                originalScene, UnityEditor.SceneManagement.OpenSceneMode.Single);
+        }
+
+        return allOk;
+    }
+
+    /// <summary>构建前自检：缺模块、场景损坏、缺 GameManager/Player 都提前报错并阻断构建</summary>
     static bool SanityCheck()
     {
         // 1) WebGL 模块是否安装
@@ -171,7 +238,15 @@ public static class WebGLBuilder
             return false;
         }
 
-        // 3) 场景是否在 Build Settings 里（不阻断，只提醒）
+        // 3) 场景能否真正加载 —— 这一项必须阻断构建。
+        //
+        // 背景：曾经因为一次脚本 bug，Level2.unity 的文件头部被塞进了一行无关文本，
+        // YAML 解析失败，场景被打包成"空场景"（0 个根对象）。构建本身完全成功、
+        // 体积也正常，所以问题一直到线上"传送到第二关后画面空白"才暴露。
+        // 静态检查文件存在是远远不够的，这里真的把场景加载一遍并统计根对象。
+        if (!ValidateScenesLoad()) return false;
+
+        // 4) 场景是否在 Build Settings 里（不阻断，只提醒）
         foreach (string s in Scenes)
         {
             bool inBuild = false;
