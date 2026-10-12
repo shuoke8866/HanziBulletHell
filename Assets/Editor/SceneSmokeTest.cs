@@ -101,6 +101,28 @@ public static class SceneSmokeTest
         {
             Debug.Log($"[冒烟]   房间「{r.name}」type={r.roomType} waveCount={r.waveCount} " +
                       $"doors={r.doors.Count} 占位={r.transform.position}  门状态: {r.DoorInfo()}");
+
+            // 刷怪点必须在房间内。
+            // 踩过的坑：Level3 的 Room3（最终BOSS 皇）与 Room4 共用了同一个刷怪点，
+            // 而那个点在 Room4 的范围里 —— 结果"皇"刷在隔壁房间，玩家在本房间
+            // 永远清不掉，门永久关闭，并且 AnotherCombatRoomActive() 会让后续所有
+            // 房间都不再刷怪，彻底卡死。这里主动报警。
+            foreach (var sp in r.enemySpawnPoints)
+            {
+                if (sp == null)
+                {
+                    Debug.LogError($"[冒烟]   房间「{r.name}」的 enemySpawnPoints 里有空引用！");
+                    continue;
+                }
+
+                if (!r.IsInsideRoom(sp.position))
+                {
+                    Debug.LogError(
+                        $"[冒烟]   房间「{r.name}」的刷怪点 {sp.name} 在 ({sp.position.x},{sp.position.y}) " +
+                        $"落在房间范围之外 —— 敌人会刷到别的房间，本房间永远清不掉。" +
+                        $"  房间范围: {r.RoomBoundsText()}  房间中心: {r.RoomCenter}");
+                }
+            }
         }
 
         if (gm == null)

@@ -3212,7 +3212,7 @@ MonoBehaviour:
   enemyPrefabs:
   - {fileID: 7000000000000000001, guid: a0f6b9e8ae391e43f16b8802fe4f12ff, type: 3}
   enemySpawnPoints:
-  - {fileID: 484907809}
+  - {fileID: 3000000201}
   waveCount: 1
   waveInterval: 1.2
   enemyHealthOverride: -1
@@ -5434,3 +5434,34 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   backgroundMusic: {fileID: 8300000, guid: 3a9f9a74c66422f47ac54fc3fb961d4b, type: 3}
   volume: 0.4
+--- !u!1 &3000000200
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3000000201}
+  m_Layer: 0
+  m_Name: BossSpawn_Huang
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3000000201
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3000000200}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 24, y: 10, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}

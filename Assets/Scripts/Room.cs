@@ -288,14 +288,59 @@ public class Room : MonoBehaviour
         if (enemySpawnPoints.Count > 0)
         {
             Vector3 basePos = enemySpawnPoints[index % enemySpawnPoints.Count].position;
+
             // 同一刷怪点出多只时散开，避免完全重叠
             float jitter = index / Mathf.Max(1, enemySpawnPoints.Count) * 1.2f;
             if (jitter > 0f)
                 basePos += new Vector3(Random.Range(-jitter, jitter), Random.Range(-jitter, jitter), 0f);
+
+            // 守卫：刷怪点必须落在本房间范围内。
+            //
+            // 踩过的坑：Level3 的 Room3（最终BOSS 皇）和 Room4（BOSS 官）共用了同一个
+            // BossSpawn (40,10)，而它在 Room4 的范围里。于是"皇"刷到了隔壁房间，
+            // 玩家在 Room3 里看不到敌人 → 房间永远清不掉 → 门永久关闭 →
+            // AnotherCombatRoomActive() 又让后续所有房间都不刷怪，彻底卡死。
+            //
+            // 这里做一次兜底：刷怪点跑到房间外就改用房间中心，并报错提示去修场景。
+            if (!IsInsideRoom(basePos))
+            {
+                Vector3 fallback = RoomCenter;
+                Debug.LogError(
+                    $"[房间] 「{name}」的刷怪点在房间范围之外（{basePos}），" +
+                    $"已改用房间中心 {fallback} 刷怪。\n" +
+                    $"  这会导致敌人刷到别的房间、本房间永远清不掉，请修正场景里 " +
+                    $"enemySpawnPoints 的位置。{RoomBoundsText()}");
+                return fallback;
+            }
+
             return basePos;
         }
 
         return transform.position + new Vector3(Random.Range(-3f, 3f), Random.Range(-2f, 2f), 0f);
+    }
+
+    /// <summary>房间触发器的真实中心</summary>
+    public Vector3 RoomCenter
+    {
+        get
+        {
+            BoxCollider2D box = GetComponent<BoxCollider2D>();
+            if (box == null) return transform.position;
+            return (Vector2)transform.position + box.offset;
+        }
+    }
+
+    /// <summary>某个世界坐标是否落在本房间范围内</summary>
+    public bool IsInsideRoom(Vector3 worldPos)
+    {
+        BoxCollider2D box = GetComponent<BoxCollider2D>();
+        if (box == null) return true;   // 没有碰撞体就不做限制
+
+        Vector2 center = (Vector2)transform.position + box.offset;
+        Vector2 half = box.size * 0.5f;
+
+        return worldPos.x >= center.x - half.x && worldPos.x <= center.x + half.x
+            && worldPos.y >= center.y - half.y && worldPos.y <= center.y + half.y;
     }
 
     void SpawnFromDatabase(string defId, Vector3 pos)
