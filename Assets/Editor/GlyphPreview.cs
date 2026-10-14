@@ -42,10 +42,10 @@ public static class GlyphPreview
         ExportSet(new List<string> { "里", "皇", "上", "下", "工", "丰", "中", "土", "圭", "日", "白", "由" }, 256);
     }
 
-    /// <summary>把问题最严重的两个字放大到最大，逐像素检查</summary>
+    /// <summary>把报告有问题的几个字放大，逐像素检查</summary>
     public static void ExportBig()
     {
-        ExportSet(new List<string> { "里", "皇" }, 480);
+        ExportSet(new List<string> { "天", "里", "圭", "兀" }, 320);
     }
 
     /// <summary>
@@ -103,8 +103,9 @@ public static class GlyphPreview
                 {
                     if (gp[y * texSize + x].a < 0.5f) continue;
 
+                    // 同样不翻转（GetPixels 与画布都是 y 向上）
                     int bx = ox + x * zoom;
-                    int by = oy + (texSize - 1 - y) * zoom;
+                    int by = oy + y * zoom;
 
                     for (int dy = 0; dy < zoom; dy++)
                     {
@@ -217,9 +218,14 @@ public static class GlyphPreview
                 {
                     if (gp[y * cell + x].a < 0.5f) continue;
 
-                    // glyph 的 y 向上，贴图 y 向下，需要翻转
+                    // 不要翻转！
+                    // Texture2D.GetPixels() 的 y 向上（(0,0) 在左下），
+                    // 画布 px[] 也是 y 向上，EncodeToPNG 同样按 y 向上写出。
+                    // 三处约定一致，逐像素拷贝即可。
+                    // （之前这里多翻了一次，导致预览图上下颠倒，
+                    //   前几轮关于字形的判断全是基于镜像图做的，教训。）
                     int tx = ox + x;
-                    int ty = oy + (cell - 1 - y);
+                    int ty = oy + y;
                     if (tx < 0 || tx >= W || ty < 0 || ty >= H) continue;
 
                     px[ty * W + tx] = new Color(1f, 0.35f, 0.30f, 1f);
