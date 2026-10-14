@@ -122,6 +122,14 @@ public class Room : MonoBehaviour
     // 供 UI/调试查询
     public bool IsNonCombatRoom { get { return IsNonCombat; } }
 
+    /// <summary>
+    /// 这个房间是不是"已经开打、但还没清完"。
+    ///
+    /// 给门用：门要根据"有没有房间正在战斗"来决定开关，
+    /// 而 enemiesSpawned 是私有的，所以这里开一个只读入口。
+    /// </summary>
+    public bool IsFighting { get { return enemiesSpawned && !roomCleared; } }
+
     void OnTriggerExit2D(Collider2D other)
     {
         // 注意：不重置 enemiesSpawned！防止玩家进出时重复刷怪

@@ -103,6 +103,32 @@ public static class SceneSmokeTest
             Debug.Log($"[冒烟]   房间「{r.name}」type={r.roomType} waveCount={r.waveCount} " +
                       $"doors={r.doors.Count} 占位={r.transform.position}  门状态: {r.DoorInfo()}");
 
+            // 门的引用必须解析得到真实对象。
+            // 场景里的门是预制体实例，如果预制体链接断掉，序列化数据会变成
+            // "stripped" 空壳 —— 运行时 door == null，房间既关不上也开不了门，
+            // 玩家就被关在里面出不去（"宝箱房无法开门"就是这么来的）。
+            foreach (var d in r.doors)
+            {
+                if (d == null)
+                {
+                    Debug.LogError($"[冒烟]   房间「{r.name}」的 doors 列表里有【空引用】—— " +
+                                   "门既关不上也开不了，玩家可能被永久关住！");
+                    continue;
+                }
+
+                // DoorProbe 是门的引用计数 / 战斗锁定层。
+                // Door 预制体里**没有**这个组件，现在是靠 Room.ClaimDoors 在运行时补挂的。
+                // 那样"门该不该关"要等玩家进房才知道，非常脆弱 ——
+                // 建议直接在 Door.prefab 里挂上，这里报 Error 提醒。
+                if (d.GetComponent<DoorProbe>() == null)
+                    Debug.LogError($"[冒烟]   门「{d.name}」没有 DoorProbe —— " +
+                                   "门的开关逻辑要依赖运行时补挂，建议写进 Door.prefab");
+
+                // 门的碰撞体缺失 → 关不上，玩家可以穿墙
+                if (d.GetComponent<Collider2D>() == null)
+                    Debug.LogError($"[冒烟]   门「{d.name}」没有 Collider2D —— 关不上，玩家能穿过去");
+            }
+
             // 刷怪点必须在房间内。
             // 踩过的坑：Level3 的 Room3（最终BOSS 皇）与 Room4 共用了同一个刷怪点，
             // 而那个点在 Room4 的范围里 —— 结果"皇"刷在隔壁房间，玩家在本房间
