@@ -4,29 +4,40 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 战斗中的常驻快捷栏（不暂停游戏）。
-/// 屏幕底部显示背包 6 格的色块，玩家不用开背包就能看到手上有什么、按一下就能用。
-///   1-6 / 鼠标点击 → 使用对应格（唯一解直接合成，多个候选则开背包让你选）
-///   Q             → 自动合成第一个能用的笔画（最省事的操作）
-///   E             → 打开完整背包（暂停式，用来挑目标汉字）
-/// 只有 6 个格子，避免变成"整理物品栏"的负担。
+/// 战斗中的常驻快捷换字栏（不暂停游戏）。
+///
+/// 屏幕底部显示 9 个按钮，每个按钮上**直接画出按下去会变成的那个汉字**
+/// （矩形字形渲染成 Sprite，不吃字体，绝不会是方框）。
+///   1-9 / 鼠标点击 → 直接切换到该汉字
+///   E               → 打开完整背包（暂停式，可以翻页看全部候选字）
+///   Q               → 切到最优解（最复杂的那个）
+///
+/// 候选来源是 HanziSystem.GetAllFormable()：仓库里能拼出的**所有**汉字，
+/// 按笔画数从多到少排。所以第 1 格永远是"目前能做出的最复杂的字"。
+/// 因为笔画池永久保留、切换无损，玩家可以随便点、随便换回来。
 /// </summary>
 public class QuickBarUI : MonoBehaviour
 {
     [Header("外观")]
-    public float slotSize = 56f;
+    public float slotSize = 62f;
     public float slotGap = 8f;
     public float bottomOffset = 18f;
-    public float fontSize = 20f;
+    public float fontSize = 18f;
+
+    /// <summary>快捷栏格子数（= 每页候选数，也是数字键 1~N 的范围）</summary>
+    public const int SlotCount = 9;
 
     private StrokeInventory inventory;
     private HanziSystem hanzi;
 
     private readonly List<Image> frames = new List<Image>();
-    private readonly List<Image> blocks = new List<Image>();
     private readonly List<TextMeshProUGUI> labels = new List<TextMeshProUGUI>();
     private readonly List<Image> glyphPreviews = new List<Image>();
     private readonly Dictionary<string, Sprite> glyphCache = new Dictionary<string, Sprite>();
+
+    /// <summary>当前显示的候选（每格一个，null 表示空格）</summary>
+    private readonly List<HanziOption> shown = new List<HanziOption>();
+
     private string lastSignature = "";
     private TextMeshProUGUI hint;
 
@@ -39,8 +50,6 @@ public class QuickBarUI : MonoBehaviour
 
     void Build()
     {
-        if (inventory == null) return;
-
         Canvas canvas = FindObjectOfType<Canvas>();
 
         GameObject root = new GameObject("QuickBar (Runtime)");
@@ -52,13 +61,12 @@ public class QuickBarUI : MonoBehaviour
         rt.pivot = new Vector2(0.5f, 0f);
         rt.anchoredPosition = new Vector2(0f, bottomOffset);
 
-        int n = inventory.maxSlots;
-        float w = n * slotSize + (n - 1) * slotGap;
+        float w = SlotCount * slotSize + (SlotCount - 1) * slotGap;
         rt.sizeDelta = new Vector2(w, slotSize + 26f);
 
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i < SlotCount; i++)
         {
-            GameObject slot = new GameObject($"Q{i + 1}");
+            GameObject slot = new GameObject($"Hanzi{i + 1}");
             slot.transform.SetParent(root.transform, false);
             RectTransform srt = slot.AddComponent<RectTransform>();
             srt.anchorMin = new Vector2(0f, 1f);
@@ -71,46 +79,40 @@ public class QuickBarUI : MonoBehaviour
             frame.color = new Color(0.2f, 0.22f, 0.32f, 0.85f);
             frames.Add(frame);
 
-            GameObject block = new GameObject("Block");
-            block.transform.SetParent(slot.transform, false);
-            RectTransform brt = block.AddComponent<RectTransform>();
-            brt.anchorMin = Vector2.zero;
-            brt.anchorMax = Vector2.one;
-            brt.offsetMin = new Vector2(4f, 4f);
-            brt.offsetMax = new Vector2(-4f, -4f);
-            Image bi = block.AddComponent<Image>();
-            bi.raycastTarget = false;
-            blocks.Add(bi);
-
-            TextMeshProUGUI lbl = MakeText(slot.transform, "Small", fontSize,
-                TextAlignmentOptions.Center, Color.white);
-            Stretch(lbl.rectTransform, 2f);
-            labels.Add(lbl);
-
-            // 汉字预览：直接用矩形字形渲染成 Sprite，完全不吃字体，绝不会是方框
+            // 汉字预览占满格子（去掉边距），这是这一格的主角
             GameObject prev = new GameObject("GlyphPreview");
             prev.transform.SetParent(slot.transform, false);
             RectTransform prt = prev.AddComponent<RectTransform>();
-            prt.anchorMin = new Vector2(0.5f, 0.5f);
-            prt.anchorMax = new Vector2(0.5f, 0.5f);
-            prt.pivot = new Vector2(0.5f, 0.5f);
-            prt.anchoredPosition = new Vector2(0f, 6f);
-            prt.sizeDelta = new Vector2(slotSize - 22f, slotSize - 22f);
+            prt.anchorMin = Vector2.zero;
+            prt.anchorMax = Vector2.one;
+            prt.offsetMin = new Vector2(4f, 14f);      // 底部留出编号的位置
+            prt.offsetMax = new Vector2(-4f, -4f);
             Image pi = prev.AddComponent<Image>();
             pi.raycastTarget = false;
             pi.enabled = false;
             glyphPreviews.Add(pi);
+
+            // 编号（1-9）压在小格底部
+            TextMeshProUGUI lbl = MakeText(slot.transform, "Num", fontSize,
+                TextAlignmentOptions.Center, new Color(1f, 1f, 1f, 0.9f));
+            RectTransform lrt = lbl.rectTransform;
+            lrt.anchorMin = new Vector2(0f, 0f);
+            lrt.anchorMax = new Vector2(1f, 0f);
+            lrt.pivot = new Vector2(0.5f, 0f);
+            lrt.anchoredPosition = new Vector2(0f, 2f);
+            lrt.sizeDelta = new Vector2(0f, 16f);
+            labels.Add(lbl);
         }
 
-        hint = MakeText(root.transform, "Hint", 16f,
+        hint = MakeText(root.transform, "Hint", 15f,
             TextAlignmentOptions.Center, new Color(0.75f, 0.8f, 0.9f));
         RectTransform hrt = hint.rectTransform;
         hrt.anchorMin = new Vector2(0.5f, 0f);
         hrt.anchorMax = new Vector2(0.5f, 0f);
         hrt.pivot = new Vector2(0.5f, 0f);
         hrt.anchoredPosition = new Vector2(0f, -2f);
-        hrt.sizeDelta = new Vector2(560f, 22f);
-        hint.text = "1-6 用笔画    Q 自动合成    E 打开背包";
+        hrt.sizeDelta = new Vector2(720f, 22f);
+        hint.text = "1-9 换字    Q 最强    E 背包（可翻页看全部）";
     }
 
     TextMeshProUGUI MakeText(Transform parent, string name, float size,
@@ -127,14 +129,6 @@ public class QuickBarUI : MonoBehaviour
         return t;
     }
 
-    static void Stretch(RectTransform rt, float pad)
-    {
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = new Vector2(pad, pad);
-        rt.offsetMax = new Vector2(-pad, -pad);
-    }
-
     void Update()
     {
         if (inventory == null)
@@ -148,7 +142,7 @@ public class QuickBarUI : MonoBehaviour
         // 背包打开时交给 BackpackUI 处理，避免一次按键触发两套
         if (BackpackUI.IsOpen) return;
 
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < SlotCount; i++)
         {
             if (Input.GetKeyDown(KeyCode.Alpha1 + i))
             {
@@ -157,10 +151,9 @@ public class QuickBarUI : MonoBehaviour
             }
         }
 
-        if (Input.GetKeyDown(KeyCode.Q)) UseFirstUsable();
+        if (Input.GetKeyDown(KeyCode.Q)) UseBest();
 
         HandleMouseClick();
-        Refresh();
     }
 
     void HandleMouseClick()
@@ -170,134 +163,146 @@ public class QuickBarUI : MonoBehaviour
         for (int i = 0; i < frames.Count; i++)
         {
             if (frames[i] == null) continue;
+            RectTransform rt = frames[i].rectTransform;
             Vector2 local;
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    frames[i].rectTransform, Input.mousePosition, null, out local))
+                    rt, Input.mousePosition, null, out local))
             {
-                if (frames[i].rectTransform.rect.Contains(local))
-                {
-                    UseSlot(i);
-                    return;
-                }
-            }
-        }
-    }
-
-    void UseSlot(int index)
-    {
-        if (inventory == null || hanzi == null) return;
-        if (index < 0 || index >= inventory.strokes.Count) return;
-
-        StrokeType stroke = inventory.strokes[index];
-
-        // 多个成长/拼字方向 → 让玩家做选择（打开背包的选择面板）
-        int optionCount = hanzi.GetGrowthCandidates(stroke).Count;
-        if (optionCount == 0) optionCount = hanzi.GetDirectCandidates(stroke).Count;
-
-        if (optionCount > 1)
-        {
-            GameToast.Show($"「{StrokeUtil.NameOf(stroke)}」有多个去向，按 E 打开背包选择", new Color(1f, 0.9f, 0.5f));
-            return;
-        }
-
-        if (!inventory.TryCombineFromBackpack(index))
-        {
-            // 失败要给出明确原因，而不是静默无反应
-            if (!hanzi.StrokeIsUseful(stroke))
-                GameToast.Show($"「{StrokeUtil.NameOf(stroke)}」现在用不上，先留着", new Color(1f, 0.6f, 0.5f));
-        }
-    }
-
-    // Q：自动用掉第一个能用的笔画（最省心的操作）
-    void UseFirstUsable()
-    {
-        if (inventory == null || hanzi == null) return;
-
-        for (int i = 0; i < inventory.strokes.Count; i++)
-        {
-            StrokeType st = inventory.strokes[i];
-            if (!hanzi.StrokeIsUseful(st)) continue;   // 用不上的跳过
-
-            if (inventory.TryCombineFromBackpack(i))
-            {
-                GameToast.Show($"已用「{StrokeUtil.NameOf(st)}」", StrokeUtil.ColorOf(st));
+                if (!rt.rect.Contains(local)) continue;
+                UseSlot(i);
                 return;
             }
         }
+    }
 
-        GameToast.Show("没有能立刻使用的笔画", new Color(0.8f, 0.8f, 0.8f));
+    /// <summary>按数字键：切到第 index 格显示的那个汉字</summary>
+    void UseSlot(int index)
+    {
+        if (hanzi == null) return;
+        if (index < 0 || index >= shown.Count) return;
+
+        HanziOption opt = shown[index];
+        if (opt == null || opt.def == null)
+        {
+            GameToast.Show($"{index + 1} 号位是空的（仓库还拼不出这么多字）", new Color(0.8f, 0.8f, 0.8f));
+            return;
+        }
+
+        if (hanzi.CurrentHanziDef != null && opt.def.hanziName == hanzi.currentHanziName)
+        {
+            GameToast.Show($"已经是「{opt.def.hanziName}」了", new Color(0.85f, 0.85f, 0.85f));
+            return;
+        }
+
+        if (hanzi.SwitchTo(opt.def))
+        {
+            Sfx.Play(Sfx.Id.Combine, 0.6f);
+            GameToast.Show($"切换到「{opt.def.hanziName}」", new Color(0.7f, 1f, 0.8f));
+            ForceRefresh();
+        }
+        else
+        {
+            GameToast.Show($"「{opt.def.hanziName}」切换失败（笔画不足）", new Color(1f, 0.6f, 0.5f));
+        }
+    }
+
+    /// <summary>Q：切到最复杂的那个（第一格）</summary>
+    void UseBest()
+    {
+        if (hanzi == null) return;
+
+        HanziDef best = hanzi.SwitchToBestAvailable();
+        if (best != null)
+        {
+            Sfx.Play(Sfx.Id.Combine, 0.6f);
+            GameToast.Show($"已切到最强：「{best.hanziName}」", new Color(1f, 0.9f, 0.5f));
+            ForceRefresh();
+        }
+        else
+        {
+            GameToast.Show("仓库里还拼不出别的字", new Color(0.8f, 0.8f, 0.8f));
+        }
+    }
+
+    void ForceRefresh()
+    {
+        lastSignature = "";
     }
 
     void Refresh()
     {
-        // 字数/当前汉字没变时跳过重算（否则每帧都会跑一堆匹配 + 取字形）
-        string signature = (hanzi != null ? hanzi.currentHanziName : "") + "#" + inventory.strokes.Count;
-        for (int i = 0; i < inventory.strokes.Count; i++)
-            signature += "," + (int)inventory.strokes[i];
+        if (hanzi == null) return;
 
-        bool dirty = signature != lastSignature;
-        if (!dirty) return;
+        // 签名：当前汉字 + 仓库内容。变了才重算（否则每帧都要跑一遍匹配 + 取字形）
+        string signature = hanzi.currentHanziName + "|";
+        List<StrokeType> avail = hanzi.AvailableStrokes();
+        for (int i = 0; i < avail.Count; i++) signature += (int)avail[i] + ",";
+
+        if (signature == lastSignature) return;
         lastSignature = signature;
 
-        for (int i = 0; i < frames.Count; i++)
+        // 取"能拼出的所有字"，按复杂度降序；快捷栏显示前 9 个
+        shown.Clear();
+        List<HanziOption> all = hanzi.GetAllFormable();
+        for (int i = 0; i < SlotCount; i++)
+            shown.Add(i < all.Count ? all[i] : null);
+
+        for (int i = 0; i < SlotCount; i++)
         {
-            bool has = i < inventory.strokes.Count;
+            HanziOption opt = shown[i];
+            bool has = opt != null && opt.def != null;
 
-            if (blocks[i] != null)
-            {
-                blocks[i].enabled = has;
-                if (has) blocks[i].color = StrokeUtil.ColorOf(inventory.strokes[i]);
-            }
-
-            // 优先看能不能让当前汉字"长大"，其次看能不能直接拼出别的字
-            List<HanziDef> growth = has && hanzi != null
-                ? hanzi.GetGrowthCandidates(inventory.strokes[i])
-                : new List<HanziDef>();
-            List<HanziDef> exact = (has && hanzi != null && growth.Count == 0)
-                ? hanzi.GetDirectCandidates(inventory.strokes[i])
-                : new List<HanziDef>();
-
-            List<HanziDef> cands = growth.Count > 0 ? growth : exact;
-            bool usable = cands.Count > 0;
-            bool ambiguous = cands.Count > 1;
-
-            // 汉字预览（矩形字形，不吃字体）
             if (glyphPreviews[i] != null)
             {
-                string preview = usable ? cands[0].hanziName : null;
-                if (string.IsNullOrEmpty(preview))
+                if (!has)
                 {
                     glyphPreviews[i].enabled = false;
                 }
                 else
                 {
+                    string name = opt.def.hanziName;
                     Sprite sp;
-                    if (!glyphCache.TryGetValue(preview, out sp))
+                    if (!glyphCache.TryGetValue(name, out sp))
                     {
-                        sp = HanziRenderer.CreateSpriteFor(preview, 64, 32f);
-                        glyphCache[preview] = sp;
+                        sp = HanziRenderer.CreateSpriteFor(name, 64, 32f);
+                        glyphCache[name] = sp;
                     }
                     glyphPreviews[i].sprite = sp;
                     glyphPreviews[i].enabled = sp != null;
-                    // 会变成哪个字，用对应笔画的颜色显示
-                    glyphPreviews[i].color = StrokeUtil.ColorOf(inventory.strokes[i]);
+
+                    bool isCurrent = hanzi.currentHanziName == name;
+                    glyphPreviews[i].color = isCurrent
+                        ? new Color(0.55f, 1f, 0.65f)      // 当前字：绿
+                        : Color.white;
                 }
             }
 
             if (labels[i] != null)
-            {
-                if (!has) labels[i].text = "";
-                else if (!usable) labels[i].text = $"{i + 1}·闲置";
-                else if (ambiguous) labels[i].text = $"{i + 1}·选";
-                else labels[i].text = $"{i + 1}";
-            }
+                labels[i].text = has ? (i + 1).ToString() : "";
 
             if (frames[i] != null)
             {
-                frames[i].color = usable
-                    ? new Color(0.9f, 0.8f, 0.3f, 0.9f)
-                    : new Color(0.2f, 0.22f, 0.32f, 0.7f);
+                bool isCurrent = has && hanzi.currentHanziName == opt.def.hanziName;
+                frames[i].color = has
+                    ? (isCurrent ? new Color(0.28f, 0.5f, 0.32f, 0.95f)
+                                 : new Color(0.9f, 0.8f, 0.3f, 0.9f))
+                    : new Color(0.2f, 0.22f, 0.32f, 0.5f);
             }
         }
+
+        if (hint != null)
+        {
+            int total = all.Count;
+            int shownCount = 0;
+            foreach (var o in shown) if (o != null) shownCount++;
+            hint.text = total > shownCount
+                ? $"1-9 换字    Q 最强    E 背包（还有 {total - shownCount} 个可换，翻页查看）"
+                : "1-9 换字    Q 最强    E 背包（可翻页看全部）";
+        }
+    }
+
+    void LateUpdate()
+    {
+        Refresh();
     }
 }

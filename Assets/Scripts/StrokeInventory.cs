@@ -36,59 +36,24 @@ public class StrokeInventory : MonoBehaviour
 
     void Update()
     {
-        // 数字键 1-9：按仓库里的笔画切换汉字
-        // （背包面板打开时由 BackpackUI 接管按键，避免一次按键触发两套逻辑）
-        if (BackpackUI.IsOpen) return;
-
-        int n = Mathf.Min(strokes.Count, 9);
-        for (int i = 0; i < n; i++)
-        {
-            if (Input.GetKeyDown(KeyCode.Alpha1 + i))
-            {
-                TryCombineFromBackpack(i);
-            }
-        }
+        // 这里**不再接管任何按键**。
+        //
+        // 换字的两条入口已经各有归属：
+        //   底部常驻快捷栏 QuickBarUI —— 数字键 1-9 换成对应汉字
+        //   背包（E 打开）BackpackUI —— 数字键 1-9 选字、A/D 翻页
+        //
+        // 以前这个类也监听 1-9 去"用第 N 个笔画合成"，和上面两处抢按键，
+        // 而且它调的是拾取入口（会重排最优解 + 把笔画从仓库删掉），
+        // 正是"按几次数字键字就退回「一」"的元凶。现在整段删掉。
     }
 
     /// <summary>
-    /// 数字键：按下仓库里第 index 个笔画 → 切换到"能用上这一笔的最复杂汉字"。
-    ///
-    /// **这里以前是错的**：它调用 hanzi.TryAddStroke(stroke)，而那是**拾取**入口
-    /// （会走 ApplyBestFor → 重新求解最优解）。于是每次按数字键都相当于"又捡了一笔"，
-    /// 解算器只看池子、没有保持现状的概念，结果越按越简单，最后退回「一」；
-    /// 同时那一笔还会被 RemoveAt 从背包里删掉，笔画就凭空消失了。
-    ///
-    /// 现在改成"切换语义"：不增不减笔画，只在已有仓库里挑一个用得上这一笔的字切过去。
-    /// 笔画永久保留（GameData.allStrokes），所以随时能再切回来。
-    /// </summary>
-    public bool TryCombineFromBackpack(int index)
-    {
-        if (hanzi == null)
-        {
-            hanzi = GetComponent<HanziSystem>();
-            if (hanzi == null) return false;
-        }
-
-        if (index < 0 || index >= strokes.Count) return false;
-
-        StrokeType stroke = strokes[index];
-
-        // 优先切到"能用到这一笔"的最复杂汉字
-        HanziDef pick = hanzi.SwitchToBestUsing(stroke);
-
-        // 没有能用到它的字 → 退回"可用笔画能拼出的最优解"
-        if (pick == null)
-            pick = hanzi.SwitchToBestAvailable();
-
-        if (pick == null)
-        {
-            GameLog.Info($"仓库里的笔画拼不出任何新字（当前「{hanzi.currentHanziName}」）");
-            return false;
-        }
-
-        GameLog.Info($"按「{StrokeUtil.NameOf(stroke)}」切换 → 当前汉字：「{hanzi.currentHanziName}」");
-        return true;
-    }
+    // 说明：这个类以前有个 TryCombineFromBackpack(index)，按下数字键就"用第 N 个笔画合成"。
+    // 它调用的是拾取入口，会重排最优解并把笔画从仓库删掉 —— 正是
+    // "按几次数字键、字就退回「一」"的元凶。现在换字全部由
+    // QuickBarUI（快捷栏）和 BackpackUI（背包）负责，这里的方法已删除。
+    //
+    // 想按"某一笔"来找字的话，用 HanziSystem.SwitchToBestUsing(stroke)。
 
     // 直接移除指定槽位（歧义选择时由 UI 判定成功后调用）
     public void RemoveAt(int index)
