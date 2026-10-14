@@ -430,7 +430,8 @@ public class Room : MonoBehaviour
         // 最后统一乘 GameBalance.BossHealthMultiplier：测试期调小便于快速打到关底，
         // 正式数值把它改回 1.0 即可，不用动这里的代码。
 
-        float bossMul = Mathf.Max(0.01f, GameBalance.BossHealthMultiplier);
+        float bossMul = Mathf.Max(0.01f, GameBalance.BossHealthMultiplier)
+                      * GameBalance.BossHealthForFloor(GameData.currentFloor);
 
         BossShi bossScript = enemy.GetComponent<BossShi>();
         if (bossScript != null)

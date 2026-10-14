@@ -74,6 +74,11 @@ public class BossShi : MonoBehaviour, IDamageable
 
         GameLog.Info("BOSS「士」近战横斩！");
 
+        // 横斩特效：一道横向弧光扫过，让玩家看清攻击方向和范围。
+        // 原本只有三颗红色弹幕飞出去，玩家不容易意识到"被砍了"。
+        Fx.SlashArc(transform.position, dir, new Color(1f, 0.35f, 0.3f), 2.8f);
+        Fx.Shake(0.32f);
+
         // 向前方近距离挥砍
         for (int i = -1; i <= 1; i++)
         {

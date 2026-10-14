@@ -299,4 +299,75 @@ public class Fx : MonoBehaviour
         EmitBurst(pos, 4, ProcTex.Streak, new Color(1f, 0.6f, 0.5f, 0.9f),
             0.3f, 1.2f, 0.1f, 0.22f, duration);
     }
+
+    // ================= 横斩 =================
+
+    /// <summary>
+    /// 横斩特效：一道横向拉长、快速淡出的亮色弧光 + 火花。
+    ///
+    /// 用于 BOSS「士」的近战横斩，以及玩家的近身斩击。
+    /// 原本这两种攻击都只有几颗弹幕飞出去，玩家看不出"被砍了"，
+    /// 加一道弧光后攻击的方向和范围就一目了然。
+    ///
+    /// 实现方式：临时创建一个 SpriteRenderer（用程序化生成的横条贴图），
+    /// 由 <see cref="SlashArcRunner"/> 在几十毫秒内拉长并淡出后自毁。
+    /// 不依赖任何美术资源，也不进对象池（横斩频率低，开销可忽略）。
+    /// </summary>
+    public static void SlashArc(Vector3 pos, Vector2 dir, Color color, float reach = 2.6f)
+    {
+        GameObject go = new GameObject("SlashArc");
+        go.transform.position = pos;
+        go.transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
+        go.transform.localScale = new Vector3(reach * 0.45f, 0.9f, 1f);
+
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = ProcTex.StrokeHeng;      // 横向细长条，天然适合当斩击弧光
+        sr.color = color;
+        sr.sortingOrder = 30;                // 盖在角色之上
+
+        var runner = go.AddComponent<SlashArcRunner>();
+        runner.Init(reach, color);
+
+        // 顺带喷一点火花，让"斩中"更有实感
+        EmitBurst(pos + (Vector3)(dir.normalized * reach * 0.45f), 6, ProcTex.Streak,
+            color, 2.2f, 5.5f, 0.06f, 0.16f, 0.22f);
+    }
+}
+
+/// <summary>
+/// 横斩弧光的生命周期：短时间内横向拉长 + 淡出，然后自毁。
+/// 单独一个类是因为 Fx 是静态类，没法挂协程。
+/// </summary>
+public class SlashArcRunner : MonoBehaviour
+{
+    float reach;
+    Color baseColor;
+    float t;
+    const float Life = 0.18f;
+
+    public void Init(float r, Color c)
+    {
+        reach = r;
+        baseColor = c;
+    }
+
+    void Update()
+    {
+        t += Time.deltaTime;
+        float k = Mathf.Clamp01(t / Life);
+
+        // 先快速拉长到最大，然后收窄（像刀锋扫过）
+        float width = Mathf.Lerp(reach * 0.45f, reach, Mathf.Min(1f, k * 2.5f));
+        float height = Mathf.Lerp(0.9f, 0.15f, k);
+        transform.localScale = new Vector3(width, height, 1f);
+
+        // 淡出
+        Color c = baseColor;
+        c.a = (1f - k) * 0.85f;
+
+        var sr = GetComponent<SpriteRenderer>();
+        if (sr != null) sr.color = c;
+
+        if (t >= Life) Destroy(gameObject);
+    }
 }

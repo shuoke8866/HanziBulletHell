@@ -57,6 +57,8 @@ public class MeleeSlash : MonoBehaviour
 
         Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, radius);
         bool struck = false;
+        Vector2 lastDir = Vector2.right;
+        float nearest = float.MaxValue;
 
         foreach (Collider2D col in hits)
         {
@@ -72,14 +74,20 @@ public class MeleeSlash : MonoBehaviour
 
             target.TakeDamage(dmg, dir);
             struck = true;
+
+            // 记住最近的敌人方向，弧光就朝那边扫
+            float d = Vector2.Distance(col.transform.position, transform.position);
+            if (d < nearest) { nearest = d; lastDir = dir.sqrMagnitude > 0.001f ? dir : Vector2.right; }
         }
 
         if (struck)
         {
             nextSlashTime = Time.time + cooldown;
             Sfx.PlayVaried(Sfx.Id.Hit, 0.35f, 0.15f);
-            Fx.HitSpark(transform.position, Vector2.zero, new Color(1f, 0.9f, 0.6f));
-            Fx.Shake(0.12f);
+
+            // 横斩特效：朝最近的敌人扫一道弧光，玩家能看清斩击范围
+            Fx.SlashArc(transform.position, lastDir, new Color(1f, 0.95f, 0.6f), radius * 1.1f);
+            Fx.Shake(0.14f);
         }
     }
 

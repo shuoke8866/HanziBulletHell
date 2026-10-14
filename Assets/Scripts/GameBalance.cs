@@ -35,14 +35,52 @@ public static class GameBalance
     /// <summary>额外敌人数量上限</summary>
     public const int MaxExtraEnemies = 4;
 
-    // ---------- BOSS 调试 ----------
+    // ---------- BOSS ----------
     /// <summary>
-    /// BOSS 血量总倍率（调试用）。
+    /// BOSS 血量总倍率（调试用全局开关）。
     ///
     /// 0.35 = 测试模式，便于快速打到关底验证流程；
     /// 1.0  = 正式数值，改这一行就能一键切换，不必去翻 Room.cs。
     /// </summary>
     public const float BossHealthMultiplier = 0.35f;
+
+    /// <summary>
+    /// 各层 BOSS 的**额外**血量倍率。
+    ///
+    /// 设计意图：一二层是"教学 BOSS"，应该脆一些，主要让玩家熟悉弹幕节奏；
+    /// 第三层关底「皇」才是真正的耐力战。
+    /// 索引 0 对应第 1 层，超出范围取最后一个。
+    /// </summary>
+    static readonly float[] BossHealthPerFloor = { 0.70f, 0.85f, 1.15f };
+
+    /// <summary>取某一层 BOSS 的血量倍率</summary>
+    public static float BossHealthForFloor(int floor)
+    {
+        if (BossHealthPerFloor.Length == 0) return 1f;
+        int i = Mathf.Clamp(floor - 1, 0, BossHealthPerFloor.Length - 1);
+        return BossHealthPerFloor[i];
+    }
+
+    // ---------- 房间奖励 ----------
+    /// <summary>清空战斗房额外掉落的笔画数（第 1 层给得多，方便起手）</summary>
+    static readonly int[] CombatBonusStrokesPerFloor = { 2, 2, 1 };
+
+    public static int CombatBonusStrokesForFloor(int floor)
+    {
+        if (CombatBonusStrokesPerFloor.Length == 0) return 1;
+        int i = Mathf.Clamp(floor - 1, 0, CombatBonusStrokesPerFloor.Length - 1);
+        return CombatBonusStrokesPerFloor[i];
+    }
+
+    /// <summary>宝箱房额外掉落的笔画数</summary>
+    static readonly int[] TreasureBonusStrokesPerFloor = { 3, 2, 2 };
+
+    public static int TreasureBonusStrokesForFloor(int floor)
+    {
+        if (TreasureBonusStrokesPerFloor.Length == 0) return 1;
+        int i = Mathf.Clamp(floor - 1, 0, TreasureBonusStrokesPerFloor.Length - 1);
+        return TreasureBonusStrokesPerFloor[i];
+    }
 
     // ---------- 玩家 ----------
     /// <summary>玩家基础移速</summary>
