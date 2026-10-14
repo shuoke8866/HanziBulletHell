@@ -132,6 +132,46 @@ public static class SceneSmokeTest
             Debug.LogError("[冒烟] 场景里没有 Player —— 无法游玩！");
 
         ReportHanziSystem(player);
+        ReportStrokePickups(rooms);
+    }
+
+    /// <summary>
+    /// 报告笔画宝箱的数量、类型分布与位置合法性。
+    ///
+    /// 位置检查很重要：宝箱如果落在房间里却压在墙上，玩家就走不过去 ——
+    /// 这正是之前 Room3 刷怪点越界那类问题的翻版，必须在测试里拦住。
+    /// </summary>
+    static void ReportStrokePickups(Room[] rooms)
+    {
+        StrokePickup[] pickups = UnityEngine.Object.FindObjectsOfType<StrokePickup>();
+        if (pickups.Length == 0) return;
+
+        var byType = new Dictionary<StrokeType, int>();
+        int outside = 0;
+
+        foreach (StrokePickup sp in pickups)
+        {
+            StrokeType t = sp.strokeType;
+            int c;
+            byType.TryGetValue(t, out c);
+            byType[t] = c + 1;
+
+            // 每个宝箱至少要落在某个房间范围内，否则玩家不一定够得到
+            bool inAny = false;
+            foreach (Room r in rooms)
+            {
+                if (r.IsInsideRoom(sp.transform.position)) { inAny = true; break; }
+            }
+            if (!inAny) outside++;
+        }
+
+        string dist = "";
+        foreach (var kv in byType) dist += $"{StrokeUtil.NameOf(kv.Key)}={kv.Value} ";
+
+        Debug.Log($"[冒烟]   笔画宝箱 {pickups.Length} 个：{dist}");
+
+        if (outside > 0)
+            Debug.LogError($"[冒烟] 有 {outside} 个宝箱落在所有房间范围之外 —— 玩家可能拿不到！");
     }
 
     /// <summary>

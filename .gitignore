@@ -60,8 +60,13 @@ Thumbs.db
 /UNITY_LICENSE_*.txt
 *.ulf
 
-# Unity 构建日志
+# Unity 构建 / 测试日志
 /_build*.log
+/_smoke.log
+/_scatter.log
+/_*.log
+/_*.txt
+/_*.dll
 
 # Unity 构建报告
 /[Bb]uildReports/
