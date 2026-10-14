@@ -27,6 +27,10 @@ public class BackpackUI : MonoBehaviour
     public float slotGap = 14f;
     public int columns = 3;
 
+    [Header("候选汉字栏")]
+    /// <summary>候选字栏占用的额外高度</summary>
+    public float candidateAreaHeight = 150f;
+
     private bool isOpen = false;
     private bool usingRuntimePanel = false;
     private GameObject runtimePanel;
@@ -39,6 +43,12 @@ public class BackpackUI : MonoBehaviour
     private readonly List<Image> slotFrames = new List<Image>();
     private readonly List<Image> slotBlocks = new List<Image>();
     private readonly List<TextMeshProUGUI> slotLabels = new List<TextMeshProUGUI>();
+
+    // 「可切换的汉字」候选栏
+    private TextMeshProUGUI candidateTitle;
+    private readonly List<GameObject> candidateButtons = new List<GameObject>();
+    private readonly List<TextMeshProUGUI> candidateLabels = new List<TextMeshProUGUI>();
+    private readonly List<HanziOption> candidateOptions = new List<HanziOption>();
 
     // 歧义/多结果选择状态
     private bool choosing = false;
@@ -80,7 +90,8 @@ public class BackpackUI : MonoBehaviour
         float gridW = columns * slotSize + (columns - 1) * slotGap;
         float gridH = rows * slotSize + (rows - 1) * slotGap;
         float panelW = Mathf.Max(760f, gridW + 80f);
-        float panelH = gridH + 340f;
+        // 340 = 标题 + 详情 + 词条 + 底部提示；再加候选字栏（标题 + 一行按钮）
+        float panelH = gridH + 340f + candidateAreaHeight;
 
         runtimePanel = new GameObject("BackpackPanel (Runtime)");
         if (canvas != null) runtimePanel.transform.SetParent(canvas.transform, false);
@@ -169,7 +180,151 @@ public class BackpackUI : MonoBehaviour
         hrt.pivot = new Vector2(0.5f, 0f);
         hrt.anchoredPosition = new Vector2(0f, 14f);
         hrt.sizeDelta = new Vector2(panelW - 40f, 26f);
-        hintText.text = "1-6 / 左键 勾选笔画    回车 或 右键 合成    C 清空选择    E/Esc 关闭";
+        hintText.text = "1-9 / 左键 勾选笔画    回车 或 右键 合成    " +
+                        "点上方候选字切换汉字    C 清空选择    E/Esc 关闭";
+
+        // ---- 可切换的汉字（候选栏） ----
+        BuildCandidateArea(panelW, detailTop + 96f + 46f + 10f);
+    }
+
+    /// <summary>
+    /// 构建「可切换的汉字」候选栏。
+    ///
+    /// 这是新合成机制的操作入口：不再靠笔顺逐步成长，而是看手上所有笔画
+    /// 算出最优解集合，玩家点一下就能切换过去。
+    /// </summary>
+    void BuildCandidateArea(float panelW, float topOffset)
+    {
+        candidateTitle = MakeText(runtimePanel.transform, "CandidateTitle", 20f,
+            TextAlignmentOptions.TopLeft, new Color(1f, 0.85f, 0.45f));
+        SetTopAnchored(candidateTitle.rectTransform, 0f, -topOffset, panelW - 80f, 26f);
+
+        float btnW = 150f;
+        float btnH = 74f;
+        float gap = 12f;
+        int maxButtons = 6;
+
+        float rowW = maxButtons * btnW + (maxButtons - 1) * gap;
+        float startX = -rowW * 0.5f + btnW * 0.5f;
+
+        for (int i = 0; i < maxButtons; i++)
+        {
+            GameObject btn = new GameObject("Candidate" + i);
+            btn.transform.SetParent(runtimePanel.transform, false);
+
+            RectTransform rt = btn.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 1f);
+            rt.anchorMax = new Vector2(0.5f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.anchoredPosition = new Vector2(startX + i * (btnW + gap), -(topOffset + 30f));
+            rt.sizeDelta = new Vector2(btnW, btnH);
+
+            Image bg = btn.AddComponent<Image>();
+            bg.color = new Color(0.22f, 0.26f, 0.36f, 1f);
+            bg.raycastTarget = false;
+
+            TextMeshProUGUI lbl = MakeText(btn.transform, "Label", 20f,
+                TextAlignmentOptions.Center, Color.white);
+            Stretch(lbl.rectTransform, 6f);
+
+            candidateButtons.Add(btn);
+            candidateLabels.Add(lbl);
+            btn.SetActive(false);
+        }
+    }
+
+    /// <summary>刷新候选栏：按当前笔画池重新求解最优解集合</summary>
+    void RefreshCandidates()
+    {
+        if (candidateTitle == null || hanzi == null) return;
+
+        candidateOptions.Clear();
+
+        List<HanziOption> ranked = hanzi.GetSwitchCandidates();
+
+        // 只展示"最优解"那一档（关键笔画数/消耗数/总笔画数都并列的字）
+        List<HanziOption> best = HanziSolver.TiedWithBest(ranked);
+        if (best.Count > 0) candidateOptions.AddRange(best);
+
+        // 池子里出现最多的笔画，用来给玩家解释"为什么是这些字"
+        List<StrokeType> pool = hanzi.BuildStrokePool();
+        List<StrokeType> keyTypes;
+        int maxFreq = HanziSolver.MaxFrequency(pool, out keyTypes);
+
+        string keyNames = "";
+        foreach (StrokeType t in keyTypes)
+        {
+            if (keyNames.Length > 0) keyNames += "/";
+            keyNames += StrokeUtil.NameOf(t);
+        }
+
+        if (candidateOptions.Count == 0)
+        {
+            candidateTitle.text = "可切换的汉字：暂无（凑不出任何字）";
+        }
+        else
+        {
+            candidateTitle.text =
+                $"可切换的汉字（最多的是「{keyNames}」×{maxFreq}，点击即可切换）";
+        }
+
+        for (int i = 0; i < candidateButtons.Count; i++)
+        {
+            bool on = i < candidateOptions.Count;
+            if (candidateButtons[i].activeSelf != on)
+                candidateButtons[i].SetActive(on);
+            if (!on) continue;
+
+            HanziOption opt = candidateOptions[i];
+            bool isCurrent = hanzi.CurrentHanziDef != null &&
+                             hanzi.CurrentHanziDef.hanziName == opt.def.hanziName;
+
+            // 第一个是最优解，用更亮的底色标出来
+            Image bg = candidateButtons[i].GetComponent<Image>();
+            if (bg != null)
+            {
+                if (isCurrent) bg.color = new Color(0.30f, 0.45f, 0.32f, 1f);
+                else if (i == 0) bg.color = new Color(0.32f, 0.38f, 0.55f, 1f);
+                else bg.color = new Color(0.22f, 0.26f, 0.36f, 1f);
+            }
+
+            if (candidateLabels[i] != null)
+            {
+                string mark = isCurrent ? "●" : (i == 0 ? "★" : "  ");
+                candidateLabels[i].text =
+                    $"{mark} {opt.def.hanziName}\n<size=70%>{opt.totalStrokes}画</size>";
+            }
+        }
+    }
+
+    /// <summary>点击候选字 → 切换当前汉字。返回 true 表示这次点击被候选栏消费了</summary>
+    bool HandleCandidateClick()
+    {
+        if (hanzi == null) return false;
+
+        for (int i = 0; i < candidateButtons.Count; i++)
+        {
+            if (!candidateButtons[i].activeSelf) continue;
+
+            RectTransform rt = candidateButtons[i].GetComponent<RectTransform>();
+            Vector2 local;
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    rt, Input.mousePosition, null, out local))
+            {
+                if (!rt.rect.Contains(local)) continue;
+                if (i >= candidateOptions.Count) return true;
+
+                HanziDef target = candidateOptions[i].def;
+                if (hanzi.SwitchTo(target))
+                {
+                    GameToast.Show($"切换到「{target.hanziName}」", new Color(0.7f, 1f, 0.8f));
+                    Sfx.Play(Sfx.Id.Combine, 0.6f);
+                    RefreshUI();
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     // 顶部锚定（pivot 在上边中点），offsetY 传负数
@@ -308,6 +463,10 @@ public class BackpackUI : MonoBehaviour
     {
         if (!Input.GetMouseButtonDown(0) && !Input.GetMouseButtonDown(1)) return;
         bool rightClick = Input.GetMouseButtonDown(1);
+
+        // 候选字栏优先判定：它在槽位下方，但两者区域不重叠，先查它更直观
+        if (!rightClick && HandleCandidateClick())
+            return;
 
         for (int i = 0; i < slotFrames.Count; i++)
         {
@@ -570,6 +729,9 @@ public class BackpackUI : MonoBehaviour
 
         if (headerText != null)
             headerText.text = $"第 {GameData.currentFloor} 层   ——   当前汉字「{hanzi.currentHanziName}」";
+
+        // 候选汉字栏：按当前笔画池重新求解
+        RefreshCandidates();
 
         // 槽位
         int maxSlots = inventory.maxSlots;

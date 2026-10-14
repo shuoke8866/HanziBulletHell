@@ -67,6 +67,8 @@ public class HanziSystem : MonoBehaviour
     // 死亡重开：把汉字重置回"一"，并清空背包
     public void ResetToDefaultHanzi()
     {
+        EnsureInitialized();
+
         currentStrokes.Clear();
         currentStrokes.Add(StrokeType.Heng);
         currentHanziDef = null;
@@ -272,6 +274,41 @@ public class HanziSystem : MonoBehaviour
                                    StrokeType.Heng, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
             new List<string> { "omni", "ring", "pierce" },
             10, 9f, "皇：10发全方位穿透");
+
+        // ---------- 补充：字形库里已画好但此前没有弹幕定义的字 ----------
+        // 这些字的折线坐标早就写在 HanziRenderer 里，只是漏了数据库登记，
+        // 于是玩家永远拼不出来。补上之后可合成字数从 32 提到 38。
+
+        AddHanzi("八",
+            new List<StrokeType> { StrokeType.Pie, StrokeType.Na },
+            new List<string> { "vshape" },
+            2, 11.5f, "八：2发分开斜射");
+
+        AddHanzi("刀",
+            new List<StrokeType> { StrokeType.Zhe, StrokeType.Pie },
+            new List<string> { "scatter" },
+            3, 10.5f, "刀：3发扇形劈砍");
+
+        AddHanzi("上",
+            new List<StrokeType> { StrokeType.Shu, StrokeType.Heng, StrokeType.Heng },
+            new List<string> { "parallel" },
+            3, 11f, "上：3发平行");
+
+        AddHanzi("下",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Dian },
+            new List<string> { "cross", "shotgun" },
+            4, 10f, "下：4发十字霰弹");
+
+        AddHanzi("丰",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Heng, StrokeType.Shu },
+            new List<string> { "parallel", "pierce" },
+            5, 10.5f, "丰：5发平行穿透");
+
+        AddHanzi("由",
+            new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng,
+                                   StrokeType.Shu, StrokeType.Heng },
+            new List<string> { "ring", "cross" },
+            6, 9.5f, "由：6发环状十字");
     }
     // 简化添加方法
     // 注意：不再显式传伤害 —— 单发伤害统一由"笔画数"推导，
@@ -291,6 +328,139 @@ public class HanziSystem : MonoBehaviour
             bulletScale = 1f,
             description = desc
         });
+    }
+
+    // ========== 笔画池与最优解（新的核心机制）==========
+    //
+    // 取代原来的"笔顺逐步成长"：不再要求目标 = 当前 +1 笔，
+    // 也不再看笔顺是不是目标的有序子序列，而是看"手上所有笔画能拼出什么"。
+
+    /// <summary>
+    /// 当前可用的全部笔画 = 当前汉字的笔画 + 背包里的笔画。
+    /// 这是"最优解"计算的输入。
+    /// </summary>
+    public List<StrokeType> BuildStrokePool()
+    {
+        EnsureInitialized();
+
+        var pool = new List<StrokeType>();
+
+        if (currentStrokes != null) pool.AddRange(currentStrokes);
+
+        StrokeInventory inv = GetComponent<StrokeInventory>();
+        if (inv != null && inv.strokes != null) pool.AddRange(inv.strokes);
+
+        return pool;
+    }
+
+    /// <summary>
+    /// 在当前进度下求解可切换的候选汉字，最优解排在第一个。
+    /// 背包面板用它来展示「可切换的汉字」列表。
+    /// </summary>
+    /// <summary>求解器实跑：池子 = 当前字 + 背包，看能不能得出候选</summary>
+    public List<HanziOption> GetSwitchCandidates()
+    {
+        EnsureInitialized();
+        return HanziSolver.Solve(BuildStrokePool(), hanziDatabase);
+    }
+
+    /// <summary>
+    /// 切换到指定汉字：把该字需要的笔画从「当前字 + 背包」里扣掉，
+    /// 用掉的背包笔画会被移除，剩下的当前字笔画退回背包。
+    ///
+    /// 这样"拆了重拼"不会凭空生出或吞掉笔画。
+    /// </summary>
+    public bool SwitchTo(HanziDef target)
+    {
+        EnsureInitialized();
+
+        if (target == null || target.strokes == null || target.strokes.Count == 0)
+            return false;
+
+        var remaining = BuildStrokePool();
+
+        // 逐个扣掉目标字需要的笔画
+        foreach (StrokeType s in target.strokes)
+        {
+            int idx = remaining.IndexOf(s);
+            if (idx < 0)
+            {
+                GameLog.Warn($"切换「{target.hanziName}」失败：缺少笔画 {StrokeUtil.NameOf(s)}");
+                return false;
+            }
+            remaining.RemoveAt(idx);
+        }
+
+        // 剩下的笔画全部退回背包（容量不够就丢弃并提示）
+        StrokeInventory inv = GetComponent<StrokeInventory>();
+        if (inv != null)
+        {
+            inv.strokes.Clear();
+            int dropped = 0;
+            foreach (StrokeType s in remaining)
+            {
+                if (inv.strokes.Count < inv.maxSlots) inv.strokes.Add(s);
+                else dropped++;
+            }
+            inv.SaveToGameData();
+
+            if (dropped > 0)
+                GameToast.Show($"背包已满，{dropped} 个笔画被丢弃", new Color(1f, 0.6f, 0.5f));
+        }
+
+        CommitHanzi(target);
+        return true;
+    }
+
+    /// <summary>
+    /// 拾取一笔后自动应用最优解：把新笔画加进池子，重新求解并切到最复杂的那个。
+    /// 返回 false 表示池子里凑不出任何字（这一笔用不上）。
+    /// </summary>
+    public bool ApplyBestFor(StrokeType newStroke)
+    {
+        EnsureInitialized();
+
+        StrokeInventory inv = GetComponent<StrokeInventory>();
+
+        // 新笔画先放进背包，这样它会计入笔画池
+        bool added = false;
+        if (inv != null && inv.strokes.Count < inv.maxSlots)
+        {
+            inv.strokes.Add(newStroke);
+            added = true;
+        }
+
+        List<HanziOption> ranked = GetSwitchCandidates();
+
+        // 求解结果里挑第一个"确实会改变当前汉字"的候选。
+        // 池子里的多余笔画可能让最优解仍然等于当前字（比如已经是大字），
+        // 这时应当继续往下看有没有别的字可换，而不是直接放弃。
+        foreach (HanziOption opt in ranked)
+        {
+            if (IsSameHanzi(opt.def, currentHanziDef)) continue;
+
+            if (SwitchTo(opt.def)) return true;
+
+            // 理论上 SwitchTo 不会失败（候选就是从池子里算出来的），
+            // 真失败了就继续尝试下一个候选。
+        }
+
+        // 没有任何更好的字 → 这一笔留在背包里备用。
+        // 注意这里必须显式保存：SwitchTo 没被调用时，背包的改动不会写回 GameData，
+        // 之前就是因为漏了这一步导致"捡到用不上的笔画会凭空消失"。
+        if (added && inv != null)
+        {
+            inv.SaveToGameData();
+            GameLog.Info($"笔画 [{StrokeUtil.NameOf(newStroke)}] 对「{currentHanziName}」现在用不上，进背包");
+        }
+
+        return false;
+    }
+
+    static bool IsSameHanzi(HanziDef a, HanziDef b)
+    {
+        if (a == null || b == null) return false;
+        return a.hanziName == b.hanziName;
     }
 
     // ========== 笔画应用 ==========
@@ -362,27 +532,25 @@ public class HanziSystem : MonoBehaviour
         // 关键：合成成功后立刻把画面上的字形换成新汉字
         SyncCharacterGlyph();
 
+        // 笔画特点：含横→穿透、含竖→护罩、含撇捺→斩击、含点→灼烧、含折→折返
+        // 先确保能力组件已挂载（运行时挂载，避免手改场景）
+        PlayerKit.EnsureAttached();
+        if (traits == null) traits = GetComponent<StrokeTraits>();
+        if (traits != null) traits.Refresh(matched);
+
         GameToast.Show($"「{currentHanziName}」  {matched.description}", new Color(1f, 0.95f, 0.6f));
 
         GameLog.Info($"获得笔画！当前汉字：「{currentHanziName}」- {matched.description}");
     }
 
+    StrokeTraits traits;
+
     // 兼容旧调用：有歧义时自动取第一个可变候选（不会卡住流程）
     public bool TryAddStroke(StrokeType newStroke)
     {
-        List<HanziDef> candidates;
-        StrokeResult r = TryAddStrokeDetailed(newStroke, out candidates);
-
-        if (r == StrokeResult.Success) return true;
-        if (r == StrokeResult.NeedChoice)
-        {
-            // 自动合成时遇到歧义：默认取第一个，并记住偏好，避免反复打断
-            HanziDef pick = candidates[0];
-            PinPreference(pick);
-            CommitHanzi(pick);
-            return true;
-        }
-        return false;
+        // 新机制：拾取后按"手上所有笔画能拼出的最复杂汉字"自动切换，
+        // 不再走旧的"笔顺 +1 笔成长"判定。
+        return ApplyBestFor(newStroke);
     }
     // 根据笔画列表返回能组成的汉字名（不能组成则返回"未知"）
     public string GetPossibleHanziName(List<StrokeType> strokes)
@@ -423,6 +591,30 @@ public class HanziSystem : MonoBehaviour
     // 这里按"笔画数"分桶，查询时只扫同长度的桶。
 
     Dictionary<int, List<HanziDef>> byStrokeCount;
+
+    /// <summary>
+    /// 确保字库与索引已经建好。可以重复调用（幂等）。
+    ///
+    /// 正常运行时由 Awake 调用。之所以单独暴露出来，是因为批处理/编辑器脚本
+    /// 里 MonoBehaviour 的 Awake 不一定会被 PlayerLoop 驱动到 —— 那样字库会是空的，
+    /// 所有合成逻辑静默失效。有了这个入口，任何调用方都能先保证状态正确。
+    /// </summary>
+    public void EnsureInitialized()
+    {
+        if (hanziDatabase == null || hanziDatabase.Count == 0)
+            BuildDatabase();
+
+        if (byStrokeCount == null || byStrokeCount.Count == 0)
+            BuildIndex();
+
+        if (currentStrokes == null || currentStrokes.Count == 0)
+        {
+            currentStrokes = new List<StrokeType> { StrokeType.Heng };
+            SaveStrokesToGameData();
+        }
+
+        UpdateCurrentHanzi();
+    }
 
     void BuildIndex()
     {
@@ -612,35 +804,41 @@ public class HanziSystem : MonoBehaviour
     /// <summary>勾选的笔画能拼出哪些汉字</summary>
     public List<HanziDef> GetCombineCandidates(List<StrokeType> selectedStrokes)
     {
-        var none = new List<HanziDef>();
-        if (selectedStrokes == null || selectedStrokes.Count == 0) return none;
+        if (selectedStrokes == null || selectedStrokes.Count == 0)
+            return new List<HanziDef>();
 
-        // A) 当前汉字 + 勾选笔画，正好是一个字
-        List<StrokeType> combined = new List<StrokeType>(currentStrokes);
-        combined.AddRange(selectedStrokes);
+        var result = new List<HanziDef>();
+
+        // 可用笔画池：当前字的笔画 + 勾选的笔画
+        List<StrokeType> pool = new List<StrokeType>(currentStrokes);
+        pool.AddRange(selectedStrokes);
 
         foreach (HanziDef def in hanziDatabase)
         {
-            if (MultisetEquals(def.strokes, combined)) return new List<HanziDef> { def };
+            if (def.strokes == null || def.strokes.Count == 0) continue;
+
+            // 还是当前这个字，没意义
+            if (currentHanziDef != null && MultisetEquals(def.strokes, currentHanziDef.strokes))
+                continue;
+
+            // A/B：目标字的笔画能从「当前字 + 勾选」里凑出来
+            if (ContainsMultiset(pool, def.strokes))
+            {
+                result.Add(def);
+                continue;
+            }
+
+            // C 重塑：目标字的笔画完全来自勾选的那部分，当前字的笔画不参与 ——
+            // 也就是"换成另一种结构"。
+            //
+            // 这一条是必须的：没有它，「一」永远变不成「丨」（一 的笔顺不是 丨 的
+            // 有序子序列），于是 丨/丿/丶 以及只能从它们长出来的 人/水/火/刀
+            // 全部不可达 —— 32 个字里有 7 个永远拿不到。
+            if (ContainsMultiset(selectedStrokes, def.strokes))
+                result.Add(def);
         }
 
-        // B) 勾选笔画自己就是一个字
-        foreach (HanziDef def in hanziDatabase)
-        {
-            if (MultisetEquals(def.strokes, selectedStrokes)) return new List<HanziDef> { def };
-        }
-
-        // C) 当前汉字 + 勾选笔画的**部分**组合也能成字（允许玩家用掉一部分）
-        List<HanziDef> partial = new List<HanziDef>();
-        foreach (HanziDef def in hanziDatabase)
-        {
-            if (def.strokes.Count > combined.Count) continue;
-            if (MultisetEquals(def.strokes, currentStrokes)) continue;   // 还是原来的字，没意义
-            if (ContainsMultiset(combined, def.strokes) &&
-                !ContainsMultiset(currentStrokes, def.strokes))
-                partial.Add(def);
-        }
-        return partial;
+        return result;
     }
 
     /// <summary>无序匹配：两组笔画的"种类计数"完全相同</summary>
@@ -934,97 +1132,172 @@ public class HanziSystem : MonoBehaviour
         SpawnByTags(firePos, baseDirection, currentHanziDef);
     }
 
+        /// <summary>
+    /// 按标签生成弹幕。
+    ///
+    /// 关键设计：**bulletCount 是权威的子弹总数**，攻击标签只决定"这些子弹怎么摆"，
+    /// 而不是每个标签各自开火一轮。
+    ///
+    /// 之前的写法是 foreach(tag) + switch，每个标签都会独立发射：
+    /// 皇 声明 10 发却实际打出 18 发（omni 8 + ring 10），田/主/圭 都是 12 发。
+    /// 后果是越复杂的字画面越糊、而且伤害摊薄除数只按声明值算（1/3），
+    /// 导致复杂度收益被系统性低估，各个字的手感也趋于雷同。
+    ///
+    /// 现在：把 bulletCount 按"形态标签"均分，每个标签只负责自己那一份，
+    /// "pierce" 之类的纯增益标签不参与分配。
+    /// </summary>
     void SpawnByTags(Vector3 firePos, Vector3 baseDir, HanziDef def)
     {
-        int count = def.bulletCount;
+        int total = Mathf.Max(1, def.bulletCount);
         float speed = CurrentBulletSpeed(def.bulletSpeed);
         int dmg = CurrentDamage;
         float scale = def.bulletScale;
-        bool pierce = def.attackTags.Contains("pierce");
 
+        // 穿透不再看标签，而是看"这个字含不含横画"（含横 → 所有弹幕穿透）。
+        // 层数由 StrokeTraits 决定：基础 3 层，王 +2，皇再追加。
+        bool pierce = traits != null && traits.Pierce;
+
+        // 收集"形态标签"（决定子弹怎么摆的），纯增益标签跳过
+        var shapes = new System.Collections.Generic.List<string>();
         foreach (string tag in def.attackTags)
         {
-            switch (tag)
-            {
-                case "straight":   // 1发直线
-                    SpawnBullet(firePos, baseDir, speed, dmg, scale, pierce);
-                    break;
+            if (tag == "pierce") continue;
+            shapes.Add(tag);
+        }
 
-                case "parallel":   // N发平行（继承：横画的累积）
-                    int parallelCount = Mathf.Clamp(count, 2, 4);
-                    // baseDir 是 XY 平面向量，Cross(baseDir, forward) 的 XY 分量为 0，
-                    // 会导致所有子弹完全重叠；这里改用 2D 垂直向量 (-y, x)。
-                    Vector3 side = new Vector3(-baseDir.y, baseDir.x, 0f).normalized;
-                    for (int i = 0; i < parallelCount; i++)
-                    {
-                        float offset = (i - (parallelCount - 1) / 2f) * 0.4f;
-                        Vector3 offsetPos = firePos + side * offset;
-                        SpawnBullet(offsetPos, baseDir, speed, dmg, scale, pierce);
-                    }
-                    break;
+        // 没有任何形态标签 → 单发直线
+        if (shapes.Count == 0)
+        {
+            SpawnBullet(firePos, baseDir, speed, dmg, scale, pierce,
+                PickStrokeFor(0), true);
+            return;
+        }
 
-                case "cross":      // 4发十字（竖的特征）
-                    for (int i = 0; i < 4; i++)
-                    {
-                        Vector3 dir = Quaternion.Euler(0, 0, 90f * i) * baseDir;
-                        SpawnBullet(firePos, dir, speed, dmg, scale, pierce);
-                    }
-                    break;
+        // 把 total 发子弹按形态标签轮流均分：
+        // 第一个标签拿到最多（保证主形态可辨识），余数依次分给后面的标签。
+        //   例：田（ring+cross，8 发）→ ring 4 发 + cross 4 发
+        //       皇（omni+ring，10 发）→ omni 5 发 + ring 5 发
+        int[] quota = new int[shapes.Count];
+        int baseQuota = total / shapes.Count;
+        int remainder = total % shapes.Count;
+        for (int i = 0; i < shapes.Count; i++)
+            quota[i] = baseQuota + (i < remainder ? 1 : 0);
 
-                case "vshape":     // 2发V形（撇捺斜向）
-                    SpawnBullet(firePos, Quaternion.Euler(0, 0, 45f) * baseDir, speed, dmg, scale, pierce);
-                    SpawnBullet(firePos, Quaternion.Euler(0, 0, -45f) * baseDir, speed, dmg, scale, pierce);
-                    break;
+        // 子弹外观的笔画来源：遍历这个字实际的笔画。
+        // 需求是"每多一个横就多一个横形状的子弹"，所以顺序遍历即可 ——
+        // 3 横的字就会连出 3 发横条，横竖混排的字会混出两种形状。
+        var strokeList = new System.Collections.Generic.List<StrokeType>();
+        if (def.strokes != null) strokeList.AddRange(def.strokes);
 
-                case "diagonal":   // 4发对角斜向（加强版撇捺）
-                    SpawnBullet(firePos, Quaternion.Euler(0, 0, 30f) * baseDir, speed, dmg, scale, pierce);
-                    SpawnBullet(firePos, Quaternion.Euler(0, 0, -30f) * baseDir, speed, dmg, scale, pierce);
-                    SpawnBullet(firePos, Quaternion.Euler(0, 0, 150f) * baseDir, speed, dmg, scale, pierce);
-                    SpawnBullet(firePos, Quaternion.Euler(0, 0, -150f) * baseDir, speed, dmg, scale, pierce);
-                    break;
+        int strokeCursor = 0;
+        for (int s = 0; s < shapes.Count; s++)
+        {
+            if (quota[s] <= 0) continue;
 
-                case "scatter":    // 扇形散射（横+撇捺的扩展）
-                    int scatterCount = Mathf.Clamp(count, 3, 7);
-                    for (int i = 0; i < scatterCount; i++)
-                    {
-                        float angle = -40f + (80f / (scatterCount - 1)) * i;
-                        Vector3 dir = Quaternion.Euler(0, 0, angle) * baseDir;
-                        SpawnBullet(firePos, dir, speed, dmg, scale, pierce);
-                    }
-                    break;
-
-                case "omni":       // 环形全向（十字+对角）
-                    for (int i = 0; i < 8; i++)
-                    {
-                        Vector3 dir = Quaternion.Euler(0, 0, 45f * i) * baseDir;
-                        SpawnBullet(firePos, dir, speed, dmg, scale, pierce);
-                    }
-                    break;
-
-                case "ring":       // 环形弹幕（折的特征）
-                    int ringCount = Mathf.Clamp(count, 6, 12);
-                    for (int i = 0; i < ringCount; i++)
-                    {
-                        float angle = (360f / ringCount) * i;
-                        Vector3 dir = Quaternion.Euler(0, 0, angle) * baseDir;
-                        SpawnBullet(firePos, dir, speed * 0.7f, dmg, scale * 0.8f, pierce);
-                    }
-                    break;
-
-                case "shotgun":    // 短距霰弹（点的特征）
-                    int pelletCount = 3;
-                    for (int i = 0; i < pelletCount; i++)
-                    {
-                        float angle = -15f + 15f * i;
-                        Vector3 dir = Quaternion.Euler(0, 0, angle) * baseDir;
-                        SpawnBullet(firePos, dir, speed * 0.6f, dmg, scale * 0.8f, pierce);
-                    }
-                    break;
-            }
+            int groupStart = strokeCursor;
+            SpawnShape(shapes[s], quota[s], firePos, baseDir, speed, dmg, scale, pierce,
+                       i => StrokeAt(strokeList, groupStart + i));
+            strokeCursor += quota[s];
         }
     }
 
-    void SpawnBullet(Vector3 pos, Vector3 dir, float spd, int dmg, float scale, bool canPierce)
+    /// <summary>取字形里第 index 个笔画（循环使用），保证不会越界返回异常值</summary>
+    static StrokeType StrokeAt(System.Collections.Generic.List<StrokeType> list, int index)
+    {
+        if (list == null || list.Count == 0) return StrokeType.Heng;
+        return list[index % list.Count];
+    }
+
+    /// <summary>取当前字第 index 个笔画</summary>
+    StrokeType PickStrokeFor(int index)
+    {
+        if (currentHanziDef == null || currentHanziDef.strokes == null ||
+            currentHanziDef.strokes.Count == 0)
+            return StrokeType.Heng;
+
+        return StrokeAt(currentHanziDef.strokes, index);
+    }
+
+    /// <summary>按指定形态摆放 n 发子弹，每发的形状取自 strokeOf 给出的笔画</summary>
+    void SpawnShape(string shape, int n, Vector3 firePos, Vector3 baseDir,
+                    float speed, int dmg, float scale, bool pierce,
+                    System.Func<int, StrokeType> strokeOf)
+    {
+        // baseDir 是 XY 平面向量，Vector3.Cross(baseDir, forward) 的 XY 分量为 0
+        // 会导致子弹完全重叠，所以统一用 2D 垂直向量 (-y, x)。
+        Vector3 side = new Vector3(-baseDir.y, baseDir.x, 0f).normalized;
+
+        for (int i = 0; i < n; i++)
+        {
+            StrokeType st = strokeOf != null ? strokeOf(i) : StrokeType.Heng;
+            Vector3 dir = baseDir;
+            Vector3 pos = firePos;      // 注意：不能改 firePos 本身，否则偏移会逐发累加
+            float spd = speed;
+            float sc = scale;
+
+            switch (shape)
+            {
+                case "straight":
+                    break;
+
+                case "parallel":
+                    pos = firePos + side * ((i - (n - 1) / 2f) * 0.4f);
+                    break;
+
+                case "cross":
+                    dir = Quaternion.Euler(0, 0, 90f * (i % 4)) * baseDir;
+                    break;
+
+                case "vshape":
+                    dir = Quaternion.Euler(0, 0, (i % 2 == 0) ? 45f : -45f) * baseDir;
+                    break;
+
+                case "diagonal":
+                    float[] diag = { 30f, -30f, 150f, -150f };
+                    dir = Quaternion.Euler(0, 0, diag[i % 4]) * baseDir;
+                    break;
+
+                case "scatter":
+                    float ts = n > 1 ? (float)i / (n - 1) : 0.5f;
+                    dir = Quaternion.Euler(0, 0, -40f + 80f * ts) * baseDir;
+                    break;
+
+                case "omni":
+                    dir = Quaternion.Euler(0, 0, 360f / n * i) * baseDir;
+                    break;
+
+                case "ring":
+                    dir = Quaternion.Euler(0, 0, 360f / n * i) * baseDir;
+                    spd = speed * 0.7f;
+                    sc = scale * 0.8f;
+                    break;
+
+                case "shotgun":
+                    float tp = n > 1 ? (float)i / (n - 1) : 0.5f;
+                    dir = Quaternion.Euler(0, 0, -15f + 30f * tp) * baseDir;
+                    spd = speed * 0.6f;
+                    sc = scale * 0.8f;
+                    break;
+
+                default:
+                    break;
+            }
+
+            SpawnBullet(pos, dir, spd, dmg, sc, pierce, st, true);
+        }
+    }
+
+void SpawnBullet(Vector3 pos, Vector3 dir, float spd, int dmg, float scale, bool canPierce)
+    {
+        SpawnBullet(pos, dir, spd, dmg, scale, canPierce, StrokeType.Heng, true);
+    }
+
+    /// <summary>
+    /// 生成一发子弹。stroke 决定弹幕外观（横条 / 竖条 / 斜条 / 圆点 / 折角）。
+    /// 需求：子弹要长成对应笔画的形状，所以每发都按它所属的笔画来画。
+    /// </summary>
+    void SpawnBullet(Vector3 pos, Vector3 dir, float spd, int dmg, float scale,
+                     bool canPierce, StrokeType stroke, bool applyShape)
     {
         GameObject bullet = Instantiate(bulletPrefab, pos, Quaternion.identity);
         Bullet b = bullet.GetComponent<Bullet>();
@@ -1033,6 +1306,17 @@ public class HanziSystem : MonoBehaviour
             b.SetDirection(dir);
             b.isPlayerBullet = true;
             b.Setup(spd, dmg, scale, canPierce);
+
+            if (applyShape)
+                b.SetStrokeShape(stroke, StrokeUtil.ColorOf(stroke));
+
+            // 含「点」→ 弹幕附带灼烧（最简版：复用现有的火 Buff 通道）
+            if (traits != null && traits.Burn)
+            {
+                b.hasFireBuff = true;
+                b.fireDPS = 1.2f;
+                b.fireDuration = 2.5f;
+            }
         }
 
         // 应用Buff

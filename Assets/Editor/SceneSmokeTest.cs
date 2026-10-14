@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -129,6 +130,123 @@ public static class SceneSmokeTest
             Debug.LogError("[冒烟] 场景里没有 GameManager —— 传送门将无法工作！");
         if (player == null)
             Debug.LogError("[冒烟] 场景里没有 Player —— 无法游玩！");
+
+        ReportHanziSystem(player);
+    }
+
+    /// <summary>
+    /// 报告汉字系统状态，并实跑一遍新合成机制（笔画池 → 最优解 → 特点开关）。
+    /// 这些是本次改动的核心，只静态看代码看不出问题。
+    /// </summary>
+    static void ReportHanziSystem(GameObject player)
+    {
+        if (player == null) return;
+
+        var hanzi = player.GetComponent<HanziSystem>();
+        var inv = player.GetComponent<StrokeInventory>();
+
+        if (hanzi == null)
+        {
+            Debug.LogError("[冒烟] Player 上没有 HanziSystem！");
+            return;
+        }
+
+        // 批处理下 MonoBehaviour 的 Awake 不一定会被 PlayerLoop 驱动到，
+        // 这里显式把汉字重置成「一」，保证后面的求解器验证从确定状态出发
+        hanzi.ResetToDefaultHanzi();
+
+        Debug.Log($"[冒烟]   汉字系统：当前「{hanzi.currentHanziName}」" +
+                  $"，背包 {inv?.strokes.Count ?? 0}/{inv?.maxSlots ?? 0}");
+
+        // 运行时挂载能力组件
+        PlayerKit.EnsureAttached();
+
+        bool hasTraits = player.GetComponent<StrokeTraits>() != null;
+        bool hasShield = player.GetComponent<PlayerShield>() != null;
+        bool hasSlash = player.GetComponent<MeleeSlash>() != null;
+
+        Debug.Log($"[冒烟]   能力组件：笔画特点={(hasTraits ? "有" : "无")} " +
+                  $"护盾={(hasShield ? "有" : "无")} 斩击={(hasSlash ? "有" : "无")}");
+
+        if (!hasTraits || !hasShield || !hasSlash)
+            Debug.LogError("[冒烟] PlayerKit 未能挂载全部能力组件！");
+
+        // 求解器实跑
+        List<HanziOption> ranked = hanzi.GetSwitchCandidates();
+        var pool = hanzi.BuildStrokePool();
+
+        string poolStr = "";
+        foreach (StrokeType s in pool) poolStr += StrokeUtil.NameOf(s);
+
+        Debug.Log($"[冒烟]   笔画池=[{poolStr}] 候选数={ranked.Count}");
+
+        if (ranked.Count > 0)
+        {
+            List<HanziOption> best = HanziSolver.TiedWithBest(ranked);
+            string names = "";
+            foreach (HanziOption o in best)
+            {
+                if (names.Length > 0) names += " ";
+                names += o.def.hanziName;
+            }
+            Debug.Log($"[冒烟]   最优解：{ranked[0].def.hanziName}（并列 {best.Count} 个：{names}）");
+        }
+        else
+        {
+            Debug.LogError("[冒烟] 笔画池凑不出任何候选汉字 —— 合成系统可能坏了！");
+        }
+
+        // 特点开关：空汉字必须把所有特点清掉
+        var st = player.GetComponent<StrokeTraits>();
+        if (st != null)
+        {
+            st.Refresh(null);
+            bool none = !st.Pierce && !st.ShieldOnFire && !st.MeleeSlash;
+
+            Debug.Log($"[冒烟]   特点开关：空字清空={none}（期望 true）");
+            if (!none)
+                Debug.LogError("[冒烟] 空汉字时笔画特点没有被清空！");
+        }
+
+        SimulatePickups(hanzi, inv);
+    }
+
+    /// <summary>
+    /// 模拟一串拾取，端到端验证"拾取后自动切到最优解"。
+    /// 只做前几个场景，够证明机制连通即可。
+    /// </summary>
+    static void SimulatePickups(HanziSystem hanzi, StrokeInventory inv)
+    {
+        if (hanzi == null || inv == null) return;
+
+        // 清空背包，从「一」开始
+        inv.strokes.Clear();
+        inv.SaveToGameData();
+        hanzi.ResetToDefaultHanzi();
+
+        var sequence = new List<StrokeType>
+        {
+            StrokeType.Heng, StrokeType.Shu, StrokeType.Heng,
+            StrokeType.Pie, StrokeType.Na
+        };
+
+        Debug.Log("[冒烟]   === 模拟拾取序列 ===");
+
+        foreach (StrokeType s in sequence)
+        {
+            // 直接把笔画交给合成逻辑（等价于玩家捡起来）
+            bool ok = hanzi.TryAddStroke(s);
+
+            string poolStr = "";
+            foreach (StrokeType p in hanzi.BuildStrokePool()) poolStr += StrokeUtil.NameOf(p);
+
+            Debug.Log($"[冒烟]     捡「{StrokeUtil.NameOf(s)}」 → " +
+                      $"当前「{hanzi.currentHanziName}」 背包={inv.strokes.Count} " +
+                      $"池=[{poolStr}] 切换={(ok ? "成功" : "未变化")}");
+        }
+
+        if (hanzi.currentHanziName == "一")
+            Debug.LogError("[冒烟] 连续捡了 5 笔，汉字仍停在「一」—— 自动合成没生效！");
     }
 
     static void RunFrames(float seconds)

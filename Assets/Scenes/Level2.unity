@@ -3493,7 +3493,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1c3199de35faa824f99f1f23d4bc397a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxSlots: 6
+  maxSlots: 9
   strokes: 
 --- !u!1 &1381714087
 GameObject:

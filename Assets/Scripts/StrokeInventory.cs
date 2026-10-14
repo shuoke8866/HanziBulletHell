@@ -4,7 +4,7 @@ using System.Collections.Generic;
 public class StrokeInventory : MonoBehaviour
 {
     [Header("背包设置")]
-    public int maxSlots = 6;
+    public int maxSlots = GameBalance.InventorySlots;
 
     [Header("当前背包内容（只读，运行时查看）")]
     public List<StrokeType> strokes = new List<StrokeType>();

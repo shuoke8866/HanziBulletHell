@@ -28,6 +28,33 @@ public class Bullet : MonoBehaviour
         moveDirection = dir.normalized;
     }
 
+    /// <summary>
+    /// 按笔画类型设置弹幕外观。
+    ///
+    /// 需求：子弹要长成对应笔画的形状 —— 横是细长横条、竖是竖条、
+    /// 撇捺是斜条、点是圆点、折是折角形。
+    ///
+    /// 朝向处理：横条基准沿 X 轴、斜条基准 45°。要让条纹"顺着弹道方向"，
+    /// 就把贴图旋转到弹道角度；竖条基准已经是 Y 轴，需要额外偏 90°。
+    /// </summary>
+    public void SetStrokeShape(StrokeType type, Color tint)
+    {
+        var sr = GetComponent<SpriteRenderer>();
+        if (sr != null)
+        {
+            sr.sprite = ProcTex.ForStroke(type);
+            sr.color = tint;
+        }
+
+        float angle = Mathf.Atan2(moveDirection.y, moveDirection.x) * Mathf.Rad2Deg;
+
+        // 竖条与折角形的基准朝向和横条差 90°，补上这个差再随弹道旋转
+        if (type == StrokeType.Shu || type == StrokeType.Zhe)
+            angle -= 90f;
+
+        transform.rotation = Quaternion.Euler(0f, 0f, angle);
+    }
+
     // 自定义弹幕属性（由 HanziSystem 调用）
     public void Setup(float spd, int dmg, float scale, bool canPierce)
     {

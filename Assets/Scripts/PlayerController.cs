@@ -78,6 +78,13 @@ public class PlayerController : MonoBehaviour
             Sfx.PlayVaried(Sfx.Id.Shoot, 0.35f, 0.10f);
             // 极轻的镜头回馈：连射时会形成节奏感，但量很小以免累加成晕眩
             Fx.Shake(0.04f);
+
+            // 含「竖」→ 每次射击获得一层护罩
+            if (StrokeTraits.Instance != null && StrokeTraits.Instance.ShieldOnFire)
+            {
+                PlayerKit.EnsureAttached();
+                if (PlayerShield.Instance != null) PlayerShield.Instance.GainLayer();
+            }
         }
     }
 

@@ -42,6 +42,14 @@ public class PlayerHealth : MonoBehaviour
     {
         if (invincibleTimer > 0) return;   // 无敌中
 
+        // 护罩（来自"竖"笔画的特点）优先吸收：有层数就免掉这次伤害
+        PlayerKit.EnsureAttached();
+        if (PlayerShield.Instance != null && PlayerShield.Instance.AbsorbHit())
+        {
+            invincibleTimer = invincibleDuration * 0.5f;   // 仍给一点无敌，避免连续判定
+            return;
+        }
+
         currentHealth -= damage;
         invincibleTimer = invincibleDuration;
         SaveHealthToGameData();

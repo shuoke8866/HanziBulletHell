@@ -56,10 +56,10 @@ public static class GameBalance
 
     // ---------- 背包 ----------
     /// <summary>背包格子数</summary>
-    public const int InventorySlots = 6;
+    public const int InventorySlots = 9;
 
     /// <summary>玩家最多能持有的笔画数（决定能拼出多大的字）</summary>
-    public const int MaxPlayerStrokes = 6;
+    public const int MaxPlayerStrokes = 9;
 
     // ---------- 房间 ----------
     /// <summary>房间触发器判定用的玩家标签</summary>
