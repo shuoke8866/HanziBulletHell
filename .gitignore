@@ -64,9 +64,11 @@ Thumbs.db
 /_build*.log
 /_smoke.log
 /_scatter.log
+/_glyph.log
 /_*.log
 /_*.txt
 /_*.dll
+/_*.png
 
 # Unity 构建报告
 /[Bb]uildReports/
