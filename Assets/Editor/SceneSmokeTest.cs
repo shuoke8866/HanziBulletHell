@@ -229,11 +229,14 @@ public static class SceneSmokeTest
                 if (names.Length > 0) names += " ";
                 names += o.def.hanziName;
             }
-            Debug.Log($"[冒烟]   最优解：{ranked[0].def.hanziName}（并列 {best.Count} 个：{names}）");
+            Debug.Log($"[冒烟]   可用笔画的最优解：{ranked[0].def.hanziName}（并列 {best.Count} 个：{names}）");
         }
         else
         {
-            Debug.LogError("[冒烟] 笔画池凑不出任何候选汉字 —— 合成系统可能坏了！");
+            // 注意：这里用"可用笔画"（池 − 当前字占用）来判定。
+            // 开局池里只有 1 横、而当前字「一」正占着它 → 可用为 0，
+            // 拼不出任何字是**正常**的，不是故障。
+            Debug.Log($"[冒烟]   可用笔画还拼不出别的字（当前「{hanzi.currentHanziName}」占用了全部笔画）");
         }
 
         // 特点开关：空汉字必须把所有特点清掉
@@ -249,6 +252,51 @@ public static class SceneSmokeTest
         }
 
         SimulatePickups(hanzi, inv);
+        SimulateReversibleSwitch(hanzi, inv);
+    }
+
+    /// <summary>
+    /// 验证"切换可逆"—— 本次改动的核心。
+    ///
+    /// 旧实现每切一次字都会丢弃装不下的笔画，于是池子越来越小，
+    /// 切几次后只能拼出「一」，且再也回不去。这里模拟：
+    ///   反复在"最复杂的字"和"最简单的字"之间来回切，
+    ///   检查永久笔画池数量是否始终不变。
+    /// </summary>
+    static void SimulateReversibleSwitch(HanziSystem hanzi, StrokeInventory inv)
+    {
+        if (hanzi == null) return;
+
+        Debug.Log("[冒烟]   === 验证切换可逆性 ===");
+
+        int poolBefore = hanzi.AllStrokes().Count;
+        Debug.Log($"[冒烟]     切换前：当前「{hanzi.currentHanziName}」 永久池 {poolBefore} 笔");
+
+        // 连续切换 12 次（尽量在复杂字与简单字之间来回）
+        int switched = 0;
+        for (int i = 0; i < 12; i++)
+        {
+            // 交替：一次挑最复杂、一次挑最简单
+            List<HanziOption> all = hanzi.GetAllFormable();
+            if (all.Count == 0) break;
+
+            HanziDef target = (i % 2 == 0)
+                ? all[0].def                        // 最复杂
+                : all[all.Count - 1].def;           // 最简单
+
+            if (target == null) continue;
+            if (target.hanziName == hanzi.currentHanziName) continue;
+
+            if (hanzi.SwitchTo(target)) switched++;
+        }
+
+        int poolAfter = hanzi.AllStrokes().Count;
+        Debug.Log($"[冒烟]     切换 {switched} 次后：当前「{hanzi.currentHanziName}」 永久池 {poolAfter} 笔");
+
+        if (poolAfter != poolBefore)
+            Debug.LogError($"[冒烟] 永久笔画池被改变了（{poolBefore} → {poolAfter}）—— 切换应该是无损的！");
+        else
+            Debug.Log("[冒烟]     ✓ 笔画池无损，切换可逆");
     }
 
     /// <summary>
@@ -272,21 +320,25 @@ public static class SceneSmokeTest
 
         Debug.Log("[冒烟]   === 模拟拾取序列 ===");
 
+        int advanced = 0;
         foreach (StrokeType s in sequence)
         {
-            // 直接把笔画交给合成逻辑（等价于玩家捡起来）
+            // 直接把笔画交给拾取逻辑（等价于玩家捡起来）
             bool ok = hanzi.TryAddStroke(s);
+            if (ok) advanced++;
 
-            string poolStr = "";
-            foreach (StrokeType p in hanzi.BuildStrokePool()) poolStr += StrokeUtil.NameOf(p);
+            string availStr = "";
+            foreach (StrokeType p in hanzi.AvailableStrokes()) availStr += StrokeUtil.NameOf(p);
 
             Debug.Log($"[冒烟]     捡「{StrokeUtil.NameOf(s)}」 → " +
-                      $"当前「{hanzi.currentHanziName}」 背包={inv.strokes.Count} " +
-                      $"池=[{poolStr}] 切换={(ok ? "成功" : "未变化")}");
+                      $"当前「{hanzi.currentHanziName}」 永久池={hanzi.AllStrokes().Count}笔 " +
+                      $"可用=[{availStr}] 换字={(ok ? "是" : "否")}");
         }
 
-        if (hanzi.currentHanziName == "一")
-            Debug.LogError("[冒烟] 连续捡了 5 笔，汉字仍停在「一」—— 自动合成没生效！");
+        // 依新规则"只有捡到最多的那种笔画才自动变字"，不保证每次都变；
+        // 但 5 笔下去至少应该变过一次。
+        if (advanced == 0)
+            Debug.LogError("[冒烟] 连续捡了 5 笔，一次都没换字 —— 自动合成没生效！");
     }
 
     static void RunFrames(float seconds)

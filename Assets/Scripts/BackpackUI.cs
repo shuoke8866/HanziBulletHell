@@ -25,11 +25,17 @@ public class BackpackUI : MonoBehaviour
     [Header("样式")]
     public float slotSize = 150f;
     public float slotGap = 14f;
-    public int columns = 3;
+    public int columns = 6;
 
     [Header("候选汉字栏")]
-    /// <summary>候选字栏占用的额外高度</summary>
-    public float candidateAreaHeight = 150f;
+    /// <summary>候选字栏占用的额外高度（两行按钮 + 标题）</summary>
+    public float candidateAreaHeight = 240f;
+
+    /// <summary>
+    /// 面板一次构建的格子数上限。
+    /// 仓库本身不设上限（笔画永久保留），这里只是"一屏显示多少格"。
+    /// </summary>
+    public const int SlotCapacity = 18;
 
     private bool isOpen = false;
     private bool usingRuntimePanel = false;
@@ -84,13 +90,15 @@ public class BackpackUI : MonoBehaviour
     {
         Canvas canvas = FindObjectOfType<Canvas>();
 
-        int maxSlots = inventory != null ? inventory.maxSlots : 6;
+        // 仓库现在不设上限（笔画永久保留），面板要在一次构建里留足格子。
+        // 6 列 × 3 行 = 18 格；超出 18 笔时只显示前 18 笔并提示总数。
+        int maxSlots = SlotCapacity;
         int rows = Mathf.CeilToInt(maxSlots / (float)columns);
 
         float gridW = columns * slotSize + (columns - 1) * slotGap;
         float gridH = rows * slotSize + (rows - 1) * slotGap;
         float panelW = Mathf.Max(760f, gridW + 80f);
-        // 340 = 标题 + 详情 + 词条 + 底部提示；再加候选字栏（标题 + 一行按钮）
+        // 340 = 标题 + 详情 + 词条 + 底部提示；再加候选字栏（标题 + 两行按钮）
         float panelH = gridH + 340f + candidateAreaHeight;
 
         runtimePanel = new GameObject("BackpackPanel (Runtime)");
@@ -199,16 +207,22 @@ public class BackpackUI : MonoBehaviour
             TextAlignmentOptions.TopLeft, new Color(1f, 0.85f, 0.45f));
         SetTopAnchored(candidateTitle.rectTransform, 0f, -topOffset, panelW - 80f, 26f);
 
+        // 两行 × 6 个 = 最多 12 个候选。
+        // 用 6 个不够 —— 仓库攒起来之后能拼出的字会超过 10 个。
+        const int perRow = 6;
+        const int rows = 2;
         float btnW = 150f;
-        float btnH = 74f;
-        float gap = 12f;
-        int maxButtons = 6;
+        float btnH = 68f;
+        float gap = 10f;
 
-        float rowW = maxButtons * btnW + (maxButtons - 1) * gap;
+        float rowW = perRow * btnW + (perRow - 1) * gap;
         float startX = -rowW * 0.5f + btnW * 0.5f;
 
-        for (int i = 0; i < maxButtons; i++)
+        for (int i = 0; i < perRow * rows; i++)
         {
+            int col = i % perRow;
+            int row = i / perRow;
+
             GameObject btn = new GameObject("Candidate" + i);
             btn.transform.SetParent(runtimePanel.transform, false);
 
@@ -216,14 +230,16 @@ public class BackpackUI : MonoBehaviour
             rt.anchorMin = new Vector2(0.5f, 1f);
             rt.anchorMax = new Vector2(0.5f, 1f);
             rt.pivot = new Vector2(0.5f, 1f);
-            rt.anchoredPosition = new Vector2(startX + i * (btnW + gap), -(topOffset + 30f));
+            rt.anchoredPosition = new Vector2(
+                startX + col * (btnW + gap),
+                -(topOffset + 30f + row * (btnH + gap)));
             rt.sizeDelta = new Vector2(btnW, btnH);
 
             Image bg = btn.AddComponent<Image>();
             bg.color = new Color(0.22f, 0.26f, 0.36f, 1f);
             bg.raycastTarget = false;
 
-            TextMeshProUGUI lbl = MakeText(btn.transform, "Label", 20f,
+            TextMeshProUGUI lbl = MakeText(btn.transform, "Label", 19f,
                 TextAlignmentOptions.Center, Color.white);
             Stretch(lbl.rectTransform, 6f);
 
@@ -234,39 +250,56 @@ public class BackpackUI : MonoBehaviour
     }
 
     /// <summary>刷新候选栏：按当前笔画池重新求解最优解集合</summary>
+    /// <summary>
+    /// 刷新「可切换的汉字」栏。
+    ///
+    /// 新模型下这里放的是**仓库里能拼出的所有汉字**（不只是最优解那一档），
+    /// 按笔画数从多到少排。因为笔画池永久保留、切换可逆，
+    /// 玩家点了哪个字都能再点回来，不需要"退回去"的额外操作。
+    ///
+    /// 栏目标题会说明当前仓库里各笔画的数量，以及"已合成过几个字"。
+    /// </summary>
     void RefreshCandidates()
     {
         if (candidateTitle == null || hanzi == null) return;
 
         candidateOptions.Clear();
 
-        List<HanziOption> ranked = hanzi.GetSwitchCandidates();
+        // 仓库里能拼出的全部汉字（按复杂度降序）
+        List<HanziOption> all = hanzi.GetAllFormable();
+        if (all.Count > 0) candidateOptions.AddRange(all);
 
-        // 只展示"最优解"那一档（关键笔画数/消耗数/总笔画数都并列的字）
-        List<HanziOption> best = HanziSolver.TiedWithBest(ranked);
-        if (best.Count > 0) candidateOptions.AddRange(best);
+        // 标题：说明仓库现状，并给出"哪个字最复杂"的提示
+        List<StrokeType> avail = hanzi.AvailableStrokes();
 
-        // 池子里出现最多的笔画，用来给玩家解释"为什么是这些字"
-        List<StrokeType> pool = hanzi.BuildStrokePool();
-        List<StrokeType> keyTypes;
-        int maxFreq = HanziSolver.MaxFrequency(pool, out keyTypes);
-
-        string keyNames = "";
-        foreach (StrokeType t in keyTypes)
+        string counted = "";
+        var seen = new List<StrokeType>();
+        foreach (StrokeType t in avail)
         {
-            if (keyNames.Length > 0) keyNames += "/";
-            keyNames += StrokeUtil.NameOf(t);
+            if (seen.Contains(t)) continue;
+            seen.Add(t);
+
+            int n = 0;
+            foreach (StrokeType x in avail) if (x == t) n++;
+
+            if (counted.Length > 0) counted += " ";
+            counted += $"{StrokeUtil.NameOf(t)}×{n}";
         }
+
+        if (string.IsNullOrEmpty(counted)) counted = "（空）";
 
         if (candidateOptions.Count == 0)
         {
-            candidateTitle.text = "可切换的汉字：暂无（凑不出任何字）";
+            candidateTitle.text = $"可切换的汉字：暂无 —— 可用笔画 {counted} 拼不出任何字";
         }
         else
         {
             candidateTitle.text =
-                $"可切换的汉字（最多的是「{keyNames}」×{maxFreq}，点击即可切换）";
+                $"可切换的汉字（可用笔画 {counted}，共 {candidateOptions.Count} 个）";
         }
+
+        // 已合成过的字数（放标题下面那行用不上，这里并入提示）
+        int formedCount = hanzi.FormedHanziNames.Count;
 
         for (int i = 0; i < candidateButtons.Count; i++)
         {
@@ -278,19 +311,19 @@ public class BackpackUI : MonoBehaviour
             HanziOption opt = candidateOptions[i];
             bool isCurrent = hanzi.CurrentHanziDef != null &&
                              hanzi.CurrentHanziDef.hanziName == opt.def.hanziName;
+            bool wasFormed = hanzi.FormedHanziNames.Contains(opt.def.hanziName);
 
-            // 第一个是最优解，用更亮的底色标出来
             Image bg = candidateButtons[i].GetComponent<Image>();
             if (bg != null)
             {
-                if (isCurrent) bg.color = new Color(0.30f, 0.45f, 0.32f, 1f);
-                else if (i == 0) bg.color = new Color(0.32f, 0.38f, 0.55f, 1f);
+                if (isCurrent) bg.color = new Color(0.30f, 0.45f, 0.32f, 1f);        // 当前字：绿
+                else if (i == 0) bg.color = new Color(0.32f, 0.38f, 0.55f, 1f);      // 最复杂：蓝
                 else bg.color = new Color(0.22f, 0.26f, 0.36f, 1f);
             }
 
             if (candidateLabels[i] != null)
             {
-                string mark = isCurrent ? "●" : (i == 0 ? "★" : "  ");
+                string mark = isCurrent ? "●" : (wasFormed ? "○" : "  ");
                 candidateLabels[i].text =
                     $"{mark} {opt.def.hanziName}\n<size=70%>{opt.totalStrokes}画</size>";
             }
@@ -429,7 +462,7 @@ public class BackpackUI : MonoBehaviour
 
     void MoveHighlight(int dir)
     {
-        int max = inventory != null ? Mathf.Max(1, Mathf.Min(inventory.maxSlots, inventory.strokes.Count)) : 1;
+        int max = inventory != null ? Mathf.Max(1, Mathf.Min(slotFrames.Count, inventory.strokes.Count)) : 1;
         selectedSlot = (selectedSlot + dir + max) % max;
     }
 
@@ -733,8 +766,8 @@ public class BackpackUI : MonoBehaviour
         // 候选汉字栏：按当前笔画池重新求解
         RefreshCandidates();
 
-        // 槽位
-        int maxSlots = inventory.maxSlots;
+        // 槽位（格子数固定为 SlotCapacity，仓库可以比它大）
+        int maxSlots = slotFrames.Count;
         for (int i = 0; i < slotFrames.Count; i++)
         {
             bool has = i < inventory.strokes.Count;

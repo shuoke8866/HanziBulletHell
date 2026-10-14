@@ -11,6 +11,26 @@ public static class GameData
     // 背包笔画
     public static List<StrokeType> inventoryStrokes = new List<StrokeType>();
 
+    /// <summary>
+    /// **永久笔画池**：本局捡到过的所有笔画，只增不减。
+    ///
+    /// 这是"自由切换汉字"的基础。原来的模型把背包当作"当前可用笔画"：
+    /// 切换汉字时背包被清空重填，装不下的笔画直接丢弃 —— 于是每切一次字，
+    /// 池子就小一点，切几次之后只能拼出「一」，而且再也回不去。
+    ///
+    /// 改成的模型：
+    ///   可用笔画 = allStrokes - 当前汉字占用的笔画
+    ///   切换汉字只是换掉"当前字占用的那几笔"，池子本身从不缩小
+    ///   → 之前拼出过的任何字都还能再拼出来（可自由回退）
+    /// </summary>
+    public static List<StrokeType> allStrokes = new List<StrokeType>();
+
+    /// <summary>
+    /// 本局合成过的汉字名（按首次合成顺序）。
+    /// 背包里会把它们列出来供玩家点击切换。
+    /// </summary>
+    public static List<string> formedHanzi = new List<string>();
+
     // 当前元素
     public static ElementType currentElement = ElementType.None;
 
@@ -36,6 +56,12 @@ public static class GameData
         currentStrokes.Add(StrokeType.Heng);
 
         inventoryStrokes.Clear();
+
+        // 永久笔画池从「一」开始（玩家开局就是「一」）
+        allStrokes.Clear();
+        allStrokes.Add(StrokeType.Heng);
+        formedHanzi.Clear();
+        formedHanzi.Add("一");
 
         currentElement = ElementType.None;
         currentFloor = 1;

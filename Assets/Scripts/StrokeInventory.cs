@@ -36,11 +36,12 @@ public class StrokeInventory : MonoBehaviour
 
     void Update()
     {
-        // 数字键1-6：选择背包中的笔画尝试合成
+        // 数字键 1-9：按仓库里的笔画切换汉字
         // （背包面板打开时由 BackpackUI 接管按键，避免一次按键触发两套逻辑）
         if (BackpackUI.IsOpen) return;
 
-        for (int i = 0; i < strokes.Count && i < maxSlots; i++)
+        int n = Mathf.Min(strokes.Count, 9);
+        for (int i = 0; i < n; i++)
         {
             if (Input.GetKeyDown(KeyCode.Alpha1 + i))
             {
@@ -49,7 +50,17 @@ public class StrokeInventory : MonoBehaviour
         }
     }
 
-    // 尝试把背包第 index 个笔画加入当前汉字
+    /// <summary>
+    /// 数字键：按下仓库里第 index 个笔画 → 切换到"能用上这一笔的最复杂汉字"。
+    ///
+    /// **这里以前是错的**：它调用 hanzi.TryAddStroke(stroke)，而那是**拾取**入口
+    /// （会走 ApplyBestFor → 重新求解最优解）。于是每次按数字键都相当于"又捡了一笔"，
+    /// 解算器只看池子、没有保持现状的概念，结果越按越简单，最后退回「一」；
+    /// 同时那一笔还会被 RemoveAt 从背包里删掉，笔画就凭空消失了。
+    ///
+    /// 现在改成"切换语义"：不增不减笔画，只在已有仓库里挑一个用得上这一笔的字切过去。
+    /// 笔画永久保留（GameData.allStrokes），所以随时能再切回来。
+    /// </summary>
     public bool TryCombineFromBackpack(int index)
     {
         if (hanzi == null)
@@ -62,16 +73,21 @@ public class StrokeInventory : MonoBehaviour
 
         StrokeType stroke = strokes[index];
 
-        if (hanzi.TryAddStroke(stroke))
+        // 优先切到"能用到这一笔"的最复杂汉字
+        HanziDef pick = hanzi.SwitchToBestUsing(stroke);
+
+        // 没有能用到它的字 → 退回"可用笔画能拼出的最优解"
+        if (pick == null)
+            pick = hanzi.SwitchToBestAvailable();
+
+        if (pick == null)
         {
-            strokes.RemoveAt(index);
-            SaveToGameData();
-            GameLog.Info($"背包笔画 [{stroke}] 融合成功！当前汉字：「{hanzi.currentHanziName}」");
-            return true;
+            GameLog.Info($"仓库里的笔画拼不出任何新字（当前「{hanzi.currentHanziName}」）");
+            return false;
         }
 
-        GameLog.Info($"笔画 [{stroke}] 无法与当前汉字组合，留在背包");
-        return false;
+        GameLog.Info($"按「{StrokeUtil.NameOf(stroke)}」切换 → 当前汉字：「{hanzi.currentHanziName}」");
+        return true;
     }
 
     // 直接移除指定槽位（歧义选择时由 UI 判定成功后调用）
@@ -110,19 +126,26 @@ public class StrokeInventory : MonoBehaviour
         SaveToGameData();
     }
 
-    // 添加笔画到背包
+    /// <summary>
+    /// 往背包（= 可用笔画仓库）里放一笔。
+    ///
+    /// **不再有容量限制**。原来的实现是"满 9 格就拒绝 / 切换汉字时把装不下的
+    /// 直接丢弃"，而这正是"字越切越简单、最后只能拼出一"的根因：
+    /// 池子 = 当前字 + 背包且总量有限，每切一次都要丢笔画。
+    ///
+    /// 现在背包只是"仓库的显示窗口"，笔画永久保留（见 GameData.allStrokes）。
+    /// maxSlots 仅用于决定 UI 一屏显示几格。
+    /// </summary>
     public bool AddStroke(StrokeType s)
     {
-        if (strokes.Count >= maxSlots)
-        {
-            GameLog.Info("背包已满！笔画留在原地。");
-            return false;
-        }
         strokes.Add(s);
         SaveToGameData();
-        GameLog.Info($"笔画 [{s}] 进入背包。背包：{strokes.Count}/{maxSlots}");
+        GameLog.Info($"笔画 [{StrokeUtil.NameOf(s)}] 存入仓库。仓库：{strokes.Count} 笔");
         return true;
     }
+
+    /// <summary>仓库里现在有多少笔（不再受 maxSlots 限制）</summary>
+    public int Count { get { return strokes.Count; } }
 
     // 就地同步到 GameData，保持引用不变
     public void SaveToGameData()

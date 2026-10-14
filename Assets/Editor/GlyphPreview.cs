@@ -45,7 +45,7 @@ public static class GlyphPreview
     /// <summary>把报告有问题的几个字放大，逐像素检查</summary>
     public static void ExportBig()
     {
-        ExportSet(new List<string> { "天", "里", "圭", "兀" }, 320);
+        ExportSet(new List<string> { "里", "圭" }, 320);
     }
 
     /// <summary>

@@ -21,12 +21,28 @@ public class HanziRenderer : MonoBehaviour
 
     // ---------------- 数据 ----------------
 
-    /// <summary>折线笔画（2~3 个点），渲染时会被展开成有宽度的轮廓线段。</summary>
+    /// <summary>
+    /// 折线笔画，**支持任意点数**（2 点以上）。
+    ///
+    /// 早期只支持 2~3 个点（直线 / 一个折角），做不了"竖+横+竖"这种
+    /// 多次拐折的笔画。现在点数不限，拖动编辑器可以随时在中间插点。
+    /// </summary>
     struct Poly
     {
-        public Vector2[] pts;
+        public List<Vector2> pts;
         public float t;
-        public Poly(Vector2[] p, float th) { pts = p; t = th; }
+
+        public Poly(Vector2[] p, float th)
+        {
+            pts = new List<Vector2>(p);
+            t = th;
+        }
+
+        public Poly(List<Vector2> p, float th)
+        {
+            pts = p;
+            t = th;
+        }
     }
 
     /// <summary>最终用于光栅化的带宽度线段，两端可以不同粗。</summary>
@@ -153,6 +169,137 @@ public class HanziRenderer : MonoBehaviour
         return n;
     }
 
+    /// <summary>
+    /// 笔画描述（给编辑器审计 / 拖动工具用）。
+    ///
+    /// **点数不限** —— 用 pts 存整条折线，拖动编辑器可以随时在中间插点，
+    /// 所以"竖+横+竖"这类需要多次拐折的笔画也能拖出来。
+    ///
+    /// kind 只用来决定"拖动时的约束"和"写回源码时用哪个构造器"：
+    ///   "H"  横 —— 拖动时保持水平
+    ///   "V"  竖 —— 拖动时保持垂直
+    ///   "D"  粗斜（撇捺）—— 端点自由
+    ///   "DS" 细斜（点）—— 端点自由，笔画更细
+    ///   "Z"  折 —— 多段折线，端点自由
+    /// </summary>
+    public struct StrokeInfo
+    {
+        public string kind;
+        public List<Vector2> pts;
+        public float thickness;
+
+        public Vector2 P(int i) { return pts[i]; }
+        public int Count { get { return pts != null ? pts.Count : 0; } }
+    }
+
+    /// <summary>
+    /// 取某个字的原始笔画坐标，供编辑器工具读写。
+    ///
+    /// 注意：这里返回的是**拷贝**。改完之后要调用 ApplyStrokes 才会生效。
+    /// </summary>
+    public static List<StrokeInfo> DebugStrokes(string ch)
+    {
+        if (defs == null) defs = BuildDefinitions();
+
+        Poly[] polys;
+        if (!defs.TryGetValue(ch, out polys)) return null;
+
+        var list = new List<StrokeInfo>();
+
+        foreach (Poly p in polys)
+        {
+            var si = new StrokeInfo
+            {
+                thickness = p.t,
+                pts = new List<Vector2>(p.pts)     // 拷贝，别改到原数据
+            };
+
+            if (p.pts.Count == 2)
+            {
+                float dx = p.pts[1].x - p.pts[0].x;
+                float dy = p.pts[1].y - p.pts[0].y;
+
+                if (Mathf.Abs(dy) < 1e-4f) si.kind = "H";
+                else if (Mathf.Abs(dx) < 1e-4f) si.kind = "V";
+                else si.kind = Mathf.Abs(p.t - 0.062f) < 0.001f ? "DS" : "D";
+            }
+            else
+            {
+                si.kind = "Z";
+            }
+
+            list.Add(si);
+        }
+
+        return list;
+    }
+
+    /// <summary>
+    /// 用编辑器改好的笔画替换某个字的定义（内存中生效，可立即看到效果）。
+    /// </summary>
+    public static bool ApplyStrokes(string ch, List<StrokeInfo> strokes)
+    {
+        if (defs == null) defs = BuildDefinitions();
+        if (!defs.ContainsKey(ch) || strokes == null || strokes.Count == 0) return false;
+
+        var arr = new Poly[strokes.Count];
+
+        for (int i = 0; i < strokes.Count; i++)
+        {
+            StrokeInfo s = strokes[i];
+            float t = s.thickness > 0f ? s.thickness : 0.078f;
+
+            if (s.pts == null || s.pts.Count < 2)
+            {
+                // 点数不合法就跳过（保持原来的笔画数，避免整张表错位）
+                arr[i] = new Poly(new[] { Vector2.zero, Vector2.zero }, t);
+                continue;
+            }
+
+            arr[i] = new Poly(new List<Vector2>(s.pts), t);
+        }
+
+        defs[ch] = arr;
+
+        // 贴图缓存必须清掉，否则还是显示旧字形
+        spriteCache.Clear();
+        return true;
+    }
+
+    /// <summary>把某个字恢复成源码里的原始定义</summary>
+    public static bool ResetGlyph(string ch)
+    {
+        if (defs == null) defs = BuildDefinitions();
+        if (!defs.ContainsKey(ch)) return false;
+
+        // 重建整张表 = 丢掉所有运行时修改
+        defs = BuildDefinitions();
+        spriteCache.Clear();
+        return true;
+    }
+
+    /// <summary>重建字形表（丢弃运行时改动的另一种写法）</summary>
+    public static void RebuildAll()
+    {
+        defs = null;
+        spriteCache.Clear();
+        defs = BuildDefinitions();
+    }
+
+    /// <summary>
+    /// 彻底清空与字形有关的所有内存状态。
+    ///
+    /// 拖动编辑器会通过 ApplyStrokes 改内存里的 defs。如果某个字怎么改都不对、
+    /// 想"从零重做"，光改源码不够 —— 旧的 defs 与 spriteCache 还在，
+    /// 场景里的字仍会显示旧贴图。这个方法把两处缓存都清掉，
+    /// 下一次取字形时从 BuildDefinitions() 完整重建。
+    /// </summary>
+    public static void ClearAllCaches()
+    {
+        defs = null;
+        spriteCache.Clear();
+    }
+
     void BuildSprite(string ch, Poly[] polys)
     {
         // 复用缓存的 Sprite，避免每次换字都重建贴图（这是拾取卡顿的主因）
@@ -182,53 +329,82 @@ public class HanziRenderer : MonoBehaviour
 
     static Seg[] BuildOutline(Poly p)
     {
-        Vector2[] v = p.pts;
-        if (v == null || v.Length < 2) return new Seg[0];
+        List<Vector2> v = p.pts;
+        if (v == null || v.Count < 2) return new Seg[0];
 
         var segs = new List<Seg>();
 
-        if (v.Length == 2)
+        // 找出所有"真正的拐角"：与前后两点连线偏离超过阈值的顶点。
+        //
+        // 阈值 0.06 是经验值：小于它说明这三点的走向基本一致（比如拖动编辑器里
+        // 在一条直线上多加的点），当作"同一段直笔"，不必在中间掐一刀。
+        const float cornerThreshold = 0.06f;
+
+        var corners = new List<int>();
+
+        if (v.Count == 2)
         {
-            segs.Add(new Seg { x0 = v[0].x, y0 = v[0].y, x1 = v[1].x, y1 = v[1].y, t0 = p.t, t1 = p.t });
+            segs.Add(new Seg
+            {
+                x0 = v[0].x, y0 = v[0].y,
+                x1 = v[1].x, y1 = v[1].y,
+                t0 = p.t, t1 = p.t
+            });
             return segs.ToArray();
         }
 
-        // 找到离首尾连线最远的顶点作为拐点
-        Vector2 a = v[0], b = v[v.Length - 1];
-        Vector2 ab = b - a;
-        float abLen = ab.magnitude;
-
-        int corner = 1;
-        float best = -1f;
-        for (int i = 1; i < v.Length - 1; i++)
+        for (int i = 1; i < v.Count - 1; i++)
         {
-            float d = abLen < 1e-6f
-                ? (v[i] - a).magnitude
-                : Mathf.Abs((v[i] - a).x * ab.y - (v[i] - a).y * ab.x) / abLen;
-            if (d > best) { best = d; corner = i; }
+            Vector2 prev = v[i - 1], cur = v[i], next = v[i + 1];
+            Vector2 chord = next - prev;
+            float len = chord.magnitude;
+
+            float dev = len < 1e-6f
+                ? (cur - prev).magnitude
+                : Mathf.Abs((cur - prev).x * chord.y - (cur - prev).y * chord.x) / len;
+
+            if (dev > cornerThreshold) corners.Add(i);
         }
 
-        // 等宽、拐角处不做外扩。
+        // 没有拐角 → 一整段直线（中间那些点只是编辑器留下的冗余点）
+        if (corners.Count == 0)
+        {
+            segs.Add(new Seg
+            {
+                x0 = v[0].x, y0 = v[0].y,
+                x1 = v[v.Count - 1].x, y1 = v[v.Count - 1].y,
+                t0 = p.t, t1 = p.t
+            });
+            return segs.ToArray();
+        }
+
+        // 相邻拐角之间是一段直笔；拐角处两段都保持满宽。
         //
-        // 演进过程：
-        //   1. 最初是"前半段满宽→半宽、后半段半宽→满宽"，想让拐角接上，
+        // 关于等宽的处理（演进过程）：
+        //   1. 最初写成"前半段满宽→半宽、后半段半宽→满宽"想让拐角接上，
         //      结果整条折线在拐角处掐细到一半 —— 口/日/田/白 的方框
-        //      看起来"腰部细一圈"，这是"字形不规整"的主要来源。
-        //   2. 改成等宽 + 端点外扩半个笔宽填缝，缝隙没了，
-        //      但笔画外侧会顶出一个小凸起（方框角上多个"钩"）。
-        //   3. 现在是等宽 + 不外扩：光栅化用的是**圆头端点**，
-        //      两段在拐角处本就重叠出一个圆角方块，直角已经接得住，
-        //      不需要额外外扩，也就没有凸起。
+        //      "腰部细一圈"，这是"字形不规整"的主要来源。
+        //   2. 改成等宽 + 端点外扩半个笔宽填缝，缝隙没了，但笔画外侧
+        //      会顶出一个小凸起（方框角上多个"钩"）。
+        //   3. 现在是等宽 + 不外扩：光栅化用圆头端点，两段在拐角处本就
+        //      重叠出一个圆角方块，直角已经接得住，不需要额外外扩。
+        int from = 0;
+        for (int c = 0; c < corners.Count; c++)
+        {
+            int to = corners[c];
+            segs.Add(new Seg
+            {
+                x0 = v[from].x, y0 = v[from].y,
+                x1 = v[to].x, y1 = v[to].y,
+                t0 = p.t, t1 = p.t
+            });
+            from = to;
+        }
+        // 最后一段：最后一个拐角 → 终点
         segs.Add(new Seg
         {
-            x0 = v[0].x, y0 = v[0].y,
-            x1 = v[corner].x, y1 = v[corner].y,
-            t0 = p.t, t1 = p.t
-        });
-        segs.Add(new Seg
-        {
-            x0 = v[corner].x, y0 = v[corner].y,
-            x1 = v[v.Length - 1].x, y1 = v[v.Length - 1].y,
+            x0 = v[from].x, y0 = v[from].y,
+            x1 = v[v.Count - 1].x, y1 = v[v.Count - 1].y,
             t0 = p.t, t1 = p.t
         });
 
@@ -330,6 +506,40 @@ public class HanziRenderer : MonoBehaviour
 
         System.Action<string> Save = key => { d[key] = L.ToArray(); L = new List<Poly>(); };
 
+        // --- 通用折线构造器：点数不限 ---
+        //
+        // 为什么不用 P(L, 粗, params float[])：
+        //   C# 的 params 不能直接变成可赋值的委托（Action<...>），
+        //   写 P(L, 0.078f, 0.5f,0.9f, ...) 会被编译器当成 10 个参数而报错
+        //   （CS1593: Delegate 'Action<List<Poly>, float, float[]>' does not take 10 arguments）。
+        //   所以按点数拆成 P3/P4/P5 三个重载，超过 5 点用 AddPoly 兜底。
+        //
+        // 拖动编辑器生成的代码就用这些形式，例如：
+        //   P4(L, 0.078f, 0.50f,0.90f, 0.50f,0.55f, 0.78f,0.55f, 0.78f,0.20f)
+
+        System.Action<List<Poly>, float, List<Vector2>> AddPoly =
+            (l, th, pts) => l.Add(new Poly(pts, th));
+
+        System.Action<List<Poly>, float, float, float, float, float, float, float> P3 =
+            (l, th, x0, y0, x1, y1, x2, y2) => AddPoly(l, th, new List<Vector2>
+            {
+                new Vector2(x0, y0), new Vector2(x1, y1), new Vector2(x2, y2)
+            });
+
+        System.Action<List<Poly>, float, float, float, float, float, float, float, float, float> P4 =
+            (l, th, x0, y0, x1, y1, x2, y2, x3, y3) => AddPoly(l, th, new List<Vector2>
+            {
+                new Vector2(x0, y0), new Vector2(x1, y1),
+                new Vector2(x2, y2), new Vector2(x3, y3)
+            });
+
+        System.Action<List<Poly>, float, float, float, float, float, float, float, float, float, float, float> P5 =
+            (l, th, x0, y0, x1, y1, x2, y2, x3, y3, x4, y4) => AddPoly(l, th, new List<Vector2>
+            {
+                new Vector2(x0, y0), new Vector2(x1, y1), new Vector2(x2, y2),
+                new Vector2(x3, y3), new Vector2(x4, y4)
+            });
+
         // ============================================================
         // 一画
         // ============================================================
@@ -355,41 +565,55 @@ public class HanziRenderer : MonoBehaviour
         H(L, 0.10f, 0.90f, 0.50f); Save("一");
         V(L, 0.50f, 0.10f, 0.90f); Save("丨");
         // 撇：从右上到左下
-        D(L, 0.62f, 0.84f, 0.34f, 0.16f); Save("丿");
+        // 丿
+        P4(L, 0.078f, 0.52f, 0.86f, 0.50f, 0.38f, 0.42f, 0.24f, 0.32f, 0.14f);
+        Save("丿");
         // 捺：从左上到右下
-        D(L, 0.38f, 0.84f, 0.66f, 0.16f); Save("乀");
+        // 乀
+        P4(L, 0.078f, 0.30f, 0.80f, 0.46f, 0.48f, 0.56f, 0.28f, 0.78f, 0.16f);
+        Save("乀");
         // 点：短促的斜点，别太细
         DS(L, 0.46f, 0.58f, 0.54f, 0.42f); Save("丶");
 
         // ============================================================
         // 二画
         // ============================================================
-        // 二：上短下长
-        H(L, 0.34f, 0.66f, 0.76f);
-        H(L, 0.10f, 0.90f, 0.24f); Save("二");
+        // 二
+        H(L, 0.26f, 0.70f, 0.70f);
+        H(L, 0.10f, 0.90f, 0.24f);
+        Save("二");
 
-        // 十：横竖都在中线上，竖上下出头
-        H(L, 0.10f, 0.90f, 0.50f);
-        V(L, 0.50f, 0.10f, 0.90f); Save("十");
+        // 十
+        H(L, 0.19f, 0.83f, 0.54f);
+        V(L, 0.50f, 0.14f, 0.92f);
+        Save("十");
 
-        // 人：撇捺从顶点分开
-        D(L, 0.50f, 0.88f, 0.18f, 0.12f);
-        D(L, 0.50f, 0.88f, 0.82f, 0.12f); Save("人");
+        // 人
+        P3(L, 0.078f, 0.48f, 0.88f, 0.44f, 0.58f, 0.18f, 0.20f);
+        P4(L, 0.078f, 0.44f, 0.58f, 0.62f, 0.38f, 0.72f, 0.28f, 0.86f, 0.20f);
+        Save("人");
 
-        // 八：两笔分开、不相连
-        D(L, 0.42f, 0.80f, 0.24f, 0.16f);
-        D(L, 0.58f, 0.80f, 0.76f, 0.16f); Save("八");
+        // 八
+        D(L, 0.42f, 0.74f, 0.21f, 0.28f);
+        D(L, 0.52f, 0.88f, 0.81f, 0.27f);
+        Save("八");
 
-        // 丁：横在上，竖钩从横中间垂下
-        H(L, 0.10f, 0.90f, 0.82f);
-        V(L, 0.50f, 0.18f, 0.82f); Save("丁");
+        // 丁
+        H(L, 0.15f, 0.83f, 0.82f);
+        P3(L, 0.078f, 0.35f, 0.29f, 0.49f, 0.19f, 0.49f, 0.81f);
+        Save("丁");
 
-        // 了：横折折向左下（第二笔是弯钩，用折线近似）
-        Z(L, 0.24f, 0.86f, 0.76f, 0.86f, 0.44f, 0.12f); Save("了");
+        // 了
+        // 注意：这条笔画有 6 个点，超过了 P5。请手动用 AddPoly(...) 写，或删掉几个点。
+        // 了
+        // 注意：这条笔画有 6 个点，超过了 P5。请手动用 AddPoly(...) 写，或删掉几个点。
+        AddPoly(L, 0.078f, new List<Vector2> { new Vector2(0.18f, 0.86f), new Vector2(0.76f, 0.86f), new Vector2(0.50f, 0.56f), new Vector2(0.50f, 0.36f), new Vector2(0.50f, 0.18f), new Vector2(0.30f, 0.38f) });
+        Save("了");
 
-        // 刀：横折 + 撇
-        Z(L, 0.24f, 0.86f, 0.76f, 0.86f, 0.46f, 0.12f);
-        D(L, 0.62f, 0.62f, 0.20f, 0.20f); Save("刀");
+        // 刀
+        P5(L, 0.078f, 0.24f, 0.86f, 0.76f, 0.86f, 0.74f, 0.44f, 0.74f, 0.30f, 0.58f, 0.40f);
+        D(L, 0.50f, 0.84f, 0.26f, 0.30f);
+        Save("刀");
 
         // ============================================================
         // 三画
@@ -399,61 +623,70 @@ public class HanziRenderer : MonoBehaviour
         H(L, 0.32f, 0.68f, 0.50f);
         H(L, 0.10f, 0.90f, 0.22f); Save("三");
 
-        // 大：横在上部，撇捺从横中点散开
-        H(L, 0.16f, 0.84f, 0.66f);
-        D(L, 0.50f, 0.66f, 0.20f, 0.12f);
-        D(L, 0.50f, 0.66f, 0.80f, 0.12f); Save("大");
+        // 大
+        H(L, 0.20f, 0.78f, 0.68f);
+        P3(L, 0.078f, 0.48f, 0.96f, 0.48f, 0.66f, 0.28f, 0.30f);
+        P4(L, 0.078f, 0.50f, 0.65f, 0.60f, 0.43f, 0.68f, 0.35f, 0.78f, 0.29f);
+        Save("大");
 
-        // 工：上横短、下横长，竖居中连接两横
+        // 工
         H(L, 0.26f, 0.74f, 0.74f);
-        H(L, 0.10f, 0.90f, 0.26f);
-        V(L, 0.50f, 0.26f, 0.74f); Save("工");
+        H(L, 0.14f, 0.86f, 0.26f);
+        V(L, 0.50f, 0.26f, 0.74f);
+        Save("工");
 
-        // 干：上横短、竖向下出头
-        H(L, 0.26f, 0.74f, 0.72f);
-        H(L, 0.10f, 0.90f, 0.40f);
-        V(L, 0.50f, 0.14f, 0.86f); Save("干");
+        // 干
+        H(L, 0.25f, 0.73f, 0.85f);
+        H(L, 0.10f, 0.90f, 0.55f);
+        V(L, 0.50f, 0.13f, 0.85f);
+        Save("干");
 
-        // 士：上横长、下横短（与"土"相反）
-        H(L, 0.10f, 0.90f, 0.74f);
-        H(L, 0.34f, 0.66f, 0.26f);
-        V(L, 0.50f, 0.26f, 0.86f); Save("士");
+        // 士
+        H(L, 0.20f, 0.82f, 0.53f);
+        H(L, 0.35f, 0.67f, 0.27f);
+        V(L, 0.51f, 0.25f, 0.85f);
+        Save("士");
 
-        // 土：上横短、下横长
-        H(L, 0.26f, 0.74f, 0.72f);
-        H(L, 0.10f, 0.90f, 0.24f);
-        V(L, 0.50f, 0.14f, 0.86f); Save("土");
+        // 土
+        H(L, 0.27f, 0.75f, 0.64f);
+        H(L, 0.12f, 0.92f, 0.25f);
+        V(L, 0.51f, 0.25f, 0.97f);
+        Save("土");
 
-        // 口：左右竖 + 上下横，方框
+        // 口
         V(L, 0.28f, 0.28f, 0.76f);
-        Z(L, 0.28f, 0.76f, 0.72f, 0.76f, 0.72f, 0.28f);
-        H(L, 0.28f, 0.72f, 0.28f); Save("口");
+        P4(L, 0.078f, 0.28f, 0.76f, 0.50f, 0.76f, 0.72f, 0.76f, 0.72f, 0.28f);
+        H(L, 0.28f, 0.72f, 0.28f);
+        Save("口");
 
         // 山：中竖最高，两侧竖短，底部横托住
         V(L, 0.50f, 0.22f, 0.86f);
         Z(L, 0.22f, 0.62f, 0.22f, 0.22f, 0.78f, 0.22f);
         V(L, 0.78f, 0.22f, 0.62f); Save("山");
 
-        // 川：三竖，左为撇、中右为竖
-        D(L, 0.22f, 0.82f, 0.20f, 0.16f);
+        // 川
+        P3(L, 0.078f, 0.24f, 0.84f, 0.24f, 0.40f, 0.16f, 0.16f);
         V(L, 0.50f, 0.16f, 0.84f);
-        V(L, 0.78f, 0.16f, 0.84f); Save("川");
+        V(L, 0.78f, 0.16f, 0.84f);
+        Save("川");
 
-        // 小：中竖钩 + 左右两点
-        V(L, 0.50f, 0.30f, 0.86f);
-        DS(L, 0.30f, 0.60f, 0.16f, 0.18f);
-        DS(L, 0.70f, 0.60f, 0.84f, 0.18f); Save("小");
+        // 小
+        P4(L, 0.078f, 0.38f, 0.26f, 0.50f, 0.14f, 0.50f, 0.40f, 0.50f, 0.80f);
+        D(L, 0.29f, 0.56f, 0.21f, 0.28f);
+        D(L, 0.68f, 0.54f, 0.78f, 0.33f);
+        Save("小");
 
-        // 上：竖在下、短横在竖中间、长横在底部
-        //     （短横要在长横之上，整体是"下宽上尖"）
-        V(L, 0.50f, 0.20f, 0.86f);
-        H(L, 0.50f, 0.74f, 0.52f);
-        H(L, 0.14f, 0.86f, 0.20f); Save("上");
+        // 上
+        V(L, 0.48f, 0.21f, 0.87f);
+        H(L, 0.50f, 0.74f, 0.54f);
+        H(L, 0.14f, 0.86f, 0.20f);
+        Save("上");
 
-        // 下：长横在上、竖从中点垂下、点在竖右侧
-        H(L, 0.10f, 0.90f, 0.80f);
-        V(L, 0.50f, 0.16f, 0.80f);
-        DS(L, 0.58f, 0.62f, 0.64f, 0.46f); Save("下");
+        // 下
+        H(L, 0.20f, 0.80f, 0.80f);
+        V(L, 0.50f, 0.24f, 0.80f);
+        D(L, 0.53f, 0.59f, 0.66f, 0.50f);
+        Save("下");
 
         // ============================================================
         // 四画
@@ -464,34 +697,39 @@ public class HanziRenderer : MonoBehaviour
         H(L, 0.10f, 0.90f, 0.20f);
         V(L, 0.50f, 0.20f, 0.80f); Save("王");
 
-        // 丰：三横等长、竖上下都出头
-        H(L, 0.16f, 0.84f, 0.78f);
-        H(L, 0.16f, 0.84f, 0.50f);
-        H(L, 0.16f, 0.84f, 0.22f);
-        V(L, 0.50f, 0.10f, 0.90f); Save("丰");
+        // 丰
+        H(L, 0.22f, 0.80f, 0.68f);
+        H(L, 0.28f, 0.74f, 0.50f);
+        H(L, 0.21f, 0.82f, 0.32f);
+        V(L, 0.51f, 0.10f, 0.90f);
+        Save("丰");
 
-        // 木：横 + 竖 + 撇捺从交叉点散开
+        // 木
         H(L, 0.16f, 0.84f, 0.62f);
         V(L, 0.50f, 0.12f, 0.90f);
-        D(L, 0.50f, 0.62f, 0.20f, 0.14f);
-        D(L, 0.50f, 0.62f, 0.80f, 0.14f); Save("木");
+        D(L, 0.50f, 0.62f, 0.26f, 0.28f);
+        P3(L, 0.078f, 0.50f, 0.61f, 0.64f, 0.40f, 0.82f, 0.28f);
+        Save("木");
 
-        // 天：两横在上，撇捺从下横散开
-        H(L, 0.30f, 0.70f, 0.86f);
-        H(L, 0.14f, 0.86f, 0.64f);
-        D(L, 0.50f, 0.64f, 0.20f, 0.12f);
-        D(L, 0.50f, 0.64f, 0.80f, 0.12f); Save("天");
+        // 天
+        H(L, 0.30f, 0.70f, 0.80f);
+        H(L, 0.15f, 0.87f, 0.56f);
+        P3(L, 0.078f, 0.50f, 0.80f, 0.50f, 0.56f, 0.28f, 0.22f);
+        P4(L, 0.078f, 0.50f, 0.56f, 0.64f, 0.34f, 0.72f, 0.26f, 0.84f, 0.22f);
+        Save("天");
 
-        // 太：大 + 一点（点在右下）
-        H(L, 0.16f, 0.84f, 0.68f);
-        D(L, 0.50f, 0.68f, 0.20f, 0.14f);
-        D(L, 0.50f, 0.68f, 0.80f, 0.14f);
-        DS(L, 0.70f, 0.40f, 0.78f, 0.24f); Save("太");
+        // 太
+        H(L, 0.22f, 0.76f, 0.68f);
+        P3(L, 0.078f, 0.48f, 0.90f, 0.48f, 0.68f, 0.26f, 0.28f);
+        P3(L, 0.078f, 0.48f, 0.68f, 0.64f, 0.42f, 0.78f, 0.28f);
+        P3(L, 0.058f, 0.39f, 0.46f, 0.45f, 0.38f, 0.48f, 0.34f);
+        Save("太");
 
-        // 兀：一 + 撇 + 竖折（下方是撇和竖折两条腿）
-        H(L, 0.10f, 0.90f, 0.82f);
-        D(L, 0.36f, 0.82f, 0.20f, 0.20f);
-        Z(L, 0.66f, 0.82f, 0.66f, 0.20f, 0.88f, 0.20f); Save("兀");
+        // 兀
+        H(L, 0.14f, 0.90f, 0.82f);
+        D(L, 0.42f, 0.82f, 0.28f, 0.26f);
+        P4(L, 0.078f, 0.66f, 0.82f, 0.66f, 0.26f, 0.78f, 0.26f, 0.86f, 0.36f);
+        Save("兀");
 
         // 日：窄长方框，中间一横
         V(L, 0.32f, 0.14f, 0.86f);
@@ -499,29 +737,33 @@ public class HanziRenderer : MonoBehaviour
         H(L, 0.32f, 0.68f, 0.50f);
         H(L, 0.32f, 0.68f, 0.14f); Save("日");
 
-        // 中：口 + 竖贯穿（竖上下都出头）
-        V(L, 0.32f, 0.34f, 0.76f);
-        Z(L, 0.32f, 0.76f, 0.68f, 0.76f, 0.68f, 0.34f);
-        H(L, 0.32f, 0.68f, 0.34f);
-        V(L, 0.50f, 0.10f, 0.90f); Save("中");
+        // 中
+        V(L, 0.32f, 0.44f, 0.68f);
+        P3(L, 0.078f, 0.32f, 0.68f, 0.76f, 0.68f, 0.76f, 0.44f);
+        H(L, 0.32f, 0.76f, 0.44f);
+        V(L, 0.54f, 0.17f, 0.91f);
+        Save("中");
 
-        // 水：中竖钩 + 左右撇捺
-        V(L, 0.50f, 0.22f, 0.88f);
-        D(L, 0.50f, 0.56f, 0.20f, 0.12f);
-        D(L, 0.50f, 0.56f, 0.80f, 0.12f);
-        DS(L, 0.42f, 0.36f, 0.18f, 0.22f); Save("水");
+        // 水
+        V(L, 0.50f, 0.24f, 0.91f);
+        P3(L, 0.078f, 0.20f, 0.66f, 0.42f, 0.67f, 0.20f, 0.44f);
+        P4(L, 0.078f, 0.74f, 0.75f, 0.60f, 0.65f, 0.70f, 0.53f, 0.82f, 0.41f);
+        D(L, 0.51f, 0.25f, 0.35f, 0.37f);
+        Save("水");
 
-        // 少：小 + 长撇（长撇从中间穿到左下）
-        V(L, 0.46f, 0.42f, 0.88f);
-        DS(L, 0.30f, 0.62f, 0.18f, 0.50f);
-        D(L, 0.46f, 0.52f, 0.76f, 0.20f);
-        D(L, 0.46f, 0.42f, 0.22f, 0.10f); Save("少");
+        // 少
+        V(L, 0.47f, 0.40f, 0.80f);
+        P3(L, 0.058f, 0.38f, 0.64f, 0.32f, 0.58f, 0.26f, 0.52f);
+        P3(L, 0.078f, 0.56f, 0.70f, 0.62f, 0.62f, 0.68f, 0.54f);
+        D(L, 0.65f, 0.52f, 0.31f, 0.24f);
+        Save("少");
 
-        // 火：左右两点 + 撇捺
-        DS(L, 0.24f, 0.74f, 0.30f, 0.58f);
-        DS(L, 0.76f, 0.74f, 0.70f, 0.58f);
-        D(L, 0.50f, 0.64f, 0.22f, 0.12f);
-        D(L, 0.50f, 0.64f, 0.78f, 0.12f); Save("火");
+        // 火
+        D(L, 0.26f, 0.70f, 0.38f, 0.58f);
+        D(L, 0.63f, 0.70f, 0.55f, 0.61f);
+        P3(L, 0.078f, 0.45f, 0.87f, 0.45f, 0.58f, 0.27f, 0.30f);
+        P3(L, 0.078f, 0.45f, 0.58f, 0.58f, 0.42f, 0.74f, 0.32f);
+        Save("火");
 
         // ============================================================
         // 五画
@@ -540,33 +782,37 @@ public class HanziRenderer : MonoBehaviour
         V(L, 0.50f, 0.20f, 0.80f);
         DS(L, 0.66f, 0.38f, 0.74f, 0.24f); Save("玉");
 
-        // 五：上横 + 竖折 + 横折 + 底横
+        // 五
         H(L, 0.26f, 0.74f, 0.86f);
-        Z(L, 0.32f, 0.86f, 0.32f, 0.52f, 0.74f, 0.52f);
+        P4(L, 0.078f, 0.28f, 0.52f, 0.42f, 0.52f, 0.74f, 0.53f, 0.74f, 0.17f);
         H(L, 0.32f, 0.74f, 0.52f);
-        Z(L, 0.30f, 0.52f, 0.30f, 0.16f, 0.78f, 0.16f);
-        H(L, 0.10f, 0.90f, 0.14f); Save("五");
+        P3(L, 0.078f, 0.44f, 0.85f, 0.44f, 0.49f, 0.45f, 0.17f);
+        H(L, 0.16f, 0.96f, 0.17f);
+        Save("五");
 
-        // 正：上横最短、下横最长，中间是"止"
-        H(L, 0.30f, 0.70f, 0.86f);
-        V(L, 0.50f, 0.52f, 0.86f);
-        V(L, 0.30f, 0.26f, 0.68f);
-        H(L, 0.30f, 0.82f, 0.68f);
-        H(L, 0.10f, 0.90f, 0.18f); Save("正");
+        // 正
+        H(L, 0.24f, 0.74f, 0.86f);
+        V(L, 0.50f, 0.20f, 0.86f);
+        V(L, 0.29f, 0.19f, 0.54f);
+        H(L, 0.48f, 0.76f, 0.54f);
+        H(L, 0.10f, 0.90f, 0.18f);
+        Save("正");
 
-        // 白：撇 + 日（比日略宽一点）
-        DS(L, 0.50f, 0.94f, 0.34f, 0.84f);
-        V(L, 0.32f, 0.16f, 0.84f);
-        Z(L, 0.32f, 0.84f, 0.68f, 0.84f, 0.68f, 0.16f);
+        // 白
+        D(L, 0.56f, 0.96f, 0.42f, 0.84f);
+        V(L, 0.32f, 0.26f, 0.76f);
+        P4(L, 0.078f, 0.32f, 0.76f, 0.50f, 0.76f, 0.68f, 0.76f, 0.68f, 0.26f);
         H(L, 0.32f, 0.68f, 0.52f);
-        H(L, 0.32f, 0.68f, 0.16f); Save("白");
+        H(L, 0.33f, 0.69f, 0.26f);
+        Save("白");
 
-        // 田：口 + 中竖 + 中横
-        V(L, 0.26f, 0.18f, 0.82f);
-        Z(L, 0.26f, 0.82f, 0.74f, 0.82f, 0.74f, 0.18f);
+        // 田
+        V(L, 0.26f, 0.18f, 0.74f);
+        P3(L, 0.078f, 0.26f, 0.74f, 0.74f, 0.74f, 0.74f, 0.16f);
         H(L, 0.26f, 0.74f, 0.18f);
-        V(L, 0.50f, 0.18f, 0.82f);
-        H(L, 0.26f, 0.74f, 0.50f); Save("田");
+        V(L, 0.50f, 0.18f, 0.74f);
+        H(L, 0.25f, 0.73f, 0.45f);
+        Save("田");
 
         // 目：比日多一横，更高更窄
         V(L, 0.32f, 0.12f, 0.88f);
@@ -574,23 +820,19 @@ public class HanziRenderer : MonoBehaviour
         H(L, 0.32f, 0.68f, 0.63f);
         H(L, 0.32f, 0.68f, 0.38f);
         H(L, 0.32f, 0.68f, 0.12f); Save("目");
+        // ==== 圭 ====
+        // 结构：两个「土」上下相叠，上小下大。上土 y 0.64~0.98，下土 y 0.10~0.43。
+        // 下土的竖只到自己的上横（0.43），**不能**穿过上土的下横（0.72），
+        // 否则两个土会被一根竖串起来，就不像"两个土"了。
+        // 圭
+        H(L, 0.29f, 0.69f, 0.71f);
+        H(L, 0.24f, 0.80f, 0.53f);
+        V(L, 0.50f, 0.54f, 0.88f);
+        H(L, 0.27f, 0.75f, 0.30f);
+        H(L, 0.14f, 0.86f, 0.10f);
+        V(L, 0.50f, 0.10f, 0.43f);
+        Save("圭");
 
-        // ============================================================
-        // 六画
-        // ============================================================
-        // 圭（两个「土」上下相叠）
-        //   字理：上小下大，下土托住上土；两土的横宽要成体系逐级加宽，
-        //   不能上土很窄、下土突然很宽（之前下土底横 0.10~0.90
-        //   比上土的 0.20~0.80 宽太多，头重脚轻）。
-        //   两土之间留 0.15 间隙。
-        //   上土：y 0.64 ~ 0.98
-        H(L, 0.30f, 0.70f, 0.94f);      // 上土 上横（短）
-        H(L, 0.22f, 0.78f, 0.72f);      // 上土 下横（长）
-        V(L, 0.50f, 0.64f, 0.98f);      // 上土 竖（上下出头）
-        //   下土：y 0.10 ~ 0.43
-        H(L, 0.26f, 0.74f, 0.43f);      // 下土 上横（短）
-        H(L, 0.14f, 0.86f, 0.10f);      // 下土 下横（长）
-        V(L, 0.50f, 0.10f, 0.57f); Save("圭");   // 下土 竖，上端接住上土的下横
 
         // 由：田 的中竖向上出头
         V(L, 0.26f, 0.14f, 0.68f);
@@ -602,34 +844,29 @@ public class HanziRenderer : MonoBehaviour
         // ============================================================
         // 七画：兵
         // ============================================================
-        DS(L, 0.50f, 0.96f, 0.36f, 0.86f);
-        V(L, 0.38f, 0.62f, 0.90f);
-        H(L, 0.12f, 0.88f, 0.68f);
-        V(L, 0.30f, 0.42f, 0.68f);
-        H(L, 0.12f, 0.88f, 0.42f);
-        DS(L, 0.46f, 0.34f, 0.26f, 0.10f);
-        DS(L, 0.54f, 0.34f, 0.74f, 0.10f); Save("兵");
+        // 兵
+        D(L, 0.59f, 0.96f, 0.33f, 0.86f);
+        V(L, 0.33f, 0.43f, 0.86f);
+        H(L, 0.32f, 0.70f, 0.67f);
+        V(L, 0.69f, 0.42f, 0.68f);
+        H(L, 0.13f, 0.89f, 0.43f);
+        D(L, 0.38f, 0.36f, 0.26f, 0.13f);
+        D(L, 0.60f, 0.35f, 0.79f, 0.13f);
+        Save("兵");
+        // ==== 里 ====
+        // 结构：上「田」下「土」。田占 y 0.46~0.94，土占 y 0.10~0.36，部件间隙 0.10。
+        // 土的横取与田框同宽（0.24~0.76），下盘才托得住；所有平行笔画间距 >= 0.12。
+        // 里
+        V(L, 0.31f, 0.47f, 0.76f);
+        P3(L, 0.078f, 0.30f, 0.76f, 0.69f, 0.76f, 0.69f, 0.48f);
+        H(L, 0.32f, 0.69f, 0.49f);
+        V(L, 0.50f, 0.46f, 0.76f);
+        H(L, 0.30f, 0.70f, 0.62f);
+        H(L, 0.37f, 0.61f, 0.35f);
+        H(L, 0.23f, 0.79f, 0.19f);
+        V(L, 0.50f, 0.20f, 0.46f);
+        Save("里");
 
-        // ============================================================
-        // 八画：里
-        //   上「田」下「土」。字理：上宽下窄，土略窄于田但必须"托得住"。
-        //
-        //   之前两次都栽在土上：
-        //     - 第一次土的横只有 0.32~0.68（田是 0.24~0.76），差太多 → 下盘散
-        //     - 第二次把土的中横拉到与田同宽，但土整体只剩 0.10~0.32 的高度，
-        //       挤成一条 → 显得"田占满、土没地方"
-        //   现在给土足够的高度（0.10~0.36），两横宽度分级：中横同宽、底横略窄。
-        // ============================================================
-        // 田（上部）0.48 ~ 0.94
-        V(L, 0.24f, 0.48f, 0.94f);
-        Z(L, 0.24f, 0.94f, 0.76f, 0.94f, 0.76f, 0.48f);
-        H(L, 0.24f, 0.76f, 0.48f);
-        V(L, 0.50f, 0.48f, 0.94f);
-        H(L, 0.24f, 0.76f, 0.71f);
-        // 土（下部）0.10 ~ 0.36：中横与田同宽撑住，底横略窄收尾
-        H(L, 0.24f, 0.76f, 0.36f);
-        H(L, 0.28f, 0.72f, 0.10f);
-        V(L, 0.50f, 0.10f, 0.36f); Save("里");
 
         // ============================================================
         // 九画：皇

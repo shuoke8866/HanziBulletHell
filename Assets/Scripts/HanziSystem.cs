@@ -64,7 +64,7 @@ public class HanziSystem : MonoBehaviour
         GameData.currentStrokes.AddRange(currentStrokes);
     }
 
-    // 死亡重开：把汉字重置回"一"，并清空背包
+    // 死亡重开：把汉字重置回"一"，并清空仓库
     public void ResetToDefaultHanzi()
     {
         EnsureInitialized();
@@ -73,6 +73,21 @@ public class HanziSystem : MonoBehaviour
         currentStrokes.Add(StrokeType.Heng);
         currentHanziDef = null;
         SaveStrokesToGameData();
+
+        // 永久池与已合成列表一并清空，否则重开会带着上一局积累的笔画
+        Pool.Clear();
+        Pool.Add(StrokeType.Heng);
+
+        if (GameData.formedHanzi == null) GameData.formedHanzi = new List<string>();
+        GameData.formedHanzi.Clear();
+        GameData.formedHanzi.Add("一");
+
+        StrokeInventory inv = GetComponent<StrokeInventory>();
+        if (inv != null && inv.strokes != null)
+        {
+            inv.strokes.Clear();
+            inv.SaveToGameData();
+        }
 
         UpdateCurrentHanzi();
         SyncCharacterGlyph();
@@ -336,39 +351,152 @@ public class HanziSystem : MonoBehaviour
     // 也不再看笔顺是不是目标的有序子序列，而是看"手上所有笔画能拼出什么"。
 
     /// <summary>
-    /// 当前可用的全部笔画 = 当前汉字的笔画 + 背包里的笔画。
-    /// 这是"最优解"计算的输入。
+    /// 永久笔画池（本局捡到过的全部笔画，只增不减）。
+    /// 保证引用始终有效 —— 外面可能持有这个 List。
+    /// </summary>
+    static List<StrokeType> Pool
+    {
+        get
+        {
+            if (GameData.allStrokes == null)
+                GameData.allStrokes = new List<StrokeType>();
+            return GameData.allStrokes;
+        }
+    }
+
+    /// <summary>把一笔永久记入笔画池，并同步一份到背包（给 UI 显示）</summary>
+    public void AddStrokeToPool(StrokeType s)
+    {
+        EnsureInitialized();
+
+        Pool.Add(s);
+
+        StrokeInventory inv = GetComponent<StrokeInventory>();
+        if (inv != null && inv.strokes != null)
+        {
+            inv.strokes.Add(s);
+            inv.SaveToGameData();
+        }
+    }
+
+    /// <summary>
+    /// **当前可用**的笔画 = 永久池 − 当前汉字已占用的笔画。
+    ///
+    /// 这是"能拼出什么字"的真正输入：当前字占着的那几笔不能同时用于拼别的字，
+    /// 而一旦切走，那几笔就自动回到可用集合里 —— 所以切换是可逆的。
+    /// </summary>
+    public List<StrokeType> AvailableStrokes()
+    {
+        EnsureInitialized();
+
+        var avail = new List<StrokeType>(Pool);
+
+        if (currentStrokes != null)
+        {
+            foreach (StrokeType s in currentStrokes)
+            {
+                int i = avail.IndexOf(s);
+                if (i >= 0) avail.RemoveAt(i);
+            }
+        }
+
+        return avail;
+    }
+
+    /// <summary>
+    /// 已有的全部笔画（含当前字占用的）。UI 显示"仓库里有什么"时用它。
+    /// </summary>
+    public List<StrokeType> AllStrokes()
+    {
+        EnsureInitialized();
+        return new List<StrokeType>(Pool);
+    }
+
+    /// <summary>当前汉字占用的笔画（UI 上标出来，让玩家看到"这些被字占着"）</summary>
+    public List<StrokeType> CurrentCharacterStrokes()
+    {
+        return currentStrokes != null ? new List<StrokeType>(currentStrokes) : new List<StrokeType>();
+    }
+
+    /// <summary>
+    /// 兼容旧调用：返回"当前字 + 可用笔画"的全集。
+    /// 求解最优解（拾取时自动变字）用它，因为那时当前字的笔画也参与重排。
     /// </summary>
     public List<StrokeType> BuildStrokePool()
     {
         EnsureInitialized();
-
-        var pool = new List<StrokeType>();
-
-        if (currentStrokes != null) pool.AddRange(currentStrokes);
-
-        StrokeInventory inv = GetComponent<StrokeInventory>();
-        if (inv != null && inv.strokes != null) pool.AddRange(inv.strokes);
-
-        return pool;
+        return AllStrokes();
     }
 
     /// <summary>
     /// 在当前进度下求解可切换的候选汉字，最优解排在第一个。
     /// 背包面板用它来展示「可切换的汉字」列表。
+    ///
+    /// 注意用的是 <see cref="AvailableStrokes"/>：候选必须是**不拆当前字**
+    /// 就能拼出来的字。这样切过去之后，原来的字一定还能切回来。
     /// </summary>
-    /// <summary>求解器实跑：池子 = 当前字 + 背包，看能不能得出候选</summary>
     public List<HanziOption> GetSwitchCandidates()
     {
         EnsureInitialized();
-        return HanziSolver.Solve(BuildStrokePool(), hanziDatabase);
+        return HanziSolver.Solve(AvailableStrokes(), hanziDatabase);
     }
 
     /// <summary>
-    /// 切换到指定汉字：把该字需要的笔画从「当前字 + 背包」里扣掉，
-    /// 用掉的背包笔画会被移除，剩下的当前字笔画退回背包。
+    /// 仓库里能拼出的**全部**汉字（含那些笔画数较少的），按复杂度排序。
+    /// 合成台要"列出所有能拼出的字"就用它。
+    /// </summary>
+    public List<HanziOption> GetAllFormable()
+    {
+        EnsureInitialized();
+
+        List<StrokeType> avail = AvailableStrokes();
+        var result = new List<HanziOption>();
+
+        foreach (HanziDef def in hanziDatabase)
+        {
+            if (def.strokes == null || def.strokes.Count == 0) continue;
+            if (currentHanziDef != null && def.hanziName == currentHanziDef.hanziName) continue;
+
+            // 能不能从可用笔画里凑出来
+            var rest = new List<StrokeType>(avail);
+            bool ok = true;
+            foreach (StrokeType s in def.strokes)
+            {
+                int i = rest.IndexOf(s);
+                if (i < 0) { ok = false; break; }
+                rest.RemoveAt(i);
+            }
+            if (!ok) continue;
+
+            result.Add(new HanziOption
+            {
+                def = def,
+                keyStrokeCount = 0,
+                usedFromPool = def.strokes.Count,
+                totalStrokes = def.strokes.Count
+            });
+        }
+
+        result.Sort((a, b) =>
+        {
+            if (a.totalStrokes != b.totalStrokes) return b.totalStrokes.CompareTo(a.totalStrokes);
+            return string.CompareOrdinal(a.Name, b.Name);
+        });
+
+        return result;
+    }
+
+    /// <summary>
+    /// 切换到指定汉字。
     ///
-    /// 这样"拆了重拼"不会凭空生出或吞掉笔画。
+    /// 新模型（可逆）：
+    ///   1. 从**可用笔画**里扣掉目标字需要的笔画
+    ///   2. 当前字占用的笔画自动回到可用集合（不需要显式搬动）
+    ///   3. 记录这个字已合成过
+    ///
+    /// 永久池永不缩小，所以「切过去的字一定能切回来」。
+    /// 旧的实现会把背包清空重填、装不下的笔画直接丢弃 ——
+    /// 这就是"越切越简单、最后只能拼出一"的根因。
     /// </summary>
     public bool SwitchTo(HanziDef target)
     {
@@ -377,81 +505,185 @@ public class HanziSystem : MonoBehaviour
         if (target == null || target.strokes == null || target.strokes.Count == 0)
             return false;
 
-        var remaining = BuildStrokePool();
+        List<StrokeType> avail = AvailableStrokes();
 
-        // 逐个扣掉目标字需要的笔画
+        // 校验：可用笔画够不够拼出目标字
+        var check = new List<StrokeType>(avail);
         foreach (StrokeType s in target.strokes)
         {
-            int idx = remaining.IndexOf(s);
+            int idx = check.IndexOf(s);
             if (idx < 0)
             {
-                GameLog.Warn($"切换「{target.hanziName}」失败：缺少笔画 {StrokeUtil.NameOf(s)}");
+                GameLog.Warn($"切换「{target.hanziName}」失败：可用笔画里没有 {StrokeUtil.NameOf(s)}");
                 return false;
             }
-            remaining.RemoveAt(idx);
+            check.RemoveAt(idx);
         }
 
-        // 剩下的笔画全部退回背包（容量不够就丢弃并提示）
+        // 扣掉目标字用到的笔画
+        var left = new List<StrokeType>(avail);
+        foreach (StrokeType s in target.strokes)
+        {
+            int idx = left.IndexOf(s);
+            if (idx < 0) return false;
+            left.RemoveAt(idx);
+        }
+
+        // 背包同步成"剩余可用笔画"，让 UI 看到正确的仓库
         StrokeInventory inv = GetComponent<StrokeInventory>();
-        if (inv != null)
+        if (inv != null && inv.strokes != null)
         {
             inv.strokes.Clear();
-            int dropped = 0;
-            foreach (StrokeType s in remaining)
-            {
-                if (inv.strokes.Count < inv.maxSlots) inv.strokes.Add(s);
-                else dropped++;
-            }
+            inv.strokes.AddRange(left);
             inv.SaveToGameData();
-
-            if (dropped > 0)
-                GameToast.Show($"背包已满，{dropped} 个笔画被丢弃", new Color(1f, 0.6f, 0.5f));
         }
 
         CommitHanzi(target);
+        RecordFormed(target.hanziName);
         return true;
     }
 
+    /// <summary>记下"这个字合成过"，供背包的汉字列表显示</summary>
+    void RecordFormed(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return;
+        if (GameData.formedHanzi == null) GameData.formedHanzi = new List<string>();
+        if (!GameData.formedHanzi.Contains(name)) GameData.formedHanzi.Add(name);
+    }
+
+    /// <summary>合成过的汉字（按顺序），UI 用</summary>
+    public List<string> FormedHanziNames
+    {
+        get
+        {
+            if (GameData.formedHanzi == null) GameData.formedHanzi = new List<string>();
+            return GameData.formedHanzi;
+        }
+    }
+
+    /// <summary>按名字找字库里的定义</summary>
+    public HanziDef FindByName(string name)
+    {
+        if (string.IsNullOrEmpty(name) || hanziDatabase == null) return null;
+        foreach (HanziDef d in hanziDatabase)
+            if (d.hanziName == name) return d;
+        return null;
+    }
+
     /// <summary>
-    /// 拾取一笔后自动应用最优解：把新笔画加进池子，重新求解并切到最复杂的那个。
-    /// 返回 false 表示池子里凑不出任何字（这一笔用不上）。
+    /// 切换到"能用上某一笔"的最复杂汉字（数字键用）。
+    ///
+    /// 找法是：在**可用笔画 + 这一笔**的前提下求解最优解集合，
+    /// 再从中挑第一个"确实需要这一笔"的字。
+    ///
+    /// 注意这一笔来自仓库、本来就已在池子里，所以这里只是加个筛选条件，
+    /// 不会改变笔画总量。返回 null 表示没有用得上它的字（调用方可以退回普通最优解）。
+    /// </summary>
+    public HanziDef SwitchToBestUsing(StrokeType stroke)
+    {
+        EnsureInitialized();
+
+        List<HanziOption> ranked = GetSwitchCandidates();
+
+        foreach (HanziOption opt in ranked)
+        {
+            if (opt.def == null || opt.def.strokes == null) continue;
+            if (IsSameHanzi(opt.def, currentHanziDef)) continue;
+
+            // 这个字必须真的用到这一笔
+            if (!opt.def.strokes.Contains(stroke)) continue;
+
+            if (SwitchTo(opt.def)) return opt.def;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 切换到"当前可用笔画能拼出的最复杂汉字"（不考虑某一笔）。
+    /// 返回 null 表示没有可切换的目标。
+    /// </summary>
+    public HanziDef SwitchToBestAvailable()
+    {
+        EnsureInitialized();
+
+        foreach (HanziOption opt in GetSwitchCandidates())
+        {
+            if (opt.def == null) continue;
+            if (IsSameHanzi(opt.def, currentHanziDef)) continue;
+            if (SwitchTo(opt.def)) return opt.def;
+        }
+
+        return null;
+    }
+
+    /// <summary>按名字直接切换（背包里点击"已合成的字"用），成功返回定义</summary>
+    public HanziDef SwitchToName(string name)
+    {
+        HanziDef def = FindByName(name);
+        if (def == null) return null;
+        if (IsSameHanzi(def, currentHanziDef)) return def;   // 已经是这个字
+        return SwitchTo(def) ? def : null;
+    }
+
+    /// <summary>
+    /// 旧的 SwitchTo 实现留在下面这段注释里作对照，说明为什么改：
+    ///
+    ///     var remaining = BuildStrokePool();
+    ///     foreach (StrokeType s in target.strokes) { ... remaining.RemoveAt(idx); }
+    ///     inv.strokes.Clear();
+    ///     foreach (StrokeType s in remaining)
+    ///         if (inv.strokes.Count < inv.maxSlots) inv.strokes.Add(s);
+    ///         else dropped++;                 // ← 这里在丢笔画
+    ///
+    /// 「池子 = 当前字 + 背包」且背包有上限，所以每切一次都要丢几笔，
+    /// 切几次之后池子只剩「一」，再也回不去。
+    /// </summary>
+    
+
+
+
+    /// <summary>
+    /// 捡到一笔之后的自动变字规则（按需求确定）：
+    ///
+    ///   **只有当这一笔正好是"仓库里出现次数最多的那种笔画"时，才自动换字。**
+    ///
+    ///   理由：如果捡到的是一笔冷门笔画（比如仓库里全是横，捡到一个点），
+    ///   强行重排只会把当前这个复杂的字拆散、换成更简单的字 —— 就是之前
+    ///   玩家反馈的"退化"。所以这种情况**保持当前汉字**，笔画只进仓库，
+    ///   等玩家自己在合成台里拼。
+    ///
+    /// 无论是哪种情况，这一笔都会永久记入笔画池（只增不减），
+    /// 所以之后随时能拿它去拼别的字。
     /// </summary>
     public bool ApplyBestFor(StrokeType newStroke)
     {
         EnsureInitialized();
 
-        StrokeInventory inv = GetComponent<StrokeInventory>();
+        // 1) 永久入池（这是"自由可逆切换"的关键）
+        AddStrokeToPool(newStroke);
 
-        // 新笔画先放进背包，这样它会计入笔画池
-        bool added = false;
-        if (inv != null && inv.strokes.Count < inv.maxSlots)
+        // 2) 这一笔是不是当前出现最多的种类？
+        List<StrokeType> afterPool = AllStrokes();
+        List<StrokeType> keyTypes;
+        int maxFreq = HanziSolver.MaxFrequency(afterPool, out keyTypes);
+
+        bool isKeyStroke = keyTypes.Contains(newStroke);
+
+        if (!isKeyStroke)
         {
-            inv.strokes.Add(newStroke);
-            added = true;
+            GameLog.Info($"「{StrokeUtil.NameOf(newStroke)}」不是当前最多的笔画种类，" +
+                         $"保持「{currentHanziName}」，笔画存入仓库");
+            return false;   // 保持现状，等玩家手动合成
         }
 
+        // 3) 是最多的种类 → 自动切到可用笔画能拼出的最复杂汉字
         List<HanziOption> ranked = GetSwitchCandidates();
 
-        // 求解结果里挑第一个"确实会改变当前汉字"的候选。
-        // 池子里的多余笔画可能让最优解仍然等于当前字（比如已经是大字），
-        // 这时应当继续往下看有没有别的字可换，而不是直接放弃。
         foreach (HanziOption opt in ranked)
         {
             if (IsSameHanzi(opt.def, currentHanziDef)) continue;
-
             if (SwitchTo(opt.def)) return true;
-
-            // 理论上 SwitchTo 不会失败（候选就是从池子里算出来的），
-            // 真失败了就继续尝试下一个候选。
-        }
-
-        // 没有任何更好的字 → 这一笔留在背包里备用。
-        // 注意这里必须显式保存：SwitchTo 没被调用时，背包的改动不会写回 GameData，
-        // 之前就是因为漏了这一步导致"捡到用不上的笔画会凭空消失"。
-        if (added && inv != null)
-        {
-            inv.SaveToGameData();
-            GameLog.Info($"笔画 [{StrokeUtil.NameOf(newStroke)}] 对「{currentHanziName}」现在用不上，进背包");
         }
 
         return false;
@@ -538,6 +770,12 @@ public class HanziSystem : MonoBehaviour
         if (traits == null) traits = GetComponent<StrokeTraits>();
         if (traits != null) traits.Refresh(matched);
 
+        // 记入"已合成"清单，背包里会把它们列出来给玩家点击切换
+        RecordFormed(matched.hanziName);
+
+        // 当前字占用的笔画可能在池子里缺额（例如开局），补齐
+        EnsurePoolCoversCurrentStrokes();
+
         GameToast.Show($"「{currentHanziName}」  {matched.description}", new Color(1f, 0.95f, 0.6f));
 
         GameLog.Info($"获得笔画！当前汉字：「{currentHanziName}」- {matched.description}");
@@ -613,7 +851,29 @@ public class HanziSystem : MonoBehaviour
             SaveStrokesToGameData();
         }
 
+        // 永久笔画池至少要包含"当前字占用的笔画"，否则开局（「一」）
+        // 会出现"池子里一笔都没有"的情况，导致首次切换全部失败。
+        // 只补差额，不重复加。
+        EnsurePoolCoversCurrentStrokes();
+
         UpdateCurrentHanzi();
+    }
+
+    /// <summary>
+    /// 保证永久池里至少有够当前字用的那些笔画。
+    /// 开局当前字是「一」，池子补上一笔横，之后切换才有东西可扣。
+    /// </summary>
+    void EnsurePoolCoversCurrentStrokes()
+    {
+        if (currentStrokes == null) return;
+
+        var have = new List<StrokeType>(Pool);
+        foreach (StrokeType s in currentStrokes)
+        {
+            int i = have.IndexOf(s);
+            if (i >= 0) { have.RemoveAt(i); continue; }
+            Pool.Add(s);          // 池子里缺这一笔，补上
+        }
     }
 
     void BuildIndex()
