@@ -57,9 +57,10 @@ public static class EnemyHealthProbe
         hs.ApplyOpeningStarter(StrokeType.Heng);
 
         // 依次捡 竖 / 横 / 横 / 竖
+        // 一路捡到能凑出「木」（横竖撇捺），再看还能换什么
         var seq = new List<StrokeType>
         {
-            StrokeType.Shu, StrokeType.Heng, StrokeType.Heng, StrokeType.Shu
+            StrokeType.Shu, StrokeType.Pie, StrokeType.Na, StrokeType.Heng
         };
 
         sb.AppendLine($"  开局：当前「{hs.currentHanziName}」  池子=[{Name(hs.AllStrokes())}]");
@@ -73,8 +74,9 @@ public static class EnemyHealthProbe
             var avail = hs.AvailableStrokes();
 
             sb.AppendLine($"  捡到「{StrokeUtil.NameOf(s)}」 池子=[{Name(hs.AllStrokes())}]");
-            sb.AppendLine($"      当前「{hs.currentHanziName}」占 [{Name(hs.CurrentCharacterStrokes())}]，" +
-                          $"可用=[{Name(avail)}]");
+            sb.AppendLine($"      当前「{hs.currentHanziName}」占 [{Name(hs.CurrentCharacterStrokes())}]");
+            sb.AppendLine($"      合成池（全部收集到的）=[{Name(hs.SynthesisStrokes())}]" +
+                          $"   空闲=[{Name(avail)}]");
 
             var full = new List<StrokeType>(hs.CurrentCharacterStrokes());
             full.AddRange(avail);

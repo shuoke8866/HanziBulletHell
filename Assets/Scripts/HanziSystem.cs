@@ -527,6 +527,42 @@ public class HanziSystem : MonoBehaviour
     }
 
     /// <summary>
+    /// **可用于合成判断的笔画 = 全部收集到的笔画（含当前字占用的那些）。**
+    ///
+    /// 这是 UI 和候选列表应该用的那一份，不是 <see cref="AvailableStrokes"/>。
+    ///
+    /// ## 为什么要分开
+    ///
+    /// AvailableStrokes() 的语义是"手上**空闲**的笔画"，用于**扣除记账**：
+    /// 切到新字时要从这个集合里扣掉它需要的笔画。
+    ///
+    /// 但"能合成什么字"要看的是**收集到的全部笔画** ——
+    /// 当前字占的那几笔本来就在手上，换个字照样能用。
+    ///
+    /// 反例（玩家反馈的 bug）：当前「木」占掉 横竖撇捺，
+    /// AvailableStrokes() 就是空的，于是背包显示"可用笔画 空、可换 0 个字"，
+    /// 明明手上有四笔却什么都换不了。
+    ///
+    /// ## 记账怎么自洽
+    ///
+    /// 池子只记"收集过什么"，不记"现在怎么摆"。
+    /// 切换时当前字占的笔画会**回到池子**（余额不变），再从池子里扣掉新字的笔画。
+    /// 所以净效果是：**池子里能拼出什么，就能切成什么**，不额外消耗。
+    /// </summary>
+    public List<StrokeType> SynthesisStrokes()
+    {
+        EnsureInitialized();
+        return new List<StrokeType>(Pool);
+    }
+
+    /// <summary>池子里能不能拼出这个字（含当前字占用的笔画）</summary>
+    public bool IsFormable(HanziDef def)
+    {
+        if (def == null || def.strokes == null || def.strokes.Count == 0) return false;
+        return HanziSolver.TryForm(def, SynthesisStrokes());
+    }
+
+    /// <summary>
     /// 已有的全部笔画（含当前字占用的）。UI 显示"仓库里有什么"时用它。
     /// </summary>
     public List<StrokeType> AllStrokes()
@@ -561,7 +597,7 @@ public class HanziSystem : MonoBehaviour
     public List<HanziOption> GetSwitchCandidates()
     {
         EnsureInitialized();
-        return SolveWithGrowth(AvailableStrokes());
+        return SolveWithGrowth(SynthesisStrokes());
     }
 
     // ============================================================
@@ -697,44 +733,45 @@ public class HanziSystem : MonoBehaviour
     }
 
     /// <summary>
-    /// 求解"把当前字成长/切换成什么最好"，**同时考虑当前字已占用的笔画**。
+    /// 求解"能把当前字切成什么"，候选来自**收集到的全部笔画**。
     ///
-    /// 做法：把「当前字占用的笔画 + 可用笔画」合成一个完整池子喂给求解器，
-    /// 再过滤掉"补不上"的目标（需要补的笔画超出了可用笔画）。
+    /// 原来这里用 AvailableStrokes()（池子 − 当前字占用），
+    /// 于是当前「木」占掉横竖撇捺后，候选集就是空 ——
+    /// 明明手上有四笔，却什么都换不了。
     ///
-    /// 这样：
-    ///   · 一 → 十 可行（补一个竖）
-    ///   · 一 → 二 不可行（要补一个横，但手上只有竖）
-    ///   · 切换回已经拼过的复杂字也可行（比如当前「十」想回「一」）
+    /// 现在用 SynthesisStrokes()（全部收集到的笔画）：
+    /// 当前字占的那几笔本来就在手上，换个字照样能用。
+    /// 记账上也是自洽的 —— 切换时当前字占的笔画会回到池子，余额不变。
     /// </summary>
-    List<HanziOption> SolveWithGrowth(List<StrokeType> available)
+    List<HanziOption> SolveWithGrowth(List<StrokeType> synthesisPool)
     {
-        var full = new List<StrokeType>();
-        if (currentHanziDef != null && currentHanziDef.strokes != null)
-            full.AddRange(currentHanziDef.strokes);
-        if (available != null) full.AddRange(available);
+        var pool = synthesisPool != null
+            ? new List<StrokeType>(synthesisPool)
+            : SynthesisStrokes();
 
-        var raw = HanziSolver.Solve(full, hanziDatabase);
+        var raw = HanziSolver.Solve(pool, hanziDatabase);
         var result = new List<HanziOption>();
 
         foreach (HanziOption opt in raw)
         {
             if (opt == null || opt.def == null || opt.def.strokes == null) continue;
+            if (currentHanziDef != null && opt.def.hanziName == currentHanziDef.hanziName) continue;
 
-            // 这一笔要补多少 —— 统一走 StrokesNeeded
+            // 池子里得真能拼出它
+            if (!HanziSolver.TryForm(opt.def, pool)) continue;
+
+            // "还要补几笔"（用于显示/排序）：成长就是差的那几笔，
+            // 换字就是它整体（因为要先把当前字拆回去）
             List<StrokeType> need = StrokesNeeded(
                 currentHanziDef != null ? currentHanziDef.strokes : null,
                 opt.def.strokes);
 
-            if (need == null) continue;
-            if (!CanCover(available, need)) continue;
-
-            opt.usedFromPool = need.Count;     // "要补几笔"，不是"总共几笔"
+            opt.usedFromPool = need != null ? need.Count : opt.def.strokes.Count;
             result.Add(opt);
         }
 
         // 重新排序（usedFromPool 被改过，按同一套规则再排一遍）
-        HanziSolver.SortOptions(result, HanziSolver.MaxFrequency(full, out _));
+        HanziSolver.SortOptions(result, HanziSolver.MaxFrequency(pool, out _));
         return result;
     }
 
@@ -747,7 +784,10 @@ public class HanziSystem : MonoBehaviour
     {
         EnsureInitialized();
 
-        List<StrokeType> avail = AvailableStrokes();
+        // 候选来自**收集到的全部笔画**，不是"扣掉当前字之后的空闲笔画"。
+        // 当前字占的那几笔本来就在手上，换个字照样能用 ——
+        // 用 AvailableStrokes() 会让「木」占满之后再无候选可换（玩家反馈的 bug）。
+        List<StrokeType> pool = SynthesisStrokes();
         var cur = currentHanziDef != null ? currentHanziDef.strokes : null;
         var result = new List<HanziOption>();
 
@@ -756,16 +796,17 @@ public class HanziSystem : MonoBehaviour
             if (def.strokes == null || def.strokes.Count == 0) continue;
             if (currentHanziDef != null && def.hanziName == currentHanziDef.hanziName) continue;
 
-            // 和 SwitchTo 用同一个入口，保证"背包里列出来的"和"点了真能切过去的"完全一致
+            // 池子里真能拼出它
+            if (!HanziSolver.TryForm(def, pool)) continue;
+
+            // "还要补几笔"（仅用于显示与排序）
             List<StrokeType> need = StrokesNeeded(cur, def.strokes);
-            if (need == null) continue;
-            if (!CanCover(avail, need)) continue;
 
             result.Add(new HanziOption
             {
                 def = def,
                 keyStrokeCount = 0,
-                usedFromPool = need.Count,     // "要补几笔"，不是"总共几笔"
+                usedFromPool = need != null ? need.Count : def.strokes.Count,
                 totalStrokes = def.strokes.Count
             });
         }
@@ -782,14 +823,15 @@ public class HanziSystem : MonoBehaviour
     /// <summary>
     /// 切换到指定汉字。
     ///
-    /// 新模型（可逆）：
-    ///   1. 从**可用笔画**里扣掉目标字需要的笔画
-    ///   2. 当前字占用的笔画自动回到可用集合（不需要显式搬动）
-    ///   3. 记录这个字已合成过
+    /// 记账模型：
+    ///   · 池子（GameData.allStrokes）只记"收集过什么"，**切换时完全不动**
+    ///   · 背包（inv.strokes）记"当前空闲的笔画"= 池子 − 新字占用的
     ///
-    /// 永久池永不缩小，所以「切过去的字一定能切回来」。
-    /// 旧的实现会把背包清空重填、装不下的笔画直接丢弃 ——
-    /// 这就是"越切越简单、最后只能拼出一"的根因。
+    /// 所以判断"切不切得过去"看的是**池子**，不是空闲笔画 ——
+    /// 当前字占的那几笔换个字照样能用（它们本来就在池子里）。
+    ///
+    /// 于是：**池子里能拼出什么，就能切成什么**，不存在额外消耗。
+    /// 这也保证了"切过去的字一定能切回来"（池子永不缩小）。
     /// </summary>
     public bool SwitchTo(HanziDef target)
     {
@@ -798,33 +840,24 @@ public class HanziSystem : MonoBehaviour
         if (target == null || target.strokes == null || target.strokes.Count == 0)
             return false;
 
-        List<StrokeType> avail = AvailableStrokes();
+        // 用**池子**做可行性判断，不是空闲笔画
+        List<StrokeType> pool = SynthesisStrokes();
 
-        var cur = currentHanziDef != null ? currentHanziDef.strokes : null;
+        if (!HanziSolver.TryForm(target, pool))
+        {
+            GameLog.Warn($"切换「{target.hanziName}」失败：收集到的笔画还不够拼出它");
+            return false;
+        }
 
-        // 从当前字变成目标字要从可用笔画里拿哪几笔 ——
-        // 统一走 StrokesNeeded（成长 / 换字 / 手上没字，三种情况都在里面分清）。
-        //
-        // 这里就是"当前字算不算进合成系统"的关键：
-        // 当前「一」=[横] 想变「十」=[横,竖]，只需要补一个竖 ——
-        // 那个横本来就要留在十里面，不该再拿一个横出来。
-        List<StrokeType> need = StrokesNeeded(cur, target.strokes);
-        if (need == null) return false;
-
-        // 校验 + 扣除（合并成一次，避免两处逻辑漂移）
-        var left = new List<StrokeType>(avail);
-        foreach (StrokeType s in need)
+        // 背包同步成"池子 − 新字占用的笔画"
+        var left = new List<StrokeType>(pool);
+        foreach (StrokeType s in target.strokes)
         {
             int idx = left.IndexOf(s);
-            if (idx < 0)
-            {
-                GameLog.Warn($"切换「{target.hanziName}」失败：还差一个 {StrokeUtil.NameOf(s)}");
-                return false;
-            }
+            if (idx < 0) return false;
             left.RemoveAt(idx);
         }
 
-        // 背包同步成"剩余可用笔画"，让 UI 看到正确的仓库
         StrokeInventory inv = GetComponent<StrokeInventory>();
         if (inv != null && inv.strokes != null)
         {
@@ -972,13 +1005,16 @@ public class HanziSystem : MonoBehaviour
             return false;   // 保持现状，等玩家手动合成
         }
 
-        // 2.5) 手上的可用笔画是不是"整好能拼出好几个笔顺相同的字"？
+        // 2.5) 手上收集到的笔画是不是"整好能拼出好几个笔顺相同的字"？
         //
         // 汉字里本来就存在笔顺一样、只靠字形区分的字：十/丁、人/八、工/士/土。
         // 光看笔顺没法决定给哪个 —— 原来按名字 Unicode 排序取第一个，
         // 结果十、人、士、土这四个字玩家**永远拿不到**。
         // 现在弹一个选择界面让玩家点，选过的会被记住。
-        List<StrokeType> avail = AvailableStrokes();
+        //
+        // 用 SynthesisStrokes（全部收集到的笔画）而不是 AvailableStrokes：
+        // 当前字占的那几笔换个字照样能用，不带进来会漏掉歧义组合。
+        List<StrokeType> avail = SynthesisStrokes();
         List<HanziDef> tied = TiedCandidatesFor(avail);
 
         if (tied.Count >= 2 && ChoiceRequested != null)
@@ -1703,17 +1739,12 @@ public class HanziSystem : MonoBehaviour
         var result = new List<HanziDef>();
         if (availableStrokes == null) return result;
 
-        // 判定依据是"把当前字成长之后，笔顺会是哪个组合"，
-        // 所以要把**当前字占用的笔画**也算进来 ——
-        // 否则玩家当前「一」、捡到「竖」时，这里是拿 [竖] 去比，
-        // 只匹配到「丨」，根本看不到「十」/「丁」这一组。
+        // 判定依据是"收集到的笔画总共能凑出哪个笔顺组合"。
         //
-        // full = 当前字笔顺 ++ 可用笔画。玩家手上"总共能凑出的笔顺"就是它 ——
-        // 当前字占的那几笔本来就会留在成长后的字里，不用额外补。
-        var full = new List<StrokeType>();
-        if (currentHanziDef != null && currentHanziDef.strokes != null)
-            full.AddRange(currentHanziDef.strokes);
-        full.AddRange(availableStrokes);
+        // 注意入参虽然叫 availableStrokes，但语义已经统一成**收集到的全部笔画**
+        // （见 SynthesisStrokes）—— 当前字占的那几笔本来就在手上，
+        // 不带进来就会漏掉「十」/「丁」这一组（玩家当前「一」捡到「竖」时的 bug）。
+        var full = new List<StrokeType>(availableStrokes);
 
         foreach (HanziDef def in FindAllMatchingHanzi(full))
         {

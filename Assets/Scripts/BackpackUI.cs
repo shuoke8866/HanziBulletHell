@@ -293,9 +293,15 @@ public class BackpackUI : MonoBehaviour
         // ---- 标题：当前汉字 + 仓库现状 ----
         if (headerText != null)
         {
+            // 显示**收集到的全部笔画**，不是"扣掉当前字之后的空闲笔画"。
+            //
+            // 原来用 AvailableStrokes()，于是当前「木」占掉横竖撇捺后，
+            // 标题显示"可用笔画 空、可换 0 个字" ——
+            // 明明手上有四笔却什么都换不了，看着就像坏了。
+            // 当前字占的那几笔本来就在手上，换个字照样能用。
             headerText.text =
                 GameText.Panel.背包当前汉字(hanzi.currentHanziName) + "　　" +
-                GameText.Panel.背包可用笔画(DescribeStrokes(hanzi.AvailableStrokes())) + "　　" +
+                GameText.Panel.背包可用笔画(DescribeStrokes(hanzi.SynthesisStrokes())) + "　　" +
                 GameText.Panel.背包可换数量(all.Count);
         }
 

@@ -233,9 +233,13 @@ public class QuickBarUI : MonoBehaviour
     {
         if (hanzi == null) return;
 
-        // 签名：当前汉字 + 仓库内容。变了才重算（否则每帧都要跑一遍匹配 + 取字形）
+        // 签名：当前汉字 + 收集到的笔画。变了才重算（否则每帧都要跑一遍匹配 + 取字形）
+        //
+        // 用 SynthesisStrokes 而不是 AvailableStrokes —— 候选列表现在是按
+        // "收集到的全部笔画"算的，签名必须跟着同一份数据，
+        // 否则当前字一变、空闲笔画跟着变，会算出无效的缓存键。
         string signature = hanzi.currentHanziName + "|";
-        List<StrokeType> avail = hanzi.AvailableStrokes();
+        List<StrokeType> avail = hanzi.SynthesisStrokes();
         for (int i = 0; i < avail.Count; i++) signature += (int)avail[i] + ",";
 
         if (signature == lastSignature) return;
