@@ -31,8 +31,14 @@ using UnityEngine;
 /// </summary>
 public static class RoomWallBuilder
 {
-    /// <summary>组成房间四壁的墙，厚度（沿墙的法线方向）</summary>
-    public const float WallThickness = 1f;
+    /// <summary>
+    /// 墙的厚度（沿墙的法线方向）。
+    ///
+    /// 原来是 1，但紧挨着门洞的那两段墙看起来明显比别处粗 ——
+    /// 门洞只有 3 个单位宽，两侧各顶着一段 1 单位厚的墙，
+    /// 视觉上门框显得很笨重。改成 0.5 之后整圈墙粗细一致、也更清爽。
+    /// </summary>
+    public const float WallThickness = 0.5f;
 
     /// <summary>
     /// 门的长度（沿墙方向）。
@@ -42,8 +48,8 @@ public static class RoomWallBuilder
     /// </summary>
     public const float DoorSpan = 3f;
 
-    /// <summary>厚度方向的尺寸 = 门的另一个边（和墙厚一致，这样关上时严丝合缝）</summary>
-    public const float DoorThickness = 1f;
+    /// <summary>门的厚度 = 墙厚，这样关上时和墙严丝合缝</summary>
+    public const float DoorThickness = WallThickness;
 
     /// <summary>生成物名字前缀，用于识别"上次生成的"以便清理</summary>
     public const string Prefix = "_Wall_";
@@ -340,7 +346,11 @@ public static class RoomWallBuilder
 
                 Vector3 p = d.transform.position;
                 float across = vertical ? p.x : p.y;
-                if (Mathf.Abs(across - coord) > WallThickness) continue;   // 不是这一面的门
+
+                // 容差要留够：墙厚现在是 0.5，而门中心可能落在墙的内侧或外侧
+                // （Room2 左墙在 x=0.5，门却在 x=0）。
+                // 用 WallThickness 当容差会刚好卡在边界上，把真门判成"不是这一面的"。
+                if (Mathf.Abs(across - coord) > WallThickness + 0.6f) continue;   // 不是这一面的门
 
                 Vector3 sc = d.transform.localScale;
                 float alongCenter = vertical ? p.y : p.x;
