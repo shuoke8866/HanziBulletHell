@@ -181,22 +181,22 @@ public class HanziSystem : MonoBehaviour
         AddHanzi("一",
             new List<StrokeType> { StrokeType.Heng },
             new List<string> { "straight" },
-            1, 12f, "1发直线");
+            "1发直线", 12f);
 
         AddHanzi("丨",
             new List<StrokeType> { StrokeType.Shu },
             new List<string> { "straight" },
-            1, 12f, "1发重弹");
+            "1发重弹", 12f);
 
         AddHanzi("丿",
             new List<StrokeType> { StrokeType.Pie },
             new List<string> { "vshape" },
-            1, 12f, "1发斜射");
+            "1发斜射", 12f);
 
         AddHanzi("丶",
             new List<StrokeType> { StrokeType.Dian },
             new List<string> { "straight" },
-            1, 12f, "1发点射");
+            "1发点射", 12f);
 
         // 乀 / 乛 是另外两种笔画的"单笔画字"。
         //
@@ -207,159 +207,159 @@ public class HanziSystem : MonoBehaviour
         AddHanzi("乀",
             new List<StrokeType> { StrokeType.Na },
             new List<string> { "vshape" },
-            1, 12f, "1发斜射");
+            "1发斜射", 12f);
 
         AddHanzi("乛",
             new List<StrokeType> { StrokeType.Zhe },
             new List<string> { "straight" },
-            1, 12f, "1发折射");
+            "1发折射", 12f);
 
         // ---------- 2 画 ----------
         AddHanzi("二",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng },
             new List<string> { "parallel" },
-            2, 11f, "2发平行");
+            "2发平行", 11f);
 
         AddHanzi("十",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Shu },
             new List<string> { "cross" },
-            4, 10f, "4发十字");
+            "4发十字", 10f);
 
         AddHanzi("人",
             new List<StrokeType> { StrokeType.Pie, StrokeType.Na },
             new List<string> { "vshape" },
-            2, 11f, "V形双向");
+            "V形双向", 11f);
 
         AddHanzi("丁",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Shu },
             new List<string> { "cross" },
-            2, 11f, "2发重弹");
+            "2发重弹", 11f);
 
         // ---------- 3 画 ----------
         AddHanzi("三",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Heng },
             new List<string> { "parallel" },
-            3, 11f, "3发平行");
+            "3发平行", 11f);
 
         AddHanzi("大",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Pie, StrokeType.Na },
             new List<string> { "scatter" },
-            5, 10f, "5发扇形");
+            "5发扇形", 10f);
 
         AddHanzi("工",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
             new List<string> { "parallel" },
-            4, 11f, "4发平行");
+            "4发平行", 11f);
 
         AddHanzi("干",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Shu },
             new List<string> { "parallel", "pierce" },
-            3, 10f, "3发穿透");
+            "3发穿透", 10f);
 
         AddHanzi("士",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
             new List<string> { "cross" },
-            4, 11f, "4发十字");
+            "4发十字", 11f);
 
         AddHanzi("土",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
             new List<string> { "ring" },
-            6, 9f, "6发环形");
+            "6发环形", 9f);
 
         AddHanzi("口",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng },
             new List<string> { "ring" },
-            6, 9f, "6发环形");
+            "6发环形", 9f);
 
         AddHanzi("兀",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Pie, StrokeType.Zhe },
             new List<string> { "scatter" },
-            5, 10f, "5发扇形");
+            "5发扇形", 10f);
 
         // ---------- 4 画 ----------
         AddHanzi("王",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
             new List<string> { "parallel", "pierce" },
-            4, 10f, "4发穿透");
+            "4发穿透", 10f);
 
         AddHanzi("木",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Pie, StrokeType.Na },
             new List<string> { "omni" },
-            6, 9f, "6发全方位");
+            "6发全方位", 9f);
 
         AddHanzi("天",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Pie, StrokeType.Na },
             new List<string> { "parallel", "vshape" },
-            5, 10f, "平行 + 斜向");
+            "平行 + 斜向", 10f);
 
         AddHanzi("太",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Pie, StrokeType.Na, StrokeType.Dian },
             new List<string> { "scatter", "shotgun" },
-            6, 9.5f, "扇形 + 霰弹");
+            "扇形 + 霰弹", 9.5f);
 
         AddHanzi("日",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Heng },
             new List<string> { "ring", "cross" },
-            6, 9f, "6发环形十字");
+            "6发环形十字", 9f);
 
         AddHanzi("中",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Shu },
             new List<string> { "ring", "pierce" },
-            6, 9f, "6发环形穿透");
+            "6发环形穿透", 9f);
 
         AddHanzi("水",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Pie, StrokeType.Na },
             new List<string> { "cross", "diagonal" },
-            6, 9f, "6发斜射");
+            "6发斜射", 9f);
 
         AddHanzi("火",
             new List<StrokeType> { StrokeType.Dian, StrokeType.Dian, StrokeType.Pie, StrokeType.Na },
             new List<string> { "vshape", "shotgun" },
-            6, 9f, "6发近距霰弹");
+            "6发近距霰弹", 9f);
 
         // ---------- 5 画 ----------
         AddHanzi("主",
             new List<StrokeType> { StrokeType.Dian, StrokeType.Heng, StrokeType.Heng,
                                    StrokeType.Shu, StrokeType.Heng },
             new List<string> { "parallel", "pierce", "ring" },
-            8, 9f, "8发穿透环形");
+            "8发穿透环形", 9f);
 
         AddHanzi("玉",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Shu,
                                    StrokeType.Heng, StrokeType.Dian },
             new List<string> { "parallel", "pierce", "shotgun" },
-            8, 9f, "8发穿透霰弹");
+            "8发穿透霰弹", 9f);
 
         AddHanzi("白",
             new List<StrokeType> { StrokeType.Pie, StrokeType.Shu, StrokeType.Zhe,
                                    StrokeType.Heng, StrokeType.Heng },
             new List<string> { "ring", "pierce" },
-            8, 8.5f, "8发环形穿透");
+            "8发环形穿透", 8.5f);
 
         AddHanzi("田",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng,
                                    StrokeType.Heng, StrokeType.Shu },
             new List<string> { "ring", "cross" },
-            8, 8.5f, "8发环形十字");
+            "8发环形十字", 8.5f);
 
         AddHanzi("目",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng,
                                    StrokeType.Heng, StrokeType.Heng },
             new List<string> { "ring", "parallel" },
-            8, 8.5f, "8发环形平行");
+            "8发环形平行", 8.5f);
 
         // ---------- 6 画 ----------
         AddHanzi("圭",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng,
                                    StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
             new List<string> { "parallel", "pierce", "ring" },
-            8, 8.5f, "8发穿透环形");
+            "8发穿透环形", 8.5f);
 
         AddHanzi("里",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Heng,
                                    StrokeType.Shu, StrokeType.Heng, StrokeType.Heng },
             new List<string> { "omni", "pierce" },
-            8, 8.5f, "8发全方位穿透");
+            "8发全方位穿透", 8.5f);
 
         // ---------- 9 画：终极形态 ----------
         AddHanzi("皇",
@@ -367,7 +367,7 @@ public class HanziSystem : MonoBehaviour
                                    StrokeType.Heng, StrokeType.Heng,
                                    StrokeType.Heng, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
             new List<string> { "omni", "ring", "pierce" },
-            10, 9f, "皇：10发全方位穿透");
+            "皇：10发全方位穿透", 9f);
 
         // ---------- 补充：字形库里已画好但此前没有弹幕定义的字 ----------
         // 这些字的折线坐标早就写在 HanziRenderer 里，只是漏了数据库登记，
@@ -376,49 +376,67 @@ public class HanziSystem : MonoBehaviour
         AddHanzi("八",
             new List<StrokeType> { StrokeType.Pie, StrokeType.Na },
             new List<string> { "vshape" },
-            2, 11.5f, "八：2发分开斜射");
+            "八：2发分开斜射", 11.5f);
 
         AddHanzi("刀",
             new List<StrokeType> { StrokeType.Zhe, StrokeType.Pie },
             new List<string> { "scatter" },
-            3, 10.5f, "刀：3发扇形劈砍");
+            "刀：3发扇形劈砍", 10.5f);
 
         AddHanzi("上",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Heng, StrokeType.Heng },
             new List<string> { "parallel" },
-            3, 11f, "上：3发平行");
+            "上：3发平行", 11f);
 
         AddHanzi("下",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Dian },
             new List<string> { "cross", "shotgun" },
-            4, 10f, "下：4发十字霰弹");
+            "下：4发十字霰弹", 10f);
 
         AddHanzi("丰",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Heng, StrokeType.Shu },
             new List<string> { "parallel", "pierce" },
-            5, 10.5f, "丰：5发平行穿透");
+            "丰：5发平行穿透", 10.5f);
 
         AddHanzi("由",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng,
                                    StrokeType.Shu, StrokeType.Heng },
             new List<string> { "ring", "cross" },
-            6, 9.5f, "由：6发环状十字");
+            "由：6发环状十字", 9.5f);
     }
     // 简化添加方法
     // 注意：不再显式传伤害 —— 单发伤害统一由"笔画数"推导，
     // 这样强度只随弹数成长，不会出现"弹数 × 伤害"双重爆炸。
+    /// <summary>
+    /// 注册一个汉字。
+    ///
+    /// **弹数、射速、单发伤害都不再手写** —— 一律由笔画数推导
+    /// （见 GameBalance.BulletCountFor / FireIntervalFor / DamageFor）。
+    ///
+    /// 为什么改成这样：手写时出现了两类毛病 ——
+    ///   · 同为 2 画的「十」4 发、「丁」2 发，同笔画差 2 倍 DPS
+    ///   · 7 画的圭/里只有 8 发（和 5 画一样强），9 画的皇算下来
+    ///     DPS 反而低于它们 —— 玩家攒到关底字发现更弱了
+    /// 现在强度只由"字有多复杂"决定，想整体调强弱改 GameBalance 那张表即可。
+    ///
+    /// bulletSpeed 保留为参数：它决定的是**手感**（快弹难躲 / 慢弹好躲），
+    /// 不是强度，所以让每个字保留自己的性格。
+    /// </summary>
     void AddHanzi(string name, List<StrokeType> strokes, List<string> tags,
-                  int count, float speed, string desc)
+                  string desc, float bulletSpeed = 11f)
     {
+        int n = strokes != null ? strokes.Count : 1;
+        int bullets = GameBalance.BulletCountFor(n);
+
         hanziDatabase.Add(new HanziDef
         {
             hanziName = name,
             strokes = strokes,
             attackTags = tags,
-            bulletCount = count,
-            bulletSpeed = speed,
-            damage = 0,      // 由 StrokeDamage 计算
-            fireRate = 0.30f,
+            bulletCount = bullets,
+            bulletSpeed = bulletSpeed,
+            damage = GameBalance.DamageFor(n, bullets),
+            fireRate = GameBalance.FireIntervalFor(n),
             bulletScale = 1f,
             description = desc
         });
@@ -756,6 +774,39 @@ public class HanziSystem : MonoBehaviour
             return false;   // 保持现状，等玩家手动合成
         }
 
+        // 2.5) 手上的可用笔画是不是"整好能拼出好几个笔顺相同的字"？
+        //
+        // 汉字里本来就存在笔顺一样、只靠字形区分的字：十/丁、人/八、工/士/土。
+        // 光看笔顺没法决定给哪个 —— 原来按名字 Unicode 排序取第一个，
+        // 结果十、人、士、土这四个字玩家**永远拿不到**。
+        // 现在弹一个选择界面让玩家点，选过的会被记住。
+        List<StrokeType> avail = AvailableStrokes();
+        List<HanziDef> tied = TiedCandidatesFor(avail);
+
+        if (tied.Count >= 2 && ChoiceRequested != null)
+        {
+            // 玩家已经为这个组合定过偏好 → 直接沿用，不再打扰
+            HanziDef pref = GetPreferredFor(avail);
+            if (pref != null)
+            {
+                foreach (HanziDef d in tied)
+                {
+                    if (d.hanziName != pref.hanziName) continue;
+                    if (IsSameHanzi(d, currentHanziDef)) return false;
+                    if (SwitchTo(d)) return true;
+                    break;
+                }
+            }
+            else
+            {
+                AwaitingChoice = true;
+                GameLog.Info($"「{Name(avail)}」可以拼出 {tied.Count} 个字，" +
+                             $"等玩家选：{JoinNames(tied)}");
+                ChoiceRequested(tied);
+                return true;
+            }
+        }
+
         // 3) 是最多的种类 → 自动切到可用笔画能拼出的最复杂汉字
         List<HanziOption> ranked = GetSwitchCandidates();
 
@@ -766,6 +817,24 @@ public class HanziSystem : MonoBehaviour
         }
 
         return false;
+    }
+
+    static string JoinNames(List<HanziDef> list)
+    {
+        string s = "";
+        foreach (HanziDef d in list)
+        {
+            if (s.Length > 0) s += " / ";
+            s += d.hanziName;
+        }
+        return s;
+    }
+
+    static string Name(List<StrokeType> list)
+    {
+        string s = "";
+        foreach (StrokeType t in list) s += StrokeUtil.NameOf(t);
+        return s;
     }
 
     static bool IsSameHanzi(HanziDef a, HanziDef b)
@@ -1302,9 +1371,9 @@ public class HanziSystem : MonoBehaviour
             int strokes = currentHanziDef != null ? currentHanziDef.strokes.Count : 1;
             int bullets = currentHanziDef != null ? Mathf.Max(1, currentHanziDef.bulletCount) : 1;
 
-            int baseDmg = Mathf.Max(2, strokes);
-            int spreadPenalty = 1 + bullets / 5;   // 弹数越多单发越轻，但曲线保持单调上升
-            int dmg = Mathf.Max(1, Mathf.RoundToInt((float)baseDmg / spreadPenalty));
+            // 伤害公式统一放在 GameBalance，和 AddHanzi 用的是同一份 ——
+            // 免得"定义时算一遍、发射时又算一遍"两处对不上。
+            int dmg = GameBalance.DamageFor(strokes, bullets);
 
             return Mathf.Max(1, Mathf.RoundToInt(dmg * PlayerStats.damageMultiplier));
         }
@@ -1411,6 +1480,88 @@ public class HanziSystem : MonoBehaviour
     {
         if (def == null) return false;
         return FindAllMatchingHanzi(def.strokes).Count > 1;
+    }
+
+    /// <summary>
+    /// 用当前**可用笔画**能拼出的、笔顺完全相同的那些字。
+    ///
+    /// 这是"十 / 丁 到底给哪个"的入口。汉字里本来就存在
+    /// 笔顺一样、只靠字形区分的字（十丁、人八、工士土），
+    /// 光靠笔顺没法自动决定 —— 所以交给玩家选。
+    ///
+    /// 返回的列表：
+    ///   · 长度 &lt;= 1 → 没有歧义，调用方照常自动切
+    ///   · 长度 &gt;= 2 → 有歧义，应当弹选择界面
+    ///
+    /// 玩家选过的会被 PinPreference 记住，下次同组合直接沿用。
+    /// </summary>
+    public List<HanziDef> TiedCandidatesFor(List<StrokeType> availableStrokes)
+    {
+        EnsureInitialized();
+
+        var result = new List<HanziDef>();
+        if (availableStrokes == null) return result;
+
+        // 找出"笔顺与可用笔画完全相等"的所有字
+        foreach (HanziDef def in FindAllMatchingHanzi(availableStrokes))
+        {
+            if (def == null || def.strokes == null) continue;
+            if (def.strokes.Count != availableStrokes.Count) continue;
+
+            bool same = true;
+            for (int i = 0; i < def.strokes.Count; i++)
+            {
+                if (def.strokes[i] != availableStrokes[i]) { same = false; break; }
+            }
+            if (same) result.Add(def);
+        }
+
+        // 排序：玩家记过的偏好优先，其余按名字，保证顺序稳定
+        string preferred = null;
+        HanziDef pref = GetPreferredFor(availableStrokes);
+        if (pref != null) preferred = pref.hanziName;
+
+        result.Sort((a, b) =>
+        {
+            if (preferred != null)
+            {
+                bool pa = a.hanziName == preferred;
+                bool pb = b.hanziName == preferred;
+                if (pa != pb) return pa ? -1 : 1;
+            }
+            return string.CompareOrdinal(a.hanziName, b.hanziName);
+        });
+
+        return result;
+    }
+
+    /// <summary>
+    /// 需要玩家选字时发出。参数是候选列表（至少 2 个）。
+    /// 由 HanziPickerUI 订阅；没有订阅者时 ApplyBestFor 会退回自动选择。
+    /// </summary>
+    public static event System.Action<List<HanziDef>> ChoiceRequested;
+
+    /// <summary>
+    /// 当前是否正等着玩家选字。
+    /// UI 用它来避让按键（别让数字键同时触发"换字"和"选字"）。
+    /// </summary>
+    public static bool AwaitingChoice;
+
+    /// <summary>
+    /// 玩家在候选里点了一个：记住偏好并立刻切过去。
+    /// </summary>
+    public void ResolveChoice(HanziDef chosen)
+    {
+        AwaitingChoice = false;
+
+        if (chosen == null) return;
+
+        PinPreference(chosen);
+
+        if (SwitchTo(chosen))
+            GameLog.Info($"玩家选择「{chosen.hanziName}」（已记住这个偏好）");
+        else
+            GameLog.Warn($"玩家选了「{chosen.hanziName}」但切换失败（笔画不足）");
     }
 
     // 玩家在候选里选了一个 → 记住这个偏好，以后再凑齐同一组笔画时自动沿用

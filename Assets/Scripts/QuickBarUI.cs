@@ -140,7 +140,7 @@ public class QuickBarUI : MonoBehaviour
         if (hanzi == null) hanzi = FindObjectOfType<HanziSystem>();
 
         // 背包打开时交给 BackpackUI 处理，避免一次按键触发两套
-        if (BackpackUI.IsOpen) return;
+        if (BackpackUI.IsOpen || HanziSystem.AwaitingChoice) return;
 
         for (int i = 0; i < SlotCount; i++)
         {

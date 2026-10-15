@@ -19,6 +19,68 @@ public static class GameBalance
     /// <summary>不同汉字的基础射速（秒/发）</summary>
     public const float BaseFireRate = 0.30f;
 
+    // ---------- 汉字强度：按笔画数统一推导 ----------
+    //
+    // 原来每个字的弹数是**手写**的，于是出现两种毛病：
+    //   1. 同为 2 画，十是 4 发、丁是 2 发 —— 同笔画差 2 倍 DPS
+    //   2. 7 画的圭/里只有 8 发，和 5 画的字一样强；9 画的皇 10 发，
+    //      算下来 DPS 反而**低于**圭/里 —— 玩家攒到关底字却发现更弱了
+    //
+    // 现在改成按笔画数查表，强度只由"字的复杂度"决定，
+    // 不再由某个字当初手写的数字决定。想整体调强弱只改这一张表。
+    static readonly int[] BulletsByStrokes =
+    {
+        /* 0 */ 1,
+        /* 1 */ 1,
+        /* 2 */ 2,
+        /* 3 */ 4,
+        /* 4 */ 5,
+        /* 5 */ 6,
+        /* 6 */ 7,
+        /* 7 */ 8,
+        /* 8 */ 9,
+        /* 9 */ 10
+    };
+
+    /// <summary>这个笔画数的字应该打几发</summary>
+    public static int BulletCountFor(int strokes)
+    {
+        if (BulletsByStrokes.Length == 0) return 1;
+        int i = Mathf.Clamp(strokes, 0, BulletsByStrokes.Length - 1);
+        return Mathf.Max(1, BulletsByStrokes[i]);
+    }
+
+    /// <summary>
+    /// 这个笔画数的字应该多久打一轮（秒）。
+    ///
+    /// 和弹数一起决定 DPS。字越复杂打得越密，但幅度比弹数小 ——
+    /// 弹数负责主要成长，射速只做微调，避免"又密又多"双重爆炸。
+    /// </summary>
+    public static float FireIntervalFor(int strokes)
+    {
+        int s = Mathf.Clamp(strokes, 1, 9);
+        return Mathf.Lerp(BaseFireRate, 0.26f, (s - 1) / 8f);
+    }
+
+    /// <summary>
+    /// 这个字的单发伤害。
+    ///
+    /// 直接由**笔画数**决定，不再拿弹数去做整除惩罚。
+    ///
+    /// 为什么改掉"除以 (1 + 弹数/5)"那套：整除会在弹数跨过 5、10 时跳变，
+    /// 结果曲线出现倒退 —— 实测 3 画 41.4 DPS、4 画只有 35.1（退步），
+    /// 9 画 115.4 反而低于 8 画的 135.8。玩家越拼越弱，很反直觉。
+    ///
+    /// 现在单发随笔画数平缓上升（2 → 6），强度成长完全交给弹数承担，
+    /// 两条曲线相乘得到单调递增的 DPS。
+    /// </summary>
+    public static int DamageFor(int strokes, int bullets)
+    {
+        int s = Mathf.Clamp(strokes, 1, 9);
+        // 1→2, 2→2, 3→3, 4→3, 5→4, 6→4, 7→5, 8→5, 9→6
+        return Mathf.Clamp(Mathf.RoundToInt(2f + (s - 1) * 0.5f), MinBulletDamage, 8);
+    }
+
     /// <summary>弹幕存活时间（秒）</summary>
     public const float BulletLifetime = 3f;
 

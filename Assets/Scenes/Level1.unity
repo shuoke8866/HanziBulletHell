@@ -1761,6 +1761,7 @@ GameObject:
   - component: {fileID: 489541294}
   - component: {fileID: 3000000009}
   - component: {fileID: 3000000013}
+  - component: {fileID: 3000000014}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -5808,6 +5809,22 @@ MonoBehaviour:
   cardW: 190
   cardH: 190
   gap: 18
+--- !u!114 &3000000014
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 489541282}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8dbe5ae65a42060cd4c39cad07556cf1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cardW: 132
+  cardH: 150
+  gap: 14
+  autoPickAfter: 6
 --- !u!114 &3000000100
 MonoBehaviour:
   m_ObjectHideFlags: 0

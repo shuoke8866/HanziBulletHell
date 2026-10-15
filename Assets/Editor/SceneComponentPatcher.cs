@@ -52,6 +52,13 @@ public static class SceneComponentPatcher
             Debug.Log("[组件] 已给 Level1 的 Player 挂上 OpeningStrokeUI");
         }
 
+        if (player.GetComponent<HanziPickerUI>() == null)
+        {
+            player.AddComponent<HanziPickerUI>();
+            added++;
+            Debug.Log("[组件] 已给 Level1 的 Player 挂上 HanziPickerUI");
+        }
+
         if (player.GetComponent<StrokeInventory>() == null)
         {
             player.AddComponent<StrokeInventory>();
