@@ -561,8 +561,183 @@ public class HanziSystem : MonoBehaviour
     public List<HanziOption> GetSwitchCandidates()
     {
         EnsureInitialized();
-        return HanziSolver.Solve(AvailableStrokes(), hanziDatabase);
+        return SolveWithGrowth(AvailableStrokes());
     }
+
+    // ============================================================
+    //  成长求解：把"当前字占用的笔画"也算进来
+    // ============================================================
+    //
+    // ## 为什么需要单独一套
+    //
+    // AvailableStrokes() 的语义是「还有哪些笔画是空闲的」——
+    // 这是**切换**用的：切到别的字时，当前字占的那几笔要留下来。
+    //
+    // 但**成长**是另一回事。玩家当前「一」（占 1 个横）、池子里有 [横,竖]，
+    // 想变成「十」只需要**补一个竖** —— 那个横本来就要留在十里面。
+    // 如果只把 [竖] 喂给求解器，它算出来只有 1 画，永远拼不出「十」。
+    //
+    // ## 正确规则
+    //
+    //   目标字的笔顺 ⊇ 当前字的笔顺（作为子序列）
+    //   且  需要补的笔画 ⊆ 可用笔画
+    //
+    // 例：当前「一」=[横]，目标「十」=[横,竖]
+    //     [横] 是 [横,竖] 的子序列 ✓，需要补 [竖]，可用 [竖] ✓ → 可行
+    //
+    // 例：当前「一」=[横]，目标「二」=[横,横]
+    //     [横] 是 [横,横] 的子序列 ✓，需要补 [横]，可用 [竖] ✗ → 不可行
+
+    /// <summary>a 是不是 b 的子序列（保持顺序，可以不连续）</summary>
+    public static bool IsSubsequence(List<StrokeType> a, List<StrokeType> b)
+    {
+        // 空集是任何集合的子序列 —— 注意 null 也要当成空集，
+        // 否则"当前没有字"时会被误判成"完全不是子序列"。
+        if (a == null || a.Count == 0) return true;
+        if (b == null || b.Count < a.Count) return false;
+
+        int i = 0;
+        for (int j = 0; j < b.Count && i < a.Count; j++)
+        {
+            if (b[j] == a[i]) i++;
+        }
+        return i == a.Count;
+    }
+
+    /// <summary>
+    /// 要把 current 变成 target，**还需要补哪些笔画**（按 target 的笔顺）。
+    ///
+    /// current 必须是 target 的子序列，否则返回 null。
+    /// 例：current=[横], target=[横,竖] → [竖]
+    ///
+    /// **current 为 null/空时返回空列表，不是全部笔画** ——
+    /// 手上还没有字，就不存在"要补"的概念，target 的笔画全都得从池子里出，
+    /// 那个判断交给调用方的 CanCover / TryForm。
+    /// 之前这里没区分，导致 null 被当成"和 target 不匹配"，白白要求多补笔画。
+    /// </summary>
+    public static List<StrokeType> StrokesToAdd(List<StrokeType> current,
+                                                List<StrokeType> target)
+    {
+        if (current == null || current.Count == 0)
+            return new List<StrokeType>();      // 没有当前字 → 没有"要补"的
+
+        if (!IsSubsequence(current, target)) return null;
+
+        var need = new List<StrokeType>();
+        int i = 0;
+
+        for (int j = 0; j < target.Count; j++)
+        {
+            if (i < current.Count && target[j] == current[i])
+            {
+                i++;            // 这一笔当前字已经占着，不用补
+                continue;
+            }
+            need.Add(target[j]);
+        }
+
+        return need;
+    }
+
+    /// <summary>need 能不能从 available 里凑出来（多重集包含）</summary>
+    public static bool CanCover(List<StrokeType> available, List<StrokeType> need)
+    {
+        if (need == null) return false;
+        if (need.Count == 0) return true;
+        if (available == null) return false;
+
+        var pool = new List<StrokeType>(available);
+        foreach (StrokeType s in need)
+        {
+            int i = pool.IndexOf(s);
+            if (i < 0) return false;
+            pool.RemoveAt(i);
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// **从当前字变成目标字，要从可用笔画里拿哪几笔。**
+    ///
+    /// 三种情况，全项目统一走这一个入口 —— 原来是各写各的，
+    /// 结果"当前字算不算数"在 SwitchTo / GetAllFormable / TiedCandidatesFor
+    /// 里各有各的答案，互相打架。
+    ///
+    ///   A) 目标是当前字的**成长**（当前笔顺是它的子序列且不同）
+    ///      只需要补差的那几笔。
+    ///      例：当前「一」=[横] → 目标「十」=[横,竖] → [竖]
+    ///
+    ///   B) 目标是**另一个字**（不构成成长关系）
+    ///      得用可用笔画完整拼出来。
+    ///      例：当前「十」=[横,竖] → 目标「丨」=[竖] → [竖]
+    ///
+    ///   C) 手上**还没有字**（cur 为空）
+    ///      目标整体都要从可用笔画里出。
+    ///
+    /// 返回 null 表示理论上不可行（调用方直接跳过）。
+    /// </summary>
+    public static List<StrokeType> StrokesNeeded(List<StrokeType> cur,
+                                                 List<StrokeType> target)
+    {
+        if (target == null || target.Count == 0) return null;
+
+        // C) 没有当前字
+        if (cur == null || cur.Count == 0)
+            return new List<StrokeType>(target);
+
+        // A) 成长
+        if (IsSubsequence(cur, target))
+        {
+            var add = StrokesToAdd(cur, target);
+            if (add != null) return add;
+        }
+
+        // B) 换成另一个字
+        return new List<StrokeType>(target);
+    }
+
+    /// <summary>
+    /// 求解"把当前字成长/切换成什么最好"，**同时考虑当前字已占用的笔画**。
+    ///
+    /// 做法：把「当前字占用的笔画 + 可用笔画」合成一个完整池子喂给求解器，
+    /// 再过滤掉"补不上"的目标（需要补的笔画超出了可用笔画）。
+    ///
+    /// 这样：
+    ///   · 一 → 十 可行（补一个竖）
+    ///   · 一 → 二 不可行（要补一个横，但手上只有竖）
+    ///   · 切换回已经拼过的复杂字也可行（比如当前「十」想回「一」）
+    /// </summary>
+    List<HanziOption> SolveWithGrowth(List<StrokeType> available)
+    {
+        var full = new List<StrokeType>();
+        if (currentHanziDef != null && currentHanziDef.strokes != null)
+            full.AddRange(currentHanziDef.strokes);
+        if (available != null) full.AddRange(available);
+
+        var raw = HanziSolver.Solve(full, hanziDatabase);
+        var result = new List<HanziOption>();
+
+        foreach (HanziOption opt in raw)
+        {
+            if (opt == null || opt.def == null || opt.def.strokes == null) continue;
+
+            // 这一笔要补多少 —— 统一走 StrokesNeeded
+            List<StrokeType> need = StrokesNeeded(
+                currentHanziDef != null ? currentHanziDef.strokes : null,
+                opt.def.strokes);
+
+            if (need == null) continue;
+            if (!CanCover(available, need)) continue;
+
+            opt.usedFromPool = need.Count;     // "要补几笔"，不是"总共几笔"
+            result.Add(opt);
+        }
+
+        // 重新排序（usedFromPool 被改过，按同一套规则再排一遍）
+        HanziSolver.SortOptions(result, HanziSolver.MaxFrequency(full, out _));
+        return result;
+    }
+
 
     /// <summary>
     /// 仓库里能拼出的**全部**汉字（含那些笔画数较少的），按复杂度排序。
@@ -573,6 +748,7 @@ public class HanziSystem : MonoBehaviour
         EnsureInitialized();
 
         List<StrokeType> avail = AvailableStrokes();
+        var cur = currentHanziDef != null ? currentHanziDef.strokes : null;
         var result = new List<HanziOption>();
 
         foreach (HanziDef def in hanziDatabase)
@@ -580,22 +756,16 @@ public class HanziSystem : MonoBehaviour
             if (def.strokes == null || def.strokes.Count == 0) continue;
             if (currentHanziDef != null && def.hanziName == currentHanziDef.hanziName) continue;
 
-            // 能不能从可用笔画里凑出来
-            var rest = new List<StrokeType>(avail);
-            bool ok = true;
-            foreach (StrokeType s in def.strokes)
-            {
-                int i = rest.IndexOf(s);
-                if (i < 0) { ok = false; break; }
-                rest.RemoveAt(i);
-            }
-            if (!ok) continue;
+            // 和 SwitchTo 用同一个入口，保证"背包里列出来的"和"点了真能切过去的"完全一致
+            List<StrokeType> need = StrokesNeeded(cur, def.strokes);
+            if (need == null) continue;
+            if (!CanCover(avail, need)) continue;
 
             result.Add(new HanziOption
             {
                 def = def,
                 keyStrokeCount = 0,
-                usedFromPool = def.strokes.Count,
+                usedFromPool = need.Count,     // "要补几笔"，不是"总共几笔"
                 totalStrokes = def.strokes.Count
             });
         }
@@ -630,25 +800,27 @@ public class HanziSystem : MonoBehaviour
 
         List<StrokeType> avail = AvailableStrokes();
 
-        // 校验：可用笔画够不够拼出目标字
-        var check = new List<StrokeType>(avail);
-        foreach (StrokeType s in target.strokes)
-        {
-            int idx = check.IndexOf(s);
-            if (idx < 0)
-            {
-                GameLog.Warn($"切换「{target.hanziName}」失败：可用笔画里没有 {StrokeUtil.NameOf(s)}");
-                return false;
-            }
-            check.RemoveAt(idx);
-        }
+        var cur = currentHanziDef != null ? currentHanziDef.strokes : null;
 
-        // 扣掉目标字用到的笔画
+        // 从当前字变成目标字要从可用笔画里拿哪几笔 ——
+        // 统一走 StrokesNeeded（成长 / 换字 / 手上没字，三种情况都在里面分清）。
+        //
+        // 这里就是"当前字算不算进合成系统"的关键：
+        // 当前「一」=[横] 想变「十」=[横,竖]，只需要补一个竖 ——
+        // 那个横本来就要留在十里面，不该再拿一个横出来。
+        List<StrokeType> need = StrokesNeeded(cur, target.strokes);
+        if (need == null) return false;
+
+        // 校验 + 扣除（合并成一次，避免两处逻辑漂移）
         var left = new List<StrokeType>(avail);
-        foreach (StrokeType s in target.strokes)
+        foreach (StrokeType s in need)
         {
             int idx = left.IndexOf(s);
-            if (idx < 0) return false;
+            if (idx < 0)
+            {
+                GameLog.Warn($"切换「{target.hanziName}」失败：还差一个 {StrokeUtil.NameOf(s)}");
+                return false;
+            }
             left.RemoveAt(idx);
         }
 
@@ -1531,23 +1703,28 @@ public class HanziSystem : MonoBehaviour
         var result = new List<HanziDef>();
         if (availableStrokes == null) return result;
 
-        // 找出"笔顺与可用笔画完全相等"的所有字
-        foreach (HanziDef def in FindAllMatchingHanzi(availableStrokes))
+        // 判定依据是"把当前字成长之后，笔顺会是哪个组合"，
+        // 所以要把**当前字占用的笔画**也算进来 ——
+        // 否则玩家当前「一」、捡到「竖」时，这里是拿 [竖] 去比，
+        // 只匹配到「丨」，根本看不到「十」/「丁」这一组。
+        //
+        // full = 当前字笔顺 ++ 可用笔画。玩家手上"总共能凑出的笔顺"就是它 ——
+        // 当前字占的那几笔本来就会留在成长后的字里，不用额外补。
+        var full = new List<StrokeType>();
+        if (currentHanziDef != null && currentHanziDef.strokes != null)
+            full.AddRange(currentHanziDef.strokes);
+        full.AddRange(availableStrokes);
+
+        foreach (HanziDef def in FindAllMatchingHanzi(full))
         {
             if (def == null || def.strokes == null) continue;
-            if (def.strokes.Count != availableStrokes.Count) continue;
-
-            bool same = true;
-            for (int i = 0; i < def.strokes.Count; i++)
-            {
-                if (def.strokes[i] != availableStrokes[i]) { same = false; break; }
-            }
-            if (same) result.Add(def);
+            if (def.hanziName == currentHanziName) continue;    // 就是当前字，不算候选
+            result.Add(def);
         }
 
         // 排序：玩家记过的偏好优先，其余按名字，保证顺序稳定
         string preferred = null;
-        HanziDef pref = GetPreferredFor(availableStrokes);
+        HanziDef pref = GetPreferredFor(full);
         if (pref != null) preferred = pref.hanziName;
 
         result.Sort((a, b) =>

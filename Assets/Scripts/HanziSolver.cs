@@ -84,6 +84,44 @@ public static class HanziSolver
     /// 目标字的笔画能不能从池子里凑出来（多重集包含），
     /// 并给出用到了几个关键笔画、消耗了池子里的几个笔画。
     /// </summary>
+    /// <summary>
+    /// 目标字的笔画能不能从池子里凑出来（多重集包含）。
+    /// 只需要知道"行不行"时的简化入口。
+    /// </summary>
+    public static bool TryForm(HanziDef def, List<StrokeType> pool)
+    {
+        int k, u;
+        return TryForm(def, pool, null, out k, out u);
+    }
+
+    /// <summary>
+    /// 按和 <see cref="Solve"/> 相同的规则给候选排序。
+    ///
+    /// 抽出来是因为 HanziSystem 在做"成长求解"时会改写 usedFromPool
+    /// （只算需要补的那几笔），改完必须用同一套规则重排，
+    /// 否则最优解会乱。
+    /// </summary>
+    public static void SortOptions(List<HanziOption> list, int maxFreq = 0)
+    {
+        if (list == null) return;
+
+        list.Sort((a, b) =>
+        {
+            if (a.keyStrokeCount != b.keyStrokeCount)
+                return b.keyStrokeCount.CompareTo(a.keyStrokeCount);
+
+            int aLeft = maxFreq - a.keyStrokeCount;
+            int bLeft = maxFreq - b.keyStrokeCount;
+            if (aLeft != bLeft) return aLeft.CompareTo(bLeft);
+
+            if (a.usedFromPool != b.usedFromPool)
+                return b.usedFromPool.CompareTo(a.usedFromPool);
+            if (a.totalStrokes != b.totalStrokes)
+                return b.totalStrokes.CompareTo(a.totalStrokes);
+            return string.CompareOrdinal(a.Name, b.Name);
+        });
+    }
+
     static bool TryForm(HanziDef def, List<StrokeType> pool,
                         List<StrokeType> keyTypes,
                         out int keyCount, out int usedFromPool)
