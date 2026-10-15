@@ -39,8 +39,18 @@ public class Room : MonoBehaviour
 
     [Header("清房奖励")]
     public bool grantBoonOnClear = true;          // 随机词条
-    public bool spawnStrokeOnClear = false;       // 额外掉落一个笔画
-    public int bonusStrokesOnClear = 1;
+    public bool spawnStrokeOnClear = false;       // 额外掉落笔画
+
+    /// <summary>
+    /// 掉落几个笔画。
+    ///
+    /// 0 或负数 = 按层数自动取值（见 GameBalance.CombatBonusStrokesForFloor /
+    /// TreasureBonusStrokesForFloor），这样第 1 层给得多、便于起手，
+    /// 后面逐层收紧，不必去每个场景里手改。
+    /// 想给某个房间单独配数量时，把它设成正数即可覆盖。
+    /// </summary>
+    [Tooltip("掉落笔画数。0 或负数 = 按层数自动取值")]
+    public int bonusStrokesOnClear = 0;
 
     [Header("状态")]
     public bool roomCleared = false;
@@ -516,12 +526,26 @@ public class Room : MonoBehaviour
 
         if (spawnStrokeOnClear && GameManager.Instance != null)
         {
-            for (int i = 0; i < bonusStrokesOnClear; i++)
+            // 数量优先用房间里配的值；没配（<=0）就按层数自动取，
+            // 第 1 层给得多便于起手，后面逐层收紧。
+            // 层数取 GameData.currentFloor 而不是缓存字段，避免切层后不同步。
+            int count = bonusStrokesOnClear;
+            if (count <= 0)
+            {
+                int floor = GameData.currentFloor;
+                count = IsNonCombat
+                    ? GameBalance.TreasureBonusStrokesForFloor(floor)
+                    : GameBalance.CombatBonusStrokesForFloor(floor);
+            }
+
+            for (int i = 0; i < count; i++)
             {
                 StrokeType t = (StrokeType)Random.Range(0, 6);
                 Vector3 pos = transform.position + new Vector3(Random.Range(-2f, 2f), Random.Range(-1f, 1f), 0f);
                 GameManager.Instance.SpawnStrokePickup(pos, t);
             }
+
+            GameLog.Info($"「{name}」掉落 {count} 个笔画（第 {GameData.currentFloor} 层）");
         }
     }
 

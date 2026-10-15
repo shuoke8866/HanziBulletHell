@@ -52,6 +52,28 @@ public class EnemyDef
     public float summonInterval = 8f;
 
     public string glyph = "一";             // 身上显示的汉字
+
+    /// <summary>
+    /// 从第几层开始会刷出这种怪（1 = 第一层就有）。
+    ///
+    /// 加这个字段的原因：原来 PickRandom 是从**整个数据库**等权重抽，
+    /// 于是第一层就可能刷出"弹幕墙怪"（24 血）和"精英·火"（45 血、冲锋），
+    /// 难度完全随机、没有成长感。
+    ///
+    /// 现在按层分层引入：
+    ///   第 1 层  横线怪 / 竖线怪 / 方块怪        —— 认弹幕、学会走位
+    ///   第 2 层  + 冲刺怪 / 炮台怪 / 兵          —— 开始有位置压力
+    ///   第 3 层  + 环绕怪 / 弹幕墙怪 / 精英      —— 真正的弹幕地狱
+    /// </summary>
+    public int minFloor = 1;
+
+    /// <summary>
+    /// 允许"越级"出现的概率。0 = 严格按 minFloor 过滤。
+    ///
+    /// 留一点随机性能避免每层敌人组合完全固定（那样第二周目就很无聊）。
+    /// 默认 0.12：偶尔提前遇到强怪，但不至于第一层就被弹幕墙糊脸。
+    /// </summary>
+    public static float EarlyAppearChance = 0.12f;
 }
 
 /// <summary>
@@ -102,18 +124,35 @@ public static class EnemyDatabase
     }
 
     // 按权重随机抽一个（可排除精英）
+    //
+    // 会按 GameData.currentFloor 过滤：只从 minFloor <= 当前层 的怪里抽。
+    // 另有 EarlyAppearChance 的概率放行一只"越级"的强怪，避免每层组合完全固定。
     public static EnemyDef PickRandom(bool allowElite, float eliteChance = 0.15f)
     {
         EnsureBuilt();
 
+        int floor = GameData.currentFloor;
+
+        // 先按层数筛出可用池
+        var allowed = all.FindAll(d => d.minFloor <= floor);
+
+        // 偶尔放行越级的怪（从"本来还不到时候"的那批里挑）
+        if (allowed.Count < all.Count && UnityEngine.Random.value < EnemyDef.EarlyAppearChance)
+        {
+            var future = all.FindAll(d => d.minFloor > floor);
+            if (future.Count > 0) allowed.Add(future[UnityEngine.Random.Range(0, future.Count)]);
+        }
+
+        if (allowed.Count == 0) allowed = all;   // 兜底，绝不返回空
+
         if (allowElite && UnityEngine.Random.value < eliteChance)
         {
-            var elites = all.FindAll(d => d.isElite);
+            var elites = allowed.FindAll(d => d.isElite);
             if (elites.Count > 0) return elites[UnityEngine.Random.Range(0, elites.Count)];
         }
 
-        var pool = all.FindAll(d => !d.isElite);
-        if (pool.Count == 0) pool = all;
+        var pool = allowed.FindAll(d => !d.isElite);
+        if (pool.Count == 0) pool = allowed;
 
         int total = 0;
         foreach (var d in pool) total += Mathf.Max(1, d.scoreWeight);
@@ -136,6 +175,7 @@ public static class EnemyDatabase
         Register(new EnemyDef
         {
             id = "yi",
+            minFloor = 1,
             displayName = "横线怪",
             glyph = "二",
             behavior = EnemyBehavior.Chase,
@@ -151,6 +191,7 @@ public static class EnemyDatabase
         Register(new EnemyDef
         {
             id = "shu",
+            minFloor = 1,
             displayName = "竖线怪",
             glyph = "川",
             behavior = EnemyBehavior.Chase,
@@ -166,6 +207,7 @@ public static class EnemyDatabase
         Register(new EnemyDef
         {
             id = "kou",
+            minFloor = 1,
             displayName = "方块怪",
             glyph = "口",
             behavior = EnemyBehavior.ChaseShoot,
@@ -181,6 +223,7 @@ public static class EnemyDatabase
         Register(new EnemyDef
         {
             id = "ren",
+            minFloor = 2,
             displayName = "冲刺怪",
             glyph = "人",
             behavior = EnemyBehavior.Charge,
@@ -197,6 +240,7 @@ public static class EnemyDatabase
         Register(new EnemyDef
         {
             id = "shi",
+            minFloor = 2,
             displayName = "炮台怪",
             glyph = "丁",
             behavior = EnemyBehavior.Turret,
@@ -212,6 +256,7 @@ public static class EnemyDatabase
         Register(new EnemyDef
         {
             id = "mu",
+            minFloor = 3,
             displayName = "环绕怪",
             glyph = "木",
             behavior = EnemyBehavior.Orbit,
@@ -227,6 +272,7 @@ public static class EnemyDatabase
         Register(new EnemyDef
         {
             id = "tian",
+            minFloor = 3,
             displayName = "弹幕墙怪",
             glyph = "田",
             behavior = EnemyBehavior.ChaseShoot,
@@ -244,6 +290,7 @@ public static class EnemyDatabase
         Register(new EnemyDef
         {
             id = "elite_wang",
+            minFloor = 3,
             displayName = "精英·王",
             glyph = "王",
             behavior = EnemyBehavior.ChaseShoot,
@@ -260,6 +307,7 @@ public static class EnemyDatabase
         Register(new EnemyDef
         {
             id = "elite_huo",
+            minFloor = 3,
             displayName = "精英·火",
             glyph = "圭",
             behavior = EnemyBehavior.Charge,
@@ -277,6 +325,7 @@ public static class EnemyDatabase
         Register(new EnemyDef
         {
             id = "elite_shui",
+            minFloor = 3,
             displayName = "精英·水",
             glyph = "水",
             behavior = EnemyBehavior.Orbit,
@@ -295,6 +344,7 @@ public static class EnemyDatabase
         Register(new EnemyDef
         {
             id = "bing",
+            minFloor = 2,
             displayName = "兵",
             glyph = "兵",
             behavior = EnemyBehavior.Chase,
