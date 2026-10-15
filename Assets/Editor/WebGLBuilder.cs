@@ -21,12 +21,46 @@ using UnityEngine;
 /// </summary>
 public static class WebGLBuilder
 {
-    static readonly string[] Scenes =
+    /// <summary>
+    /// 要构建的场景 —— **直接读 Unity 的官方配置，不在这里硬编码。**
+    ///
+    /// 踩过的坑：这里原来手写 `{ Level1, Level2, Level3 }`。
+    /// 后来加了新手教程层 Level0、也把它写进了 Build Settings，
+    /// 但这个手写列表没同步 —— 结果构建出来的包里**没有教程层**，
+    /// 玩家点开直接进第一层，完全看不到教程。
+    ///
+    /// 两处都记着"要构建哪些场景"就是两个数据源，迟早对不上。
+    /// 现在只认 <see cref="EditorBuildSettings.scenes"/> 这一处
+    /// （也就是 File → Build Settings 里那个列表）。
+    /// 用 Tools/更新构建场景列表 维护它即可。
+    /// </summary>
+    static string[] Scenes
     {
-        "Assets/Scenes/Level1.unity",
-        "Assets/Scenes/Level2.unity",
-        "Assets/Scenes/Level3.unity"
-    };
+        get
+        {
+            var list = new System.Collections.Generic.List<string>();
+
+            foreach (var s in EditorBuildSettings.scenes)
+            {
+                if (s == null || !s.enabled) continue;
+                if (string.IsNullOrEmpty(s.path)) continue;
+                if (!s.path.EndsWith(".unity")) continue;
+                list.Add(s.path);
+            }
+
+            // 兜底：Build Settings 空着的时候别构建出个空包
+            if (list.Count == 0)
+            {
+                Debug.LogWarning("[WebGLBuilder] Build Settings 里没有启用的场景，" +
+                                 "回退到默认三个关卡");
+                list.Add("Assets/Scenes/Level1.unity");
+                list.Add("Assets/Scenes/Level2.unity");
+                list.Add("Assets/Scenes/Level3.unity");
+            }
+
+            return list.ToArray();
+        }
+    }
 
     /// <summary>构建输出目录（相对项目根目录11）</summary>
     const string OutputFolder = "docs";
