@@ -19,7 +19,29 @@ using UnityEngine.UI;
 [RequireComponent(typeof(BoxCollider2D))]
 public class TutorialHint : MonoBehaviour
 {
-    [Header("提示内容（一行一条，依次显示）")]
+    /// <summary>
+    /// 这组提示对应 <see cref="GameText.Tutorial"/> 里的哪一组。
+    ///
+    /// 选了分组就**每帧从 GameText 现取**，不读序列化的 lines ——
+    /// 于是改 GameText.Tutorial 里的文案立刻生效，不用重新生成教程层。
+    ///
+    /// 为什么这么做：原来文案是生成场景时**烤进场景文件**的，
+    /// 改了 GameText 却看不到变化，很容易误以为"工具没生效"。
+    /// </summary>
+    public enum TutorialGroup
+    {
+        None = 0,       // 用手填的 lines
+        Start = 1,      // 起始房：认全六种笔画
+        Collect = 2,    // 收集房：捡笔画与自动合成
+        Swap = 3,       // 换字房：切换与背包
+        Boss = 4        // 头目前
+    }
+
+    [Header("文案来源")]
+    [Tooltip("选了分组就每帧从 GameText 现取，改文案立刻生效；None 才用手填的 lines")]
+    public TutorialGroup group = TutorialGroup.None;
+
+    [Header("手填提示（group = None 时用）")]
     [TextArea(2, 4)]
     public List<string> lines = new List<string>();
 
@@ -44,6 +66,22 @@ public class TutorialHint : MonoBehaviour
     bool consumed;
     int shownCount;
     float lineTimer;
+
+    /// <summary>当前该显示哪几条 —— 按分组现取，或用手填的</summary>
+    List<string> CurrentLines
+    {
+        get
+        {
+            switch (group)
+            {
+                case TutorialGroup.Start: return new List<string>(GameText.Tutorial.起始房());
+                case TutorialGroup.Collect: return new List<string>(GameText.Tutorial.收集房());
+                case TutorialGroup.Swap: return new List<string>(GameText.Tutorial.换字房());
+                case TutorialGroup.Boss: return new List<string>(GameText.Tutorial.头目前());
+                default: return lines;
+            }
+        }
+    }
 
     void Reset()
     {
@@ -90,7 +128,7 @@ public class TutorialHint : MonoBehaviour
 
         lineTimer = 0f;
 
-        if (shownCount < lines.Count)
+        if (shownCount < CurrentLines.Count)
             AdvanceLine();
         else
             HidePanel();
@@ -99,7 +137,9 @@ public class TutorialHint : MonoBehaviour
     /// <summary>显示下一条；没有了就收起</summary>
     void AdvanceLine()
     {
-        if (shownCount >= lines.Count)
+        var src = CurrentLines;
+
+        if (shownCount >= src.Count)
         {
             HidePanel();
             consumed = true;
@@ -108,7 +148,7 @@ public class TutorialHint : MonoBehaviour
 
         EnsurePanel();
 
-        sharedText.text = lines[shownCount];
+        sharedText.text = src[shownCount];
         sharedText.color = textColor;
         sharedText.fontSize = fontSize;
         sharedPanel.SetActive(true);

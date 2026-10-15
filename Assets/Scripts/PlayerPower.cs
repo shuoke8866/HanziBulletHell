@@ -17,14 +17,36 @@ public static class PlayerPower
     ///
     /// 直接复用 HanziSystem.EstimatedDPS，不在这里重写伤害公式 ——
     /// 公式一旦有两份实现必然漂移（改平衡时容易漏掉一份），这个项目已经踩过同类坑。
+    ///
+    /// **但要乘一个命中率**：EstimatedDPS 算的是"假设每一发都命中同一个敌人"，
+    /// 而扇形/环形弹幕打单体时大部分会飞走。
+    /// 不修正的话 BOSS 血量会被系统性放大 3~5 倍 —— 实测按声明值反推
+    /// 会配出 90 秒的 BOSS 战，对作品集演示来说是劝退级的。
+    ///
+    /// 命中率按弹幕形状给（和 EnemyHealthBalancer 用的是同一套经验值）：
+    ///   1~2 发 60%   3~4 发 35%   5~6 发 25%   7 发以上 20%
     /// </summary>
     public static float EstimatedDps()
     {
         HanziSystem hanzi = Object.FindObjectOfType<HanziSystem>();
-        if (hanzi == null) return 8f;
+        if (hanzi == null) return 5f;
 
-        float dps = hanzi.EstimatedDPS;
-        return dps > 0.1f ? dps : 8f;
+        float raw = hanzi.EstimatedDPS;
+        if (raw <= 0.1f) return 5f;
+
+        return raw * HitRateOf(hanzi);
+    }
+
+    /// <summary>按当前汉字的弹数估命中率</summary>
+    static float HitRateOf(HanziSystem hanzi)
+    {
+        HanziDef def = hanzi.CurrentHanziDef;
+        int bullets = def != null ? Mathf.Max(1, def.bulletCount) : 1;
+
+        if (bullets <= 2) return 0.60f;
+        if (bullets <= 4) return 0.35f;
+        if (bullets <= 6) return 0.25f;
+        return 0.20f;
     }
 
     /// <summary>

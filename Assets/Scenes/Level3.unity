@@ -4741,6 +4741,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8516708738680078839, guid: da1db911d31ff724984f245a98bd3f18, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1319587814}
+    - targetCorrespondingSourceObject: {fileID: 8516708738680078839, guid: da1db911d31ff724984f245a98bd3f18, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1319587815}
   m_SourcePrefab: {fileID: 100100000, guid: da1db911d31ff724984f245a98bd3f18, type: 3}
 --- !u!114 &1319587812 stripped
 MonoBehaviour:
@@ -4772,6 +4775,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxSlots: 9
   strokes: 
+--- !u!114 &1319587815
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1319587813}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8dbe5ae65a42060cd4c39cad07556cf1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cardW: 132
+  cardH: 150
+  gap: 14
+  autoPickAfter: 6
 --- !u!1 &1332404641
 GameObject:
   m_ObjectHideFlags: 0

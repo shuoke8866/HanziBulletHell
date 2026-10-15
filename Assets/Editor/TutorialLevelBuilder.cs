@@ -339,7 +339,14 @@ public static class TutorialLevelBuilder
     //  教程提示
     // ============================================================
 
-    static void AddHint(string name, Vector2 pos, Vector2 size, params string[] lines)
+    /// <summary>
+    /// 放一个教程提示牌。
+    ///
+    /// **不再把文案烤进场景**，只记一个分组 —— TutorialHint 运行时
+    /// 从 GameText.Tutorial 现取。这样改文案立刻生效，不用重新生成教程层。
+    /// （原来把文案序列化进场景，改了 GameText 却看不到变化，很容易误判工具失效。）
+    /// </summary>
+    static void AddHint(string name, Vector2 pos, Vector2 size, TutorialHint.TutorialGroup group)
     {
         GameObject go = new GameObject(name);
         go.transform.position = new Vector3(pos.x, pos.y, 0f);
@@ -349,30 +356,30 @@ public static class TutorialLevelBuilder
         box.size = size;
 
         TutorialHint hint = go.AddComponent<TutorialHint>();
-        hint.lines = new List<string>(lines);
+        hint.group = group;
         hint.lineDuration = 7f;
     }
 
     static void AddHints(float x0, float pitch)
     {
-        // 文案全部来自 GameText.Tutorial —— 想改教程说什么，
-        // 编辑 GameText.cs 或用 Tools/字幕编辑器，不用碰这个文件。
+        // 只指定分组；具体文案在 GameText.Tutorial 里，
+        // 用 Tools/字幕编辑器 或直接改 GameText.cs 都能立刻生效。
 
         // Room1：先认全六种笔画 —— 这是教程最主要的目标
         AddHint("Hint_Start", new Vector2(x0, 0f), new Vector2(RoomW - 1f, RoomH - 1f),
-            GameText.Tutorial.起始房());
+            TutorialHint.TutorialGroup.Start);
 
         // Room2：教收集与自动合成
         AddHint("Hint_Collect", new Vector2(x0 + pitch * 1f, 0f), new Vector2(RoomW - 2f, RoomH - 1f),
-            GameText.Tutorial.收集房());
+            TutorialHint.TutorialGroup.Collect);
 
         // Room3：教换字与背包
         AddHint("Hint_Swap", new Vector2(x0 + pitch * 2f, 0f), new Vector2(RoomW - 1f, RoomH - 1f),
-            GameText.Tutorial.换字房());
+            TutorialHint.TutorialGroup.Swap);
 
         // Room4：BOSS 前，顺便交代"教程和实战是分开的"
         AddHint("Hint_Boss", new Vector2(x0 + pitch * 2.5f, 0f), new Vector2(6f, RoomH - 1f),
-            GameText.Tutorial.头目前());
+            TutorialHint.TutorialGroup.Boss);
     }
 
     // ============================================================

@@ -36,6 +36,19 @@ using UnityEngine;
 /// </summary>
 public static class EnemyHealthBalancer
 {
+    /// <summary>
+    /// 全局血量倍率 —— **调难度只改这一个数**。
+    ///
+    /// 目标击杀秒数（下面的 Ttk 表）是按"纯输出时间"算的理论值，
+    /// 但实战里玩家要躲弹幕、走位、换字，真正能站着输出的时间没那么多。
+    /// 所以最终血量 = 理论值 × 这个倍率。
+    ///
+    /// 1.0 = 完全按理论值（打起来会偏软）
+    /// 2.5 = 疑似当前合适值
+    /// 想整体变难/变简单，改这一个数然后重跑 Tools 里的配血即可。
+    /// </summary>
+    const float HealthScale = 2.5f;
+
     /// <summary>各弹数的命中率（打单体时的典型值）</summary>
     static float HitRate(int bullets)
     {
@@ -111,7 +124,8 @@ public static class EnemyHealthBalancer
             int floor = MinFloor[id];
             int strokes = TypicalStrokesForFloor(floor);
             float dps = EffectiveDps(strokes);
-            int hp = Mathf.Max(2, Mathf.RoundToInt(kv.Value * dps));
+            // 理论值 × 全局倍率：实战里玩家要躲弹幕、走位，不是站着输出
+            int hp = Mathf.Max(2, Mathf.RoundToInt(kv.Value * dps * HealthScale));
 
             newHealth[id] = hp;
 
