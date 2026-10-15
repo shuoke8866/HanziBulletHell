@@ -63,22 +63,52 @@ public static class GameBalance
     }
 
     /// <summary>
-    /// 这个字的单发伤害。
-    ///
-    /// 直接由**笔画数**决定，不再拿弹数去做整除惩罚。
-    ///
-    /// 为什么改掉"除以 (1 + 弹数/5)"那套：整除会在弹数跨过 5、10 时跳变，
-    /// 结果曲线出现倒退 —— 实测 3 画 41.4 DPS、4 画只有 35.1（退步），
-    /// 9 画 115.4 反而低于 8 画的 135.8。玩家越拼越弱，很反直觉。
-    ///
-    /// 现在单发随笔画数平缓上升（2 → 6），强度成长完全交给弹数承担，
-    /// 两条曲线相乘得到单调递增的 DPS。
+    /// 这一档笔画的**标准单发伤害**（对应 BulletCountFor 的标准弹数）。
+    /// 两者相乘就是这一档的"目标总伤害"。
     /// </summary>
-    public static int DamageFor(int strokes, int bullets)
+    static int BaseDamageFor(int strokes)
     {
         int s = Mathf.Clamp(strokes, 1, 9);
-        // 1→2, 2→2, 3→3, 4→3, 5→4, 6→4, 7→5, 8→5, 9→6
-        return Mathf.Clamp(Mathf.RoundToInt(2f + (s - 1) * 0.5f), MinBulletDamage, 8);
+        return Mathf.Clamp(Mathf.RoundToInt(2f + (s - 1) * 0.5f), MinBulletDamage, 12);
+    }
+
+    /// <summary>
+    /// 这个字的单发伤害。
+    ///
+    /// **总输出恒定，单发随弹数反比缩放。**
+    ///
+    /// 参数：
+    ///   strokes    笔画数（决定强度档次）
+    ///   standard   这一档的标准弹数（强度基准，见 BulletCountFor）
+    ///   actual     这个字实际打几发（形状特色，比如「十」打 4 发十字）
+    ///
+    /// 算法：先算出这一档的"目标总伤害" = standard × BaseDamageFor(strokes)，
+    /// 再除以这个字的实际弹数。于是：
+    ///
+    ///   十（2 画，4 发）单发轻；丁（2 画，2 发）单发重 —— 两者总输出相同。
+    ///
+    /// 形状可以随字自由变化，强度曲线仍然只由笔画数决定。
+    ///
+    /// 注意：单发伤害是整数，取整会让同笔画的字有 ±15% 以内的浮动
+    /// （比如 2 画的刀 3 发，只能取 1 或 2，无法正好等于 2.0）。
+    /// 这个误差在体感上察觉不到，换来的是每个字都有自己独特的弹幕形状。
+    ///
+    /// 为什么不用"除以 (1 + 弹数/5)"那套老公式：整除会在弹数跨过 5、10 时跳变，
+    /// 曲线因此倒退（实测 3 画 41.4 DPS、4 画只有 35.1）。
+    /// </summary>
+    public static int DamageFor(int strokes, int standard, int actual)
+    {
+        int std = Mathf.Max(1, standard);
+        int act = Mathf.Max(1, actual);
+
+        float targetTotal = std * (float)BaseDamageFor(strokes);
+        return Mathf.Max(1, Mathf.RoundToInt(targetTotal / act));
+    }
+
+    /// <summary>兼容旧调用：只给笔画数时按标准弹数算</summary>
+    public static int DamageFor(int strokes, int bullets)
+    {
+        return DamageFor(strokes, bullets, bullets);
     }
 
     /// <summary>弹幕存活时间（秒）</summary>

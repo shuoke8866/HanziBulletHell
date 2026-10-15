@@ -107,7 +107,7 @@ public class HanziPickerUI : MonoBehaviour
 
         if (autoPickAfter > 0f && Time.unscaledTime - openedAt > autoPickAfter)
         {
-            GameToast.Show("超时 —— 自动选了第一个", new Color(0.85f, 0.85f, 0.85f));
+            GameToast.Show(GameText.Toast.选字超时(), new Color(0.85f, 0.85f, 0.85f));
             Pick(0);
         }
     }
@@ -137,7 +137,7 @@ public class HanziPickerUI : MonoBehaviour
             TextMeshProUGUI title = MakeText(panel.transform, "Title", 24f,
                 TextAlignmentOptions.Center, new Color(1f, 0.95f, 0.6f));
             AnchorTop(title.rectTransform, 0f, -12f, 520f, 34f);
-            title.text = "这几个字笔顺一样，你要哪个？";
+            title.text = GameText.Panel.选字标题();
         }
 
         // 按当前候选数重排
@@ -231,7 +231,7 @@ public class HanziPickerUI : MonoBehaviour
         hrt.pivot = new Vector2(0.5f, 0f);
         hrt.anchoredPosition = new Vector2(0f, 8f);
         hrt.sizeDelta = new Vector2(panelW - 30f, 26f);
-        hint.text = "按 1-3 或点一下卡片。选过一次就会记住，以后自动沿用。";
+        hint.text = GameText.Hint.选字面板();
     }
 
     static void AnchorTop(RectTransform rt, float x, float y, float w, float h)
@@ -297,7 +297,7 @@ public class HanziPickerUI : MonoBehaviour
         if (panel != null) panel.SetActive(false);
 
         Sfx.Play(Sfx.Id.Combine, 0.5f);
-        GameToast.Show($"选定「{chosen.hanziName}」", new Color(0.7f, 1f, 0.8f));
+        GameToast.Show(GameText.Toast.选定汉字(chosen.hanziName), new Color(0.7f, 1f, 0.8f));
 
         if (owner != null)
             owner.ResolveChoice(chosen);

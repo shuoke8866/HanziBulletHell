@@ -66,7 +66,7 @@ public class BossHuang : MonoBehaviour, IDamageable
         nextSummonTime = Time.time + 3f;
 
         GameLog.Info($"===== BOSS「皇」降临！（{maxHealth} HP）=====");
-        GameToast.Show("BOSS「皇」降临", new Color(1f, 0.85f, 0.3f));
+        GameToast.Show(GameText.Boss.皇降临(), new Color(1f, 0.85f, 0.3f));
     }
 
     void Update()
@@ -108,7 +108,7 @@ public class BossHuang : MonoBehaviour, IDamageable
         enraged = true;
         moveSpeed *= 1.4f;
         GameLog.Info("BOSS「皇」暴怒！招式加速、召唤加剧");
-        GameToast.Show("「皇」暴怒！", new Color(1f, 0.35f, 0.25f));
+        GameToast.Show(GameText.Boss.皇暴怒(), new Color(1f, 0.35f, 0.25f));
     }
 
     // ---------------- 招式 ----------------
@@ -185,7 +185,7 @@ public class BossHuang : MonoBehaviour, IDamageable
 
         summonsSpawned += n;
         GameLog.Info($"BOSS「皇」召唤了 {n} 名士兵「兵」（累计 {summonsSpawned}）");
-        GameToast.Show($"「皇」召唤了 {n} 名士兵", new Color(0.9f, 0.9f, 1f));
+        GameToast.Show(GameText.Boss.皇召唤(n), new Color(0.9f, 0.9f, 1f));
     }
 
     void SpawnBullet(Vector3 pos, Vector3 dir, float speed, Color color)
@@ -240,7 +240,7 @@ void ApplyDamageInternal(int damage)
         isDead = true;
 
         GameLog.Info("BOSS「皇」被击败！");
-        GameToast.Show("「皇」已被击败！", new Color(1f, 0.95f, 0.5f));
+        GameToast.Show(GameText.Boss.皇被击败(), new Color(1f, 0.95f, 0.5f));
 
         if (currentRoom != null)
             currentRoom.OnEnemyDied(gameObject);

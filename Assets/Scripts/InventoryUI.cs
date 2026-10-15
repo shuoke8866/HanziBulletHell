@@ -12,7 +12,7 @@ public class InventoryUI : MonoBehaviour
 
         if (inventory.strokes.Count == 0)
         {
-            inventoryText.text = "背包：空";
+            inventoryText.text = GameText.Panel.背包空();
             return;
         }
 

@@ -244,7 +244,7 @@ public class BackpackUI : MonoBehaviour
         hrt.pivot = new Vector2(0.5f, 0f);
         hrt.anchoredPosition = new Vector2(0f, 12f);
         hrt.sizeDelta = new Vector2(panelWidth - 40f, 26f);
-        hintText.text = "1-9 选字     A / D 翻页     鼠标点击也可选     E / Esc 关闭";
+        hintText.text = GameText.Hint.背包();
 
         panel.SetActive(false);
     }
@@ -294,9 +294,9 @@ public class BackpackUI : MonoBehaviour
         if (headerText != null)
         {
             headerText.text =
-                $"当前汉字「{hanzi.currentHanziName}」　　" +
-                $"可用笔画 {DescribeStrokes(hanzi.AvailableStrokes())}　　" +
-                $"可换 {all.Count} 个字";
+                GameText.Panel.背包当前汉字(hanzi.currentHanziName) + "　　" +
+                GameText.Panel.背包可用笔画(DescribeStrokes(hanzi.AvailableStrokes())) + "　　" +
+                GameText.Panel.背包可换数量(all.Count);
         }
 
         // ---- 九宫格 ----
@@ -352,8 +352,8 @@ public class BackpackUI : MonoBehaviour
         if (pageText != null)
         {
             pageText.text = all.Count == 0
-                ? "仓库里还拼不出任何字 —— 先去捡笔画"
-                : $"第 {page + 1} / {pageCount} 页　　（共 {all.Count} 个候选，按笔画数从多到少）";
+                ? GameText.Panel.背包空仓()
+                : GameText.Panel.背包页码(page + 1, pageCount, all.Count);
         }
     }
 
@@ -414,7 +414,7 @@ public class BackpackUI : MonoBehaviour
         if (index < 0 || index >= pageOptions.Count)
         {
             Sfx.Play(Sfx.Id.Error, 0.25f);
-            GameToast.Show($"[{index + 1}] 是空格子（本页只有 {pageOptions.Count} 个字）",
+            GameToast.Show(GameText.Toast.空号位(index + 1, pageOptions.Count),
                 new Color(0.85f, 0.85f, 0.85f));
             return;
         }
@@ -425,20 +425,20 @@ public class BackpackUI : MonoBehaviour
         if (target.hanziName == hanzi.currentHanziName)
         {
             Sfx.Play(Sfx.Id.Error, 0.25f);
-            GameToast.Show($"已经是「{target.hanziName}」了", new Color(0.85f, 0.85f, 0.85f));
+            GameToast.Show(GameText.Toast.已是该字(target.hanziName), new Color(0.85f, 0.85f, 0.85f));
             return;
         }
 
         if (hanzi.SwitchTo(target))
         {
             Sfx.Play(Sfx.Id.Combine, 0.6f);
-            GameToast.Show($"切换到「{target.hanziName}」", new Color(0.7f, 1f, 0.8f));
+            GameToast.Show(GameText.Toast.切换汉字(target.hanziName), new Color(0.7f, 1f, 0.8f));
             Refresh();
         }
         else
         {
             Sfx.Play(Sfx.Id.Error, 0.3f);
-            GameToast.Show($"「{target.hanziName}」切换失败（笔画不足）",
+            GameToast.Show(GameText.Toast.切换失败(target.hanziName),
                 new Color(1f, 0.6f, 0.5f));
         }
     }

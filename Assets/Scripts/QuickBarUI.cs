@@ -184,25 +184,25 @@ public class QuickBarUI : MonoBehaviour
         HanziOption opt = shown[index];
         if (opt == null || opt.def == null)
         {
-            GameToast.Show($"{index + 1} 号位是空的（仓库还拼不出这么多字）", new Color(0.8f, 0.8f, 0.8f));
+            GameToast.Show(GameText.Toast.快捷栏空位(index + 1), new Color(0.8f, 0.8f, 0.8f));
             return;
         }
 
         if (hanzi.CurrentHanziDef != null && opt.def.hanziName == hanzi.currentHanziName)
         {
-            GameToast.Show($"已经是「{opt.def.hanziName}」了", new Color(0.85f, 0.85f, 0.85f));
+            GameToast.Show(GameText.Toast.已是该字(opt.def.hanziName), new Color(0.85f, 0.85f, 0.85f));
             return;
         }
 
         if (hanzi.SwitchTo(opt.def))
         {
             Sfx.Play(Sfx.Id.Combine, 0.6f);
-            GameToast.Show($"切换到「{opt.def.hanziName}」", new Color(0.7f, 1f, 0.8f));
+            GameToast.Show(GameText.Toast.切换汉字(opt.def.hanziName), new Color(0.7f, 1f, 0.8f));
             ForceRefresh();
         }
         else
         {
-            GameToast.Show($"「{opt.def.hanziName}」切换失败（笔画不足）", new Color(1f, 0.6f, 0.5f));
+            GameToast.Show(GameText.Toast.切换失败(opt.def.hanziName), new Color(1f, 0.6f, 0.5f));
         }
     }
 
@@ -215,12 +215,12 @@ public class QuickBarUI : MonoBehaviour
         if (best != null)
         {
             Sfx.Play(Sfx.Id.Combine, 0.6f);
-            GameToast.Show($"已切到最强：「{best.hanziName}」", new Color(1f, 0.9f, 0.5f));
+            GameToast.Show(GameText.Toast.选中最强(best.hanziName), new Color(1f, 0.9f, 0.5f));
             ForceRefresh();
         }
         else
         {
-            GameToast.Show("仓库里还拼不出别的字", new Color(0.8f, 0.8f, 0.8f));
+            GameToast.Show(GameText.Toast.没有更强的(), new Color(0.8f, 0.8f, 0.8f));
         }
     }
 
@@ -296,8 +296,8 @@ public class QuickBarUI : MonoBehaviour
             int shownCount = 0;
             foreach (var o in shown) if (o != null) shownCount++;
             hint.text = total > shownCount
-                ? $"1-9 换字    Q 最强    E 背包（还有 {total - shownCount} 个可换，翻页查看）"
-                : "1-9 换字    Q 最强    E 背包（可翻页看全部）";
+                ? GameText.Hint.快捷栏还有更多(total - shownCount)
+                : GameText.Hint.快捷栏();
         }
     }
 

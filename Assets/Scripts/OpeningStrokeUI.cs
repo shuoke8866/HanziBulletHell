@@ -116,12 +116,12 @@ public class OpeningStrokeUI : MonoBehaviour
         TextMeshProUGUI title = MakeText(panel.transform, "Title", 30f,
             TextAlignmentOptions.Center, new Color(1f, 0.95f, 0.6f));
         AnchorTop(title.rectTransform, 0f, -18f, panelW - 40f, 44f);
-        title.text = "选一支笔画，开始";
+        title.text = GameText.Panel.开局标题();
 
         TextMeshProUGUI sub = MakeText(panel.transform, "Sub", 20f,
             TextAlignmentOptions.Center, new Color(0.75f, 0.82f, 0.95f));
         AnchorTop(sub.rectTransform, 0f, -62f, panelW - 40f, 30f);
-        sub.text = "这一支就是你的起手字 —— 之后捡到的笔画都会往它上面加。";
+        sub.text = GameText.Panel.开局说明();
 
         // ---- 六张卡 ----
         float startX = -rowW * 0.5f + cardW * 0.5f;
@@ -194,7 +194,7 @@ public class OpeningStrokeUI : MonoBehaviour
         hrt.pivot = new Vector2(0.5f, 0f);
         hrt.anchoredPosition = new Vector2(0f, 14f);
         hrt.sizeDelta = new Vector2(panelW - 40f, 32f);
-        hint.text = "按 1-6 或点一下卡片";
+        hint.text = GameText.Hint.开局选笔画();
 
         // 用 tab 组把 hover 效果做出来
         CreateHoverProbe();

@@ -10,7 +10,7 @@ public class UIManager : MonoBehaviour
     {
         if (hanziSystem != null && hanziText != null)
         {
-            hanziText.text = "当前汉字：" + hanziSystem.currentHanziName;
+            hanziText.text = GameText.Panel.当前汉字标签() + hanziSystem.currentHanziName;
         }
     }
 }

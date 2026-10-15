@@ -87,7 +87,7 @@ public class Portal : MonoBehaviour
         go.transform.localPosition = new Vector3(0f, 1.2f, 0f);
 
         hintText = go.AddComponent<TextMeshPro>();
-        hintText.text = "按 回车 进入下一层";
+        hintText.text = GameText.Toast.进入下层();
         hintText.fontSize = 3.2f;
         hintText.alignment = TextAlignmentOptions.Center;
         hintText.color = new Color(1f, 0.95f, 0.6f);

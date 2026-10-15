@@ -101,14 +101,14 @@ public class StrokePickup : MonoBehaviour
             GameData.strokesCollected++;
             Sfx.PlayVaried(Sfx.Id.Pickup, 0.45f);
             Fx.PickupPop(transform.position, StrokeUtil.ColorOf(strokeType));
-            GameToast.Show($"拾取 {StrokeUtil.NameOf(strokeType)}（存背包）", StrokeUtil.ColorOf(strokeType));
+            GameToast.Show(GameText.Toast.拾取存背包(StrokeUtil.NameOf(strokeType)), StrokeUtil.ColorOf(strokeType));
             Destroy(gameObject);
         }
         // 背包也满了 → 不拾取，笔画留在原地（可按 F 重试）
         else if (inv != null)
         {
             Sfx.Play(Sfx.Id.Error, 0.35f);
-            GameToast.Show($"背包已满，「{StrokeUtil.NameOf(strokeType)}」留在地上", new Color(1f, 0.6f, 0.5f));
+            GameToast.Show(GameText.Toast.背包已满(StrokeUtil.NameOf(strokeType)), new Color(1f, 0.6f, 0.5f));
         }
     }
 }

@@ -511,7 +511,7 @@ public class Room : MonoBehaviour
         Fx.Shake(0.20f);
 
         GameLog.Info($"「{name}」已清理！");
-        GameToast.Show($"房间清理完成！", new Color(0.6f, 1f, 0.7f));
+        GameToast.Show(GameText.Toast.房间清理完成(), new Color(0.6f, 1f, 0.7f));
 
         GrantClearReward();
     }
@@ -526,7 +526,7 @@ public class Room : MonoBehaviour
             Sfx.Play(Sfx.Id.Boon, 0.5f);
             if (PlayerRef.Transform != null)
                 Fx.SynthesisBurst(PlayerRef.Transform.position, boon.color);
-            GameToast.Show($"获得词条：{boon.displayName} —— {boon.description}", boon.color);
+            GameToast.Show(GameText.Toast.获得词条(boon.displayName, boon.description), boon.color);
         }
 
         if (spawnStrokeOnClear && GameManager.Instance != null)

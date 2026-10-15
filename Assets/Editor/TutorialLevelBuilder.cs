@@ -355,31 +355,24 @@ public static class TutorialLevelBuilder
 
     static void AddHints(float x0, float pitch)
     {
+        // 文案全部来自 GameText.Tutorial —— 想改教程说什么，
+        // 编辑 GameText.cs 或用 Tools/字幕编辑器，不用碰这个文件。
+
         // Room1：先认全六种笔画 —— 这是教程最主要的目标
         AddHint("Hint_Start", new Vector2(x0, 0f), new Vector2(RoomW - 1f, RoomH - 1f),
-            "用 W A S D 走动。",
-            "地上这一排是汉字的基本笔画，一共六种：横、竖、撇、捺、点、折。",
-            "所有汉字都是这六种拼出来的。记住它们长什么样，比什么都重要。",
-            "鼠标指着哪边，字就往哪边打。按住左键就能一直打。");
+            GameText.Tutorial.起始房());
 
         // Room2：教收集与自动合成
         AddHint("Hint_Collect", new Vector2(x0 + pitch * 1f, 0f), new Vector2(RoomW - 2f, RoomH - 1f),
-            "打倒这些家伙，地上会掉笔画。走过去就自动捡。",
-            "笔画攒够了，你的字会自己变成更复杂的字 —— 字越复杂，打得越狠。",
-            "顺手按 F 把宝箱开了，里面有笔画。");
+            GameText.Tutorial.收集房());
 
         // Room3：教换字与背包
         AddHint("Hint_Swap", new Vector2(x0 + pitch * 2f, 0f), new Vector2(RoomW - 1f, RoomH - 1f),
-            "屏幕底下那排字，按 1-9 就能换过去。",
-            "打不动了就换个大字试试，火力完全不一样。",
-            "按 E 打开背包，A / D 翻页，里面是你现在能拼出来的所有字。",
-            "换错了也不要紧，笔画不会丢，随时能换回来。");
+            GameText.Tutorial.换字房());
 
         // Room4：BOSS 前，顺便交代"教程和实战是分开的"
         AddHint("Hint_Boss", new Vector2(x0 + pitch * 2.5f, 0f), new Vector2(6f, RoomH - 1f),
-            "前面是个难缠的家伙，注意躲它那道横扫的刀光。",
-            "打赢了会出现传送门 —— 走过去按 F。",
-            "这里捡到的笔画不会带进正式关。正式开局会让你自己挑一支笔画起手。");
+            GameText.Tutorial.头目前());
     }
 
     // ============================================================
