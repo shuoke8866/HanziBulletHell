@@ -3603,16 +3603,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9626d0948766f64cafbad6e6d2be138, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  roomType: 4
+  roomType: 0
   doors:
   - {fileID: 849504940}
   useDatabasePool: 0
   singleDefId: 
-  enemyPrefabs:
-  - {fileID: 5860914716362875413, guid: 32a029e01437f214aa9ba183a8297b4d, type: 3}
-  enemySpawnPoints:
-  - {fileID: 484907809}
-  waveCount: 1
+  enemyPrefabs: []
+  enemySpawnPoints: []
+  waveCount: 0
   waveInterval: 1.2
   enemyHealthOverride: -1
   extraEnemiesPerWave: 0
@@ -4097,7 +4095,7 @@ MonoBehaviour:
   useDatabasePool: 0
   singleDefId: 
   enemyPrefabs:
-  - {fileID: 7000000000000000001, guid: a0f6b9e8ae391e43f16b8802fe4f12ff, type: 3}
+  - {fileID: 5860914716362875413, guid: a0f6b9e8ae391e43f16b8802fe4f12ff, type: 3}
   enemySpawnPoints:
   - {fileID: 3000000201}
   waveCount: 1

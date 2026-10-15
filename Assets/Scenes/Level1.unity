@@ -1817,6 +1817,7 @@ GameObject:
   - component: {fileID: 489541293}
   - component: {fileID: 489541294}
   - component: {fileID: 3000000009}
+  - component: {fileID: 3000000013}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -6309,6 +6310,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3000000002}
   m_CullTransparentMesh: 1
+--- !u!114 &3000000013
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 489541282}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41ab06ebb0c0b81cbe28bfcce64ecb5d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cardW: 190
+  cardH: 190
+  gap: 18
 --- !u!114 &3000000100
 MonoBehaviour:
   m_ObjectHideFlags: 0

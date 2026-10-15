@@ -5,8 +5,14 @@ using System.Collections.Generic;
 // 否则其他系统持有的旧引用会指向已经被丢弃的列表。
 public static class GameData
 {
-    // 当前汉字的笔画
-    public static List<StrokeType> currentStrokes = new List<StrokeType> { StrokeType.Heng };
+    /// <summary>
+    /// 当前汉字的笔画。
+    ///
+    /// 开局为空：等玩家在开局界面选完起手笔画，再按那个字的笔顺装上
+    /// （见 <see cref="BeginRealRun"/> 与 HanziSystem.ApplyOpeningStarter）。
+    /// 教程层则是空着进场，靠捡笔画长起来。
+    /// </summary>
+    public static List<StrokeType> currentStrokes = new List<StrokeType>();
 
     // 背包笔画
     public static List<StrokeType> inventoryStrokes = new List<StrokeType>();
@@ -49,27 +55,38 @@ public static class GameData
     // 例：横横竖 这个组合玩家选了"工"，以后凑齐横横竖就自动变"工"
     public static Dictionary<string, string> hanziPreferences = new Dictionary<string, string>();
 
+    /// <summary>
+    /// 当前是不是在**新手教程层**。
+    ///
+    /// 教程和实战的数据必须完全独立：
+    /// 玩家在教程里把六种笔画都捡了一遍、试过各种换字，
+    /// 这些如果带进第一层，开局就等于半套装备，成长曲线直接废掉。
+    ///
+    /// 所以教程里捡到的东西只活在教程层，走出教程时
+    /// <see cref="BeginRealRun"/> 会把一切清零，实战从选一支笔画重新开始。
+    /// </summary>
+    public static bool inTutorial = true;
+
+    /// <summary>
+    /// 实战是否已经"开局选过笔画"。
+    /// 选过之后就不再弹选择界面（重开关卡也不会重复弹）。
+    /// </summary>
+    public static bool openingStrokeChosen = false;
+
+    /// <summary>实战可选的开局笔画（六种基本笔画）</summary>
+    public static readonly StrokeType[] StarterChoices =
+    {
+        StrokeType.Heng, StrokeType.Shu, StrokeType.Pie,
+        StrokeType.Na, StrokeType.Dian, StrokeType.Zhe
+    };
+
     // 重置为新游戏（死亡或主动重开时调用）
     public static void ResetAll()
     {
-        currentStrokes.Clear();
-        currentStrokes.Add(StrokeType.Heng);
-
-        inventoryStrokes.Clear();
-
-        // 永久笔画池从「一」开始（玩家开局就是「一」）
-        allStrokes.Clear();
-        allStrokes.Add(StrokeType.Heng);
-        formedHanzi.Clear();
-        formedHanzi.Add("一");
+        ClearRunState();
 
         currentElement = ElementType.None;
         currentFloor = 0;   // 从新手教程层开始
-
-        enemiesKilled = 0;
-        bossesKilled = 0;
-        strokesCollected = 0;
-        carriedHealth = 0;
 
         hanziPreferences.Clear();
 
@@ -77,6 +94,68 @@ public static class GameData
         PlayerStats.ResetAll();
 
         GameLog.Info("GameData 已重置为新游戏");
+    }
+
+    /// <summary>
+    /// **开始正式一局**：把教程层的一切成果清空，用玩家选的笔画重新开局。
+    ///
+    /// 这是"教程与实战独立"的落地点 —— 教程里捡了多少笔画、
+    /// 合成过多少字，走到这里全部归零。
+    /// </summary>
+    public static void BeginRealRun(StrokeType starter)
+    {
+        ClearRunState();
+
+        currentStrokes.Add(starter);
+        allStrokes.Add(starter);
+
+        // 开局只有一支笔画，就按这一支对应的最简汉字起手
+        string startHanzi = HanziForSingleStroke(starter);
+        formedHanzi.Add(startHanzi);
+
+        currentElement = ElementType.None;
+        currentFloor = 1;             // 正式第一层
+        inTutorial = false;
+        openingStrokeChosen = true;
+
+        PlayerStats.ResetAll();
+
+        GameLog.Info($"正式开局：起始笔画「{StrokeUtil.NameOf(starter)}」→ 汉字「{startHanzi}」");
+    }
+
+    /// <summary>把各种临时状态清干净（教程和实战共用）</summary>
+    static void ClearRunState()
+    {
+        currentStrokes.Clear();
+        inventoryStrokes.Clear();
+        allStrokes.Clear();
+        formedHanzi.Clear();
+
+        enemiesKilled = 0;
+        bossesKilled = 0;
+        strokesCollected = 0;
+        carriedHealth = 0;
+    }
+
+    /// <summary>
+    /// 单支笔画能组成的最简汉字（开局起手字）。
+    ///
+    /// 一到五画各有自己的单笔画字；**折没有** —— 字库里没有「乛」这个字形，
+    /// 所以折用「刀」（Zhe,Pie）代替：它是字库里以折起笔、笔画最少的字。
+    /// 选折开局的玩家起手就是「刀」，比别的开局多一笔，算是这点小补偿。
+    /// </summary>
+    public static string HanziForSingleStroke(StrokeType s)
+    {
+        switch (s)
+        {
+            case StrokeType.Heng: return "一";
+            case StrokeType.Shu: return "丨";
+            case StrokeType.Pie: return "丿";
+            case StrokeType.Na: return "乀";
+            case StrokeType.Dian: return "丶";
+            case StrokeType.Zhe: return "刀";
+            default: return "一";
+        }
     }
 
     // 本轮进度摘要

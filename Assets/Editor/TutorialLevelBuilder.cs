@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
 using System.IO;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -117,6 +118,11 @@ public static class TutorialLevelBuilder
 
         // ---- 6) 宝箱 / 笔画 ----
         AddStrokeChest(new Vector2(x0 + Pitch * 2f, 0f));
+
+        // 教程的核心任务之一是"让玩家认全六种笔画"。
+        // 所以在起始房正中间摆一排六张展台，每种笔画一个，
+        // 玩家一进场就能一眼看全：横、竖、撇、捺、点、折各长什么样。
+        AddStrokeGallery(new Vector2(x0, 0f));
 
         // ---- 7) BOSS 与传送门 ----
         AddBoss(rooms[3], new Vector2(x0 + Pitch * 3f, 0f));
@@ -240,6 +246,85 @@ public static class TutorialLevelBuilder
         room.waveCount = 1;
     }
 
+    /// <summary>
+    /// 在房间正中摆一排"笔画展台"：六种基本笔画各一个，附名字，
+    /// **同时在展台旁边放一份真的可拾取笔画**。
+    ///
+    /// 展台本身只是贴图（让玩家看清有哪六种、分别叫什么），
+    /// 真正能捡的是旁边那个 StrokePickup —— 两者成对出现，
+    /// 玩家看到"哦，这个形状的笔画叫横"，走过去顺手就捡了。
+    ///
+    /// 为什么不做成"捡起来才认识"：
+    /// 教程要给的是**认知**，得先看清全部六种再谈选择。
+    /// 但也不能只给看不给捡 —— 那样教程里玩家空着手，什么也做不了。
+    /// </summary>
+    static void AddStrokeGallery(Vector2 center)
+    {
+        var all = new[]
+        {
+            StrokeType.Heng, StrokeType.Shu, StrokeType.Pie,
+            StrokeType.Na, StrokeType.Dian, StrokeType.Zhe
+        };
+
+        const float spacing = 2.0f;
+        float startX = -(all.Length - 1) * 0.5f * spacing;
+
+        GameObject gallery = new GameObject("StrokeGallery");
+        gallery.transform.position = new Vector3(center.x, center.y + 0.6f, 0f);
+
+        GameObject pickupPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+            "Assets/StrokePickup.prefab");
+        if (pickupPrefab == null)
+            Debug.LogWarning("[教程] 找不到 StrokePickup.prefab，展台旁边不会有可捡的笔画");
+
+        for (int i = 0; i < all.Length; i++)
+        {
+            StrokeType st = all[i];
+            Vector3 pos = new Vector3(center.x + startX + i * spacing,
+                                      center.y + 0.6f, 0f);
+
+            // ---- 展台：字形 + 名字（只看不捡）----
+            GameObject slot = new GameObject($"Gallery_{st}");
+            slot.transform.SetParent(gallery.transform, false);
+            slot.transform.position = pos;
+
+            GameObject gl = new GameObject("Glyph");
+            gl.transform.SetParent(slot.transform, false);
+            gl.transform.localPosition = Vector3.zero;
+
+            SpriteRenderer sr = gl.AddComponent<SpriteRenderer>();
+            sr.sprite = HanziRenderer.CreateSpriteFor(
+                GameData.HanziForSingleStroke(st), 96, 48f);
+            sr.color = StrokeUtil.ColorOf(st);
+            sr.sortingOrder = 6;
+            gl.transform.localScale = Vector3.one * 0.9f;
+
+            GameObject txt = new GameObject("Name");
+            txt.transform.SetParent(slot.transform, false);
+            txt.transform.localPosition = new Vector3(0f, -0.85f, -0.1f);
+
+            var tm = txt.AddComponent<TextMeshPro>();
+            tm.text = StrokeUtil.NameOf(st);
+            tm.fontSize = 3f;
+            tm.alignment = TextAlignmentOptions.Center;
+            tm.color = StrokeUtil.ColorOf(st);
+            tm.sortingOrder = 7;
+
+            // ---- 可拾取笔画：放在展台正下方一格 ----
+            if (pickupPrefab != null)
+            {
+                GameObject pick = (GameObject)PrefabUtility.InstantiatePrefab(pickupPrefab);
+                pick.name = $"TutorialPickup_{st}";
+                pick.transform.position = pos + new Vector3(0f, -1.9f, 0f);
+
+                StrokePickup sp = pick.GetComponent<StrokePickup>();
+                if (sp != null) sp.strokeType = st;
+            }
+        }
+
+        Debug.Log($"[教程] 笔画展台 + 可拾取笔画已放置：{all.Length} 种");
+    }
+
     static void AddPortal(Vector2 pos)
     {
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Portal.prefab");
@@ -270,11 +355,12 @@ public static class TutorialLevelBuilder
 
     static void AddHints(float x0, float pitch)
     {
-        // Room1：先教最基础的两件事，别的都先别说
+        // Room1：先认全六种笔画 —— 这是教程最主要的目标
         AddHint("Hint_Start", new Vector2(x0, 0f), new Vector2(RoomW - 1f, RoomH - 1f),
             "用 W A S D 走动。",
-            "鼠标指着哪边，字就往哪边打。按住左键就能一直打。",
-            "屏幕上飞来飞去的方块别硬接 —— 碰一下掉血，血空了就得重来。");
+            "地上这一排是汉字的基本笔画，一共六种：横、竖、撇、捺、点、折。",
+            "所有汉字都是这六种拼出来的。记住它们长什么样，比什么都重要。",
+            "鼠标指着哪边，字就往哪边打。按住左键就能一直打。");
 
         // Room2：教收集与自动合成
         AddHint("Hint_Collect", new Vector2(x0 + pitch * 1f, 0f), new Vector2(RoomW - 2f, RoomH - 1f),
@@ -289,10 +375,11 @@ public static class TutorialLevelBuilder
             "按 E 打开背包，A / D 翻页，里面是你现在能拼出来的所有字。",
             "换错了也不要紧，笔画不会丢，随时能换回来。");
 
-        // Room4：BOSS 前的最后一句
+        // Room4：BOSS 前，顺便交代"教程和实战是分开的"
         AddHint("Hint_Boss", new Vector2(x0 + pitch * 2.5f, 0f), new Vector2(6f, RoomH - 1f),
             "前面是个难缠的家伙，注意躲它那道横扫的刀光。",
-            "打赢了会出现传送门 —— 走过去按 F，就正式开始了。");
+            "打赢了会出现传送门 —— 走过去按 F。",
+            "这里捡到的笔画不会带进正式关。正式开局会让你自己挑一支笔画起手。");
     }
 
     // ============================================================

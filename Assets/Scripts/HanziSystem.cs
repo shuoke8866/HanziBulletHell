@@ -42,10 +42,14 @@ public class HanziSystem : MonoBehaviour
         }
         else
         {
+            // 空手进场：教程层是空着开始、靠捡笔画长起来的；
+            // 实战层则由开局界面选完起手笔画后再装上（ApplyOpeningStarter）。
+            //
+            // 原来这里会硬塞一支「横」，结果是"教程里刚捡的笔画被顶掉"、
+            // "实战选的起手笔画被覆盖成「一」"。
             currentStrokes.Clear();
-            currentStrokes.Add(StrokeType.Heng);
-            // 就地写入，保持 GameData 里的 List 引用不变（其他系统可能持有引用）
             SaveStrokesToGameData();
+            GameLog.Info("进场时手上没有笔画（等待拾取或开局选择）");
         }
 
         UpdateCurrentHanzi();
@@ -93,6 +97,65 @@ public class HanziSystem : MonoBehaviour
         SyncCharacterGlyph();
 
         GameLog.Info("汉字已重置为「一」");
+    }
+
+    /// <summary>
+    /// 正式开局：把玩家的**起手笔画**装进去。
+    ///
+    /// 和 <see cref="ResetToDefaultHanzi"/> 的区别：那个永远回到「一」，
+    /// 这个用玩家在开局界面选的笔画 —— 选竖就以「丨」起手、选折就以「刀」起手。
+    ///
+    /// 调用方（OpeningStrokeUI）已经先调用过 GameData.BeginRealRun，
+    /// 那边会把教程层的全部成果清零，所以这里是从干净状态开始装。
+    /// </summary>
+    public void ApplyOpeningStarter(StrokeType starter)
+    {
+        EnsureInitialized();
+
+        string startHanzi = GameData.HanziForSingleStroke(starter);
+        currentHanziDef = FindByName(startHanzi);
+
+        currentStrokes.Clear();
+
+        if (currentHanziDef != null && currentHanziDef.strokes != null &&
+            currentHanziDef.strokes.Count > 0)
+        {
+            // 用起手字的完整笔顺。
+            // 「折」的起手字「刀」是两画（Zhe+Pie），
+            // 只塞一支 Zhe 的话池子凑不出这个字，开局会显示不出汉字。
+            currentStrokes.AddRange(currentHanziDef.strokes);
+        }
+        else
+        {
+            currentStrokes.Add(starter);
+        }
+
+        SaveStrokesToGameData();
+
+        // 永久池 = 起手字占用的笔画，此外什么都没有
+        Pool.Clear();
+        Pool.AddRange(currentStrokes);
+
+        if (GameData.allStrokes == null) GameData.allStrokes = new List<StrokeType>();
+        GameData.allStrokes.Clear();
+        GameData.allStrokes.AddRange(currentStrokes);
+
+        if (GameData.formedHanzi == null) GameData.formedHanzi = new List<string>();
+        GameData.formedHanzi.Clear();
+        GameData.formedHanzi.Add(startHanzi);
+
+        StrokeInventory inv = GetComponent<StrokeInventory>();
+        if (inv != null && inv.strokes != null)
+        {
+            inv.strokes.Clear();
+            inv.SaveToGameData();
+        }
+
+        UpdateCurrentHanzi();
+        SyncCharacterGlyph();
+
+        GameLog.Info($"开局起手：笔画「{StrokeUtil.NameOf(starter)}」→ 汉字「{startHanzi}」" +
+                     $"（{currentStrokes.Count} 画）");
     }
 
     void BuildDatabase()
@@ -845,15 +908,17 @@ public class HanziSystem : MonoBehaviour
         if (byStrokeCount == null || byStrokeCount.Count == 0)
             BuildIndex();
 
-        if (currentStrokes == null || currentStrokes.Count == 0)
-        {
-            currentStrokes = new List<StrokeType> { StrokeType.Heng };
-            SaveStrokesToGameData();
-        }
+        // **不**在这里补笔画：手上没有笔画是合法状态 ——
+        // 教程层空手进场、靠捡笔画长起来；实战层则由开局界面选完起手笔画再装上。
+        //
+        // 原来这里会硬塞一支「横」（Awake 里还塞过一次），结果是
+        // "教程里刚捡到的笔画被顶掉"、"实战选的起手笔画被覆盖成「一」"。
+        if (currentStrokes == null)
+            currentStrokes = new List<StrokeType>();
 
-        // 永久笔画池至少要包含"当前字占用的笔画"，否则开局（「一」）
-        // 会出现"池子里一笔都没有"的情况，导致首次切换全部失败。
-        // 只补差额，不重复加。
+        // 永久笔画池至少要包含"当前字占用的笔画"，
+        // 否则会出现"池子里一笔都没有"、导致切换全部失败。
+        // 手上没笔画时这里是空操作（currentStrokes 也是空的）。
         EnsurePoolCoversCurrentStrokes();
 
         UpdateCurrentHanzi();
