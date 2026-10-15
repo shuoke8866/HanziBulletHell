@@ -45,40 +45,67 @@ public static class GameBalance
     public const float BossHealthMultiplier = 0.35f;
 
     /// <summary>
-    /// 各层 BOSS 的**额外**血量倍率。
+    /// 数值平衡用的层号：**教程层（0）算作第 1 档**。
     ///
-    /// 设计意图：一二层是"教学 BOSS"，应该脆一些，主要让玩家熟悉弹幕节奏；
-    /// 第三层关底「皇」才是真正的耐力战。
-    /// 索引 0 对应第 1 层，超出范围取最后一个。
+    /// 为什么要这个换算：关卡编号是 0=教程、1/2/3=正式层，
+    /// 但所有成长曲线（血量、速度、奖励、BOSS 倍率）都是按 1 起算的。
+    /// 直接拿 currentFloor=0 去查表会落到"第 1 层"甚至变成负数，
+    /// 所以统一走这里 +1 之后再查表。
     /// </summary>
-    static readonly float[] BossHealthPerFloor = { 0.70f, 0.85f, 1.15f };
+    public static int BalanceFloor
+    {
+        get { return Mathf.Max(1, GameData.currentFloor + 1); }
+    }
 
-    /// <summary>取某一层 BOSS 的血量倍率</summary>
+    /// <summary>
+    /// 各层的**额外**血量倍率，索引 0 = 教程层。
+    ///
+    /// 设计意图：教程与一二层是"教学 BOSS"，应该脆一些，
+    /// 主要让玩家熟悉弹幕节奏；第三层关底「皇」才是真正的耐力战。
+    /// </summary>
+    static readonly float[] BossHealthPerFloor = { 0.60f, 0.75f, 0.90f, 1.15f };
+
+    /// <summary>
+    /// 教程层 BOSS 的额外削弱系数（乘在 BossHealthPerFloor[0] 之上）。
+    ///
+    /// 教程 BOSS 的作用只是"让玩家确认自己会打了"，不该在这儿卡人。
+    /// 玩家在教程里死掉、被迫重看一遍提示，是最劝退的体验之一。
+    /// 觉得太软或太硬就改这一个数。
+    /// </summary>
+    public const float TutorialBossExtraMultiplier = 0.5f;
+
+    /// <summary>教程层 BOSS 的最终倍率</summary>
+    public static float TutorialBossMultiplier
+    {
+        get { return BossHealthPerFloor[0] * TutorialBossExtraMultiplier; }
+    }
+
+    /// <summary>取某一层的 BOSS 血量倍率（floor 直接传 GameData.currentFloor，教程层=0）</summary>
     public static float BossHealthForFloor(int floor)
     {
         if (BossHealthPerFloor.Length == 0) return 1f;
-        int i = Mathf.Clamp(floor - 1, 0, BossHealthPerFloor.Length - 1);
+        int i = Mathf.Clamp(floor, 0, BossHealthPerFloor.Length - 1);
         return BossHealthPerFloor[i];
     }
 
     // ---------- 房间奖励 ----------
-    /// <summary>清空战斗房额外掉落的笔画数（第 1 层给得多，方便起手）</summary>
-    static readonly int[] CombatBonusStrokesPerFloor = { 2, 2, 1 };
+    /// <summary>清空战斗房掉落的笔画数（索引 0 = 教程层）</summary>
+    static readonly int[] CombatBonusStrokesPerFloor = { 3, 2, 2, 1 };
 
     public static int CombatBonusStrokesForFloor(int floor)
     {
         if (CombatBonusStrokesPerFloor.Length == 0) return 1;
-        int i = Mathf.Clamp(floor - 1, 0, CombatBonusStrokesPerFloor.Length - 1);
+        int i = Mathf.Clamp(floor, 0, CombatBonusStrokesPerFloor.Length - 1);
         return CombatBonusStrokesPerFloor[i];
     }
 
-    /// <summary>宝箱房额外掉落的笔画数</summary>
-    static readonly int[] TreasureBonusStrokesPerFloor = { 3, 2, 2 };
+    /// <summary>宝箱房掉落的笔画数（索引 0 = 教程层）</summary>
+    static readonly int[] TreasureBonusStrokesPerFloor = { 4, 3, 2, 2 };
 
     public static int TreasureBonusStrokesForFloor(int floor)
     {
         if (TreasureBonusStrokesPerFloor.Length == 0) return 1;
-        int i = Mathf.Clamp(floor - 1, 0, TreasureBonusStrokesPerFloor.Length - 1);
+        int i = Mathf.Clamp(floor, 0, TreasureBonusStrokesPerFloor.Length - 1);
         return TreasureBonusStrokesPerFloor[i];
     }
 
@@ -105,10 +132,18 @@ public static class GameBalance
     public const string EnemyTag = "Enemy";
     public const string WallTag = "Wall";
 
-    /// <summary>层数 → 场景名</summary>
+    /// <summary>
+    /// 关卡编号 → 场景名。**0 = 新手教程层。**
+    ///
+    /// 编号和各层的中文叫法差 1：编号 0 是教程，编号 1/2/3 对应"第一/二/三层"。
+    /// 这样做的好处是 GameData.currentFloor 从 0 开始，
+    /// 成长公式 (currentFloor - 1) 在教程层正好等于 0，倍率刚好是 1.0，
+    /// 不需要给教程层开特例。
+    /// </summary>
     public static string SceneForFloor(int floor)
     {
-        if (floor <= 1) return "Level1";
+        if (floor <= 0) return "Level0";     // 新手教程
+        if (floor == 1) return "Level1";
         if (floor == 2) return "Level2";
         return "Level3";
     }

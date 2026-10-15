@@ -136,14 +136,31 @@ public static class EnemyDatabase
         // 先按层数筛出可用池
         var allowed = all.FindAll(d => d.minFloor <= floor);
 
-        // 偶尔放行越级的怪（从"本来还不到时候"的那批里挑）
-        if (allowed.Count < all.Count && UnityEngine.Random.value < EnemyDef.EarlyAppearChance)
+        // 兜底：如果这一层一个都没有，就退到"minFloor 最小的那批"，
+        // **不能**直接放行全部 —— 那样等于分层完全失效。
+        //
+        // 踩过的坑：教程层的 floor 是 0，而所有怪的 minFloor 都 >= 1，
+        // 过滤后必然为空；原来的 `if (allowed.Count == 0) allowed = all;`
+        // 于是把 11 种怪（含精英和弹幕墙怪）全放进了新手教程。
+        if (allowed.Count == 0)
+        {
+            int lowest = int.MaxValue;
+            foreach (var d in all) if (d.minFloor < lowest) lowest = d.minFloor;
+
+            allowed = all.FindAll(d => d.minFloor == lowest);
+            if (allowed.Count == 0) allowed = all;   // 真的一个定义都没有才会走到
+        }
+
+        // 偶尔放行越级的怪（从"本来还不到时候"的那批里挑）。
+        //
+        // 教程层（floor <= 0）**完全不放行** —— 那一层是让新手学基本操作的，
+        // 突然冒出一只精英或弹幕墙怪是很糟的体验。
+        if (floor > 0 && allowed.Count < all.Count &&
+            UnityEngine.Random.value < EnemyDef.EarlyAppearChance)
         {
             var future = all.FindAll(d => d.minFloor > floor);
             if (future.Count > 0) allowed.Add(future[UnityEngine.Random.Range(0, future.Count)]);
         }
-
-        if (allowed.Count == 0) allowed = all;   // 兜底，绝不返回空
 
         if (allowElite && UnityEngine.Random.value < eliteChance)
         {

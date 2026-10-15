@@ -169,26 +169,28 @@ public class GameManager : MonoBehaviour
         SceneManager.LoadScene(target);
     }
 
-    // 第 1 层 → Level1，第 2 层 → Level2，第 3 层起 → Level3（之后循环 Level3 并靠倍率提升难度）
+    // 关卡编号 → 场景。**0 = 新手教程**，1/2/3 = 第一/二/三层，
+    // 第 3 层之后循环 Level3，靠层数倍率继续提升难度。
+    //
+    // 真正的实现放在 GameBalance 里（那边是"所有数值与流程配置"的归属地），
+    // 这里只做转发，避免两处各写一份、改一处漏一处。
     public static string SceneForFloor(int floor)
     {
-        if (floor <= 1) return "Level1";
-        if (floor == 2) return "Level2";
-        return "Level3";
+        return GameBalance.SceneForFloor(floor);
     }
 
     // ---------- 死亡 / 重开 ----------
     // 真肉鸽：清空所有笔画，回到第 1 层
     public void RestartRun()
     {
-        GameLog.Info("玩家死亡 —— 重置本轮进度，回到第 1 层");
+        GameLog.Info("玩家死亡 —— 重置进度，从新手教程层重新开始");
 
         GameData.ResetAll();
-        currentFloor = 1;
+        currentFloor = GameData.currentFloor;    // ResetAll 会把它设回 0（教程层）
 
         Time.timeScale = 1f;
 
-        SceneManager.LoadScene(SceneForFloor(1));
+        SceneManager.LoadScene(SceneForFloor(currentFloor));
     }
 
     public void SpawnStrokePickup(Vector3 pos, StrokeType type)

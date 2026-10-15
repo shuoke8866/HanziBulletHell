@@ -283,7 +283,7 @@ public class Room : MonoBehaviour
         // 的房间会先生成随机杂兵并 return，Boss 永远不出现 —— 第二关的 Boss 房就是这么空掉的。
         if (enemyPrefabs.Count == 0 && useDatabasePool)
         {
-            bool allowElite = roomType == RoomType.Elite || roomType == RoomType.Boss || GameData.currentFloor >= 3;
+            bool allowElite = roomType == RoomType.Elite || roomType == RoomType.Boss || GameBalance.BalanceFloor >= 4;
             float eliteChance = roomType == RoomType.Elite ? 0.75f : 0.12f;
             EnemyDef def = EnemyDatabase.PickRandom(allowElite, eliteChance);
             if (def != null)
@@ -442,6 +442,11 @@ public class Room : MonoBehaviour
 
         float bossMul = Mathf.Max(0.01f, GameBalance.BossHealthMultiplier)
                       * GameBalance.BossHealthForFloor(GameData.currentFloor);
+
+        // 教程层再削一刀：那儿的 BOSS 只是让玩家确认自己会打了，
+        // 死一次就要重看一遍提示，是最劝退的体验之一。
+        if (GameData.currentFloor <= 0)
+            bossMul *= GameBalance.TutorialBossExtraMultiplier;
 
         BossShi bossScript = enemy.GetComponent<BossShi>();
         if (bossScript != null)

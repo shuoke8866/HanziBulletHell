@@ -126,6 +126,6 @@ public class PlayerHealth : MonoBehaviour
         GameData.ResetAll();
         Time.timeScale = 1f;
         UnityEngine.SceneManagement.SceneManager.LoadScene(
-            GameManager.SceneForFloor(1));
+            GameManager.SceneForFloor(GameData.currentFloor));
     }
 }

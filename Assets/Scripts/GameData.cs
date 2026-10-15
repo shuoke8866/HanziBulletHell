@@ -35,7 +35,7 @@ public static class GameData
     public static ElementType currentElement = ElementType.None;
 
     // 当前层数（唯一真实来源，GameManager 只是它的视图）
-    public static int currentFloor = 1;
+    public static int currentFloor = 0;   // 0 = 新手教程层
 
     // 本轮统计
     public static int enemiesKilled = 0;
@@ -64,7 +64,7 @@ public static class GameData
         formedHanzi.Add("一");
 
         currentElement = ElementType.None;
-        currentFloor = 1;
+        currentFloor = 0;   // 从新手教程层开始
 
         enemiesKilled = 0;
         bossesKilled = 0;

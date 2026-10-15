@@ -24,6 +24,7 @@ public static class SceneSmokeTest
 {
     static readonly string[] Scenes =
     {
+        "Assets/Scenes/Level0.unity",     // 新手教程（启动场景）
         "Assets/Scenes/Level1.unity",
         "Assets/Scenes/Level2.unity",
         "Assets/Scenes/Level3.unity"
@@ -325,6 +326,55 @@ public static class SceneSmokeTest
 
         try
         {
+            // ---- 教程层（0）：只应该有最基础的三种怪，绝不能出精英 ----
+            {
+                GameData.currentFloor = 0;
+
+                var tutSeen = new Dictionary<string, int>();
+                var leaked = new Dictionary<string, int>();
+                string tutList = "";
+
+                for (int i = 0; i < 300; i++)
+                {
+                    EnemyDef d = EnemyDatabase.PickRandom(false, 0f);
+                    if (d == null) continue;
+
+                    if (!tutSeen.ContainsKey(d.id)) tutSeen[d.id] = 0;
+                    tutSeen[d.id]++;
+
+                    if (d.minFloor > 1 || d.isElite)
+                    {
+                        if (!leaked.ContainsKey(d.displayName)) leaked[d.displayName] = 0;
+                        leaked[d.displayName]++;
+                    }
+                }
+
+                foreach (var kv in tutSeen)
+                {
+                    EnemyDef d = EnemyDatabase.Get(kv.Key);
+                    if (tutList.Length > 0) tutList += " ";
+                    tutList += $"{d.displayName}×{kv.Value}";
+                }
+
+                Debug.Log($"[冒烟]   教程层(0) 抽 300 次 → {tutList}");
+
+                // 汇总成一条报错，避免刷屏 300 行
+                if (leaked.Count > 0)
+                {
+                    string detail = "";
+                    foreach (var kv in leaked) detail += $"{kv.Key}×{kv.Value} ";
+                    Debug.LogError($"[冒烟] 教程层出现了不该有的怪：{detail}" +
+                                   "—— 教程层只该有 minFloor=1 的基础怪，且不能出精英！");
+                }
+
+                // 教程层 BOSS 血量倍率应明显低于正式层
+                float tut = GameBalance.TutorialBossMultiplier;
+                float lv1 = GameBalance.BossHealthForFloor(1);
+                Debug.Log($"[冒烟]   教程 BOSS 倍率 {tut:0.00}（第 1 层 {lv1:0.00}）");
+                if (tut >= lv1)
+                    Debug.LogError("[冒烟] 教程 BOSS 倍率不低于第 1 层 —— 教程会比正式关还难！");
+            }
+
             // ---- 精英怪：第 1 层不该出，第 3 层必须能出 ----
             for (int floor = 1; floor <= 3; floor++)
             {
