@@ -240,12 +240,12 @@ public class HanziSystem : MonoBehaviour
 
         AddHanzi("人",
             new List<StrokeType> { StrokeType.Pie, StrokeType.Na },
-            new List<string> { "vshape" },
-            2, 11f, "V形双向");
+            new List<string> { "vshape", "straight" },
+            3, 11f, "V形双向");
 
         AddHanzi("丁",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Shu },
-            new List<string> { "cross" },
+            new List<string> { "straight", "diagonal" },
             2, 11f, "2发重弹");
 
         // ---------- 3 画 ----------
@@ -256,7 +256,7 @@ public class HanziSystem : MonoBehaviour
 
         AddHanzi("大",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Pie, StrokeType.Na },
-            new List<string> { "scatter" },
+            new List<string> { "straight", "vshape" },
             5, 10f, "5发扇形");
 
         AddHanzi("工",
@@ -445,8 +445,13 @@ public class HanziSystem : MonoBehaviour
     /// 所以弹数多则单发轻、弹数少则单发重，**总输出恒定**。
     /// 这样形状可以随字自由变化，强度曲线仍然只由笔画数决定。
     /// </summary>
+    /// <param name="shotScale">
+    /// 弹幕尺寸倍率。1 = 标准大小。
+    /// 编辑器里可以调，写回时以第 7 个参数的形式落在源码上。
+    /// </param>
     void AddHanzi(string name, List<StrokeType> strokes, List<string> tags,
-                  int shotCount, float bulletSpeed, string desc)
+                  int shotCount, float bulletSpeed, string desc,
+                  float shotScale = 1f)
     {
         int n = strokes != null ? strokes.Count : 1;
 
@@ -463,7 +468,7 @@ public class HanziSystem : MonoBehaviour
             bulletSpeed = bulletSpeed,
             damage = GameBalance.DamageFor(n, standard, actual),
             fireRate = GameBalance.FireIntervalFor(n),
-            bulletScale = 1f,
+            bulletScale = Mathf.Max(0.2f, shotScale),
             description = desc
         });
     }
@@ -1963,14 +1968,49 @@ public class HanziSystem : MonoBehaviour
             new Vector2(baseDir.x, baseDir.y),
             speed, scale);
 
+        // 有延迟的形态（螺旋 / 波浪 / 钳形 / 随机）要错开发射 ——
+        // 否则所有子弹会在同一帧出现，看起来就不是"一波一波"而是"一下子全冒出来"。
+        bool anyDelay = false;
+        for (int i = 0; i < shots.Count; i++)
+            if (shots[i].delay > 0.01f) { anyDelay = true; break; }
+
+        if (anyDelay)
+            StartCoroutine(FireShotsDelayed(shots, firePos, dmg, pierce, strokeOf));
+        else
+            for (int i = 0; i < shots.Count; i++)
+                FireOneShot(shots[i], firePos, dmg, pierce,
+                            strokeOf != null ? strokeOf(i) : StrokeType.Heng);
+    }
+
+    /// <summary>按各自的 delay 错开发射一整轮</summary>
+    System.Collections.IEnumerator FireShotsDelayed(
+        System.Collections.Generic.List<BulletShapes.Shot> shots,
+        Vector3 firePos, int dmg, bool pierce,
+        System.Func<int, StrokeType> strokeOf)
+    {
+        float t = 0f;
+
         for (int i = 0; i < shots.Count; i++)
         {
-            StrokeType st = strokeOf != null ? strokeOf(i) : StrokeType.Heng;
+            float wait = shots[i].delay - t;
+            if (wait > 0f)
+            {
+                yield return new WaitForSeconds(wait);
+                t = shots[i].delay;
+            }
 
-            SpawnBullet(new Vector3(shots[i].position.x, shots[i].position.y, firePos.z),
-                        new Vector3(shots[i].direction.x, shots[i].direction.y, 0f),
-                        shots[i].speed, dmg, shots[i].scale, pierce, st, true);
+            FireOneShot(shots[i], firePos, dmg, pierce,
+                        strokeOf != null ? strokeOf(i) : StrokeType.Heng);
         }
+    }
+
+    void FireOneShot(BulletShapes.Shot shot, Vector3 firePos, int dmg, bool pierce,
+                     StrokeType st)
+    {
+        SpawnBullet(new Vector3(shot.position.x, shot.position.y, firePos.z),
+                    new Vector3(shot.direction.x, shot.direction.y, 0f),
+                    shot.speed, dmg, shot.scale, pierce, st, true,
+                    shot.lifeScale > 0f ? shot.lifeScale : 1f);
     }
 
 void SpawnBullet(Vector3 pos, Vector3 dir, float spd, int dmg, float scale, bool canPierce)
@@ -1983,7 +2023,8 @@ void SpawnBullet(Vector3 pos, Vector3 dir, float spd, int dmg, float scale, bool
     /// 需求：子弹要长成对应笔画的形状，所以每发都按它所属的笔画来画。
     /// </summary>
     void SpawnBullet(Vector3 pos, Vector3 dir, float spd, int dmg, float scale,
-                     bool canPierce, StrokeType stroke, bool applyShape)
+                     bool canPierce, StrokeType stroke, bool applyShape,
+                     float lifeScale = 1f)
     {
         GameObject bullet = Instantiate(bulletPrefab, pos, Quaternion.identity);
         Bullet b = bullet.GetComponent<Bullet>();
@@ -1992,6 +2033,10 @@ void SpawnBullet(Vector3 pos, Vector3 dir, float spd, int dmg, float scale, bool
             b.SetDirection(dir);
             b.isPlayerBullet = true;
             b.Setup(spd, dmg, scale, canPierce);
+
+            // 存活时间倍率：爆散这类"近距短命"弹幕靠它
+            if (!Mathf.Approximately(lifeScale, 1f))
+                b.lifetime *= Mathf.Max(0.1f, lifeScale);
 
             if (applyShape)
                 b.SetStrokeShape(stroke, StrokeUtil.ColorOf(stroke));

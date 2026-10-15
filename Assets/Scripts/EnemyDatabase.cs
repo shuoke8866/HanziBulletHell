@@ -270,8 +270,8 @@ public static class EnemyDatabase
             shotPattern = EnemyShotPattern.Twin,
             health = 24, moveSpeed = 2f, shootInterval = 2.2f,
             bulletSpeed = 7f, bulletDamage = 1,
-            bodyScale = new Vector3(0.5f, 2f, 1f),
-            bodyColor = new Color(0.7f, 0.95f, 1f),
+            bodyScale = new Vector3(0.5f, 1f, 1f),
+            bodyColor = new Color(0.7f, 0.95f, 1f, 1f),
             scoreWeight = 4
         });
 
@@ -421,11 +421,11 @@ public static class EnemyDatabase
             glyph = "兵",
             behavior = EnemyBehavior.Chase,
             shotPattern = EnemyShotPattern.Aimed,
-            health = 65, moveSpeed = 2.2f, shootInterval = 2.8f,
+            health = 200, moveSpeed = 2.2f, shootInterval = 2.8f,
             bulletSpeed = 5.5f, bulletDamage = 1,
             meleeDamage = 1f,
             bodyScale = new Vector3(1f, 1f, 1f),
-            bodyColor = new Color(0.85f, 0.85f, 0.95f),
+            bodyColor = new Color(0.85f, 0.85f, 0.95f, 1f),
             scoreWeight = 0            // 0 = 不会被随机池抽到，只能被召唤
         });
     }

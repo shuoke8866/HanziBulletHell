@@ -40,6 +40,7 @@ public class BulletPatternEditorWindow : EditorWindow
         public int bulletCount;
         public int savedBulletCount;
         public float bulletSpeed;
+        public float bulletScale = 1f;
         public int strokeCount;
 
         // 编辑中的副本
@@ -54,6 +55,7 @@ public class BulletPatternEditorWindow : EditorWindow
             {
                 if (editCount != bulletCount) return true;
                 if (!Mathf.Approximately(editSpeed, bulletSpeed)) return true;
+                if (!Mathf.Approximately(editScale, bulletScale)) return true;
                 if (editTags.Count != tags.Count) return true;
                 for (int i = 0; i < tags.Count; i++)
                     if (editTags[i] != tags[i]) return true;
@@ -109,6 +111,7 @@ public class BulletPatternEditorWindow : EditorWindow
                 bulletCount = def.bulletCount,
                 savedBulletCount = def.savedBulletCount,
                 bulletSpeed = def.bulletSpeed,
+                bulletScale = def.bulletScale,
                 strokeCount = def.strokes != null ? def.strokes.Count : 1
             };
             if (def.attackTags != null) r.tags.AddRange(def.attackTags);
@@ -116,6 +119,7 @@ public class BulletPatternEditorWindow : EditorWindow
             r.editTags.AddRange(r.tags);
             r.editCount = r.bulletCount;
             r.editSpeed = r.bulletSpeed;
+            r.editScale = r.bulletScale;
 
             rows.Add(r);
         }
@@ -230,7 +234,7 @@ public class BulletPatternEditorWindow : EditorWindow
                 r.editTags.AddRange(r.tags);
                 r.editCount = r.bulletCount;
                 r.editSpeed = r.bulletSpeed;
-                r.editScale = 1f;
+                r.editScale = r.bulletScale;
             }
             RebuildPreview();
         }
@@ -336,6 +340,13 @@ public class BulletPatternEditorWindow : EditorWindow
         r.editSpeed = EditorGUILayout.Slider(
             new GUIContent("弹速", "子弹飞行速度。这是手感参数，不影响强度。"),
             r.editSpeed, 3f, 20f);
+        if (EditorGUI.EndChangeCheck()) RebuildPreview();
+
+        // ---- 大小 ----
+        EditorGUI.BeginChangeCheck();
+        r.editScale = EditorGUILayout.Slider(
+            new GUIContent("弹幕大小", "子弹的尺寸倍率。1 = 标准。大一点的弹幕更容易看清，也更难躲。"),
+            r.editScale, 0.4f, 2.5f);
         if (EditorGUI.EndChangeCheck()) RebuildPreview();
 
         EditorGUILayout.Space(8f);
@@ -521,8 +532,9 @@ public class BulletPatternEditorWindow : EditorWindow
         sb.Append(" },\n");
 
         sb.Append("            ").Append(r.editCount).Append(", ")
-          .Append(r.editSpeed.ToString("0.#")).Append("f, \"")
-          .Append(DescOf(oldBlock)).Append("\");");
+          .Append(r.editSpeed.ToString("0.##")).Append("f, \"")
+          .Append(DescOf(oldBlock)).Append("\", ")
+          .Append(r.editScale.ToString("0.##")).Append("f);");
 
         result = src.Substring(0, start) + sb.ToString() + src.Substring(end + 1);
         return true;

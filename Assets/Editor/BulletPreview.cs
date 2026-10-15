@@ -46,11 +46,16 @@ public class BulletPreview
         public float speed;
         public float scale;
         public Color color;
+
+        /// <summary>延迟发射：还没到时间就先不出现（螺旋/连发这类形态要用）</summary>
+        public float delay;
+        public bool spawned;
     }
 
     readonly List<Sim> sims = new List<Sim>();
     Texture2D tex;
     Color[] px;
+    float elapsed;
 
     public Texture2D Texture { get { return tex; } }
 
@@ -77,6 +82,7 @@ public class BulletPreview
 
     public void Clear()
     {
+        elapsed = 0f;
         EnsureTexture();
         for (int i = 0; i < px.Length; i++)
             px[i] = new Color(0.06f, 0.07f, 0.11f, 1f);
@@ -100,6 +106,7 @@ public class BulletPreview
     {
         EnsureTexture();
         sims.Clear();
+        elapsed = 0f;
 
         // 过滤掉纯增益标签
         var real = new List<string>();
@@ -136,14 +143,16 @@ public class BulletPreview
             {
                 AddShot(shots[i].position, shots[i].direction,
                         shots[i].speed, shots[i].scale,
-                        ColorOf(strokes, strokeCursor + i));
+                        ColorOf(strokes, strokeCursor + i),
+                        shots[i].delay);
             }
 
             strokeCursor += n;
         }
     }
 
-    void AddShot(Vector2 pos, Vector2 dir, float speed, float scale, Color color)
+    void AddShot(Vector2 pos, Vector2 dir, float speed, float scale, Color color,
+                 float delay = 0f)
     {
         sims.Add(new Sim
         {
@@ -151,7 +160,9 @@ public class BulletPreview
             dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector2.right,
             speed = speed,
             scale = scale,
-            color = color
+            color = color,
+            delay = delay,
+            spawned = delay <= 0f
         });
     }
 
@@ -180,10 +191,18 @@ public class BulletPreview
 
         // 2) 移动 + 画
         float dt = stepSeconds;
+        elapsed += dt;
         float worldToPx = (resolution * 0.5f) / arenaRadius;
 
         foreach (Sim s in sims)
         {
+            // 延迟发射：还没到时间就先不出现
+            if (!s.spawned)
+            {
+                if (elapsed < s.delay) continue;
+                s.spawned = true;
+            }
+
             s.pos += s.dir * s.speed * dt;
 
             // 撞到场地边界就反弹，让预览一直有东西看（不然子弹飞出去就空了）

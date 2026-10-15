@@ -37,13 +37,28 @@ public static class BulletShapes
         public Vector2 direction;
         public float speed;
         public float scale;
+
+        /// <summary>
+        /// 延迟多少秒才发射（0 = 立刻）。
+        ///
+        /// 用途：螺旋、连发这类"一波一波打出去"的形态 ——
+        /// 一次算好所有子弹，但让它们错开发射，看起来就是连续的。
+        /// 调用方自己决定怎么处理（游戏里用协程，预览里直接跳过未到时间的）。
+        /// </summary>
+        public float delay;
+
+        /// <summary>存活时间倍率（1 = 用默认值）。短命弹幕做"近距爆"很有用</summary>
+        public float lifeScale;
     }
 
     /// <summary>所有可用的形态原语（编辑器下拉框用这个顺序）</summary>
     public static readonly string[] All =
     {
+        // 基础（原来的 9 种）
         "straight", "parallel", "cross", "vshape", "diagonal",
-        "scatter", "omni", "ring", "shotgun"
+        "scatter", "omni", "ring", "shotgun",
+        // 新增：带时间维度的形态
+        "spiral", "wave", "boom", "pincer", "random"
     };
 
     /// <summary>纯增益标签，不参与"怎么摆子弹"的分配</summary>
@@ -65,6 +80,11 @@ public static class BulletShapes
             case "omni": return "全向 360°";
             case "ring": return "环形（慢·小）";
             case "shotgun": return "近距霰弹（慢·小）";
+            case "spiral": return "螺旋（依次旋转发射）";
+            case "wave": return "波浪（左右交错）";
+            case "boom": return "爆散（近距全向·短命）";
+            case "pincer": return "钳形（左右夹击）";
+            case "random": return "随机散射";
             default: return shape;
         }
     }
@@ -95,6 +115,8 @@ public static class BulletShapes
             Vector2 pos = firePos;
             float spd = speed;
             float sc = scale;
+            float delay = 0f;
+            float life = 1f;
 
             switch (shape)
             {
@@ -146,6 +168,45 @@ public static class BulletShapes
                     break;
                 }
 
+                // ================= 新增：带时间维度的形态 =================
+
+                case "spiral":
+                    // 每一发都比上一发多转一个固定角度，并且错开发射 ——
+                    // 连起来看就是一条旋转的弹链。这是最经典的弹幕形态。
+                    dir = Rotate(baseDir, i * 22f);
+                    delay = i * 0.055f;
+                    break;
+
+                case "wave":
+                    // 左右交错 + 错开时间，形成一道波浪线
+                    dir = Rotate(baseDir, (i % 2 == 0) ? 14f : -14f);
+                    pos = firePos + side * ((i % 2 == 0) ? 0.3f : -0.3f);
+                    delay = i * 0.09f;
+                    spd = speed * 0.9f;
+                    break;
+
+                case "boom":
+                    // 近距离向四周炸开：全向但飞得慢、命短，逼玩家贴身躲
+                    dir = Rotate(baseDir, 360f / n * i + 18f);
+                    spd = speed * 0.45f;
+                    sc = scale * 1.15f;
+                    life = 0.45f;
+                    break;
+
+                case "pincer":
+                    // 左右两侧各来一发，朝中间收拢 —— 玩家往哪边躲都难受
+                    dir = Rotate(baseDir, (i % 2 == 0) ? 55f : -55f);
+                    pos = firePos + side * ((i % 2 == 0) ? 0.5f : -0.5f);
+                    delay = (i / 2) * 0.12f;
+                    spd = speed * 0.85f;
+                    break;
+
+                case "random":
+                    // 随机方向（但幅度受限，不会完全乱飞）
+                    dir = Rotate(baseDir, Random.Range(-38f, 38f));
+                    delay = Random.Range(0f, 0.14f);
+                    break;
+
                 default:
                     break;
             }
@@ -155,11 +216,19 @@ public static class BulletShapes
                 position = pos,
                 direction = dir,
                 speed = spd,
-                scale = sc
+                scale = sc,
+                delay = delay,
+                lifeScale = life
             });
         }
 
         return result;
+    }
+
+    /// <summary>这个形态是不是"带时间维度"的（有延迟发射）</summary>
+    public static bool HasDelay(string shape)
+    {
+        return shape == "spiral" || shape == "wave" || shape == "pincer" || shape == "random";
     }
 
     static Vector2 Rotate(Vector2 v, float degrees)
