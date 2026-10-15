@@ -80,6 +80,28 @@ public static class GameData
         StrokeType.Na, StrokeType.Dian, StrokeType.Zhe
     };
 
+    /// <summary>
+    /// **离开展教程、进入正式第一层时调用**：把玩家身上一切"跨层携带"的
+    /// 状态清空，让他真的一无所有地开始。
+    ///
+    /// 为什么单独抽一个方法：<see cref="BeginRealRun"/> 要等玩家在开局界面
+    /// 选完笔画才执行，但玩家**走进第一层的那一刻**身上就已经带着教程的战利品了 ——
+    /// PlayerHealth.Start() 会读 carriedHealth 把血补上，
+    /// ElementSystem 也会带着教程里吃的元素。所以必须在切场景之前先清一遍。
+    ///
+    /// 清的是"人身上的东西"（血、元素、词条加成），
+    /// 笔画和汉字由 BeginRealRun 负责，两步配合才是完整的开局。
+    /// </summary>
+    public static void ClearCarriedPlayerState()
+    {
+        carriedHealth = 0;               // PlayerHealth 会回到满血
+        currentElement = ElementType.None;
+
+        PlayerStats.ResetAll();          // 词条加成（射速/移速/伤害/弹速/额外血）
+
+        GameLog.Info("已清空玩家携带状态（血量 / 元素 / 词条）—— 正式开局一无所有");
+    }
+
     // 重置为新游戏（死亡或主动重开时调用）
     public static void ResetAll()
     {
@@ -87,6 +109,8 @@ public static class GameData
 
         currentElement = ElementType.None;
         currentFloor = 0;   // 从新手教程层开始
+        inTutorial = true;
+        openingStrokeChosen = false;
 
         hanziPreferences.Clear();
 
@@ -94,6 +118,34 @@ public static class GameData
         PlayerStats.ResetAll();
 
         GameLog.Info("GameData 已重置为新游戏");
+    }
+
+    /// <summary>
+    /// **死亡重开**：回到正式第一层，但要保留开局选的起手笔画。
+    ///
+    /// 和 ResetAll 的区别：
+    ///   ResetAll     —— 回教程层，一切重来（玩家主动"新游戏"时用）
+    ///   RespawnAtRealRun —— 回第一层，起手笔画还记得（死亡时用）
+    ///
+    /// 血量、元素、词条、捡到的笔画都要清 —— 死亡就是从头再来。
+    /// </summary>
+    public static void RespawnAtRealRun()
+    {
+        StrokeType starter = StrokeType.Heng;
+        if (currentStrokes != null && currentStrokes.Count > 0)
+            starter = currentStrokes[0];
+
+        ClearRunState();
+        ClearCarriedPlayerState();
+
+        currentFloor = 1;             // 正式第一层
+        inTutorial = false;
+
+        hanziPreferences.Clear();
+
+        BeginRealRun(starter);        // 这里会连词条一起再清一次，无妨，幂等
+
+        GameLog.Info($"死亡重开：回到第 1 层，起手笔画保留为「{StrokeUtil.NameOf(starter)}」");
     }
 
     /// <summary>
@@ -138,11 +190,13 @@ public static class GameData
     }
 
     /// <summary>
-    /// 单支笔画能组成的最简汉字（开局起手字）。
+    /// 单支笔画能组成的最简汉字（开局起手字 / 教程展台显示的字形）。
     ///
-    /// 一到五画各有自己的单笔画字；**折没有** —— 字库里没有「乛」这个字形，
-    /// 所以折用「刀」（Zhe,Pie）代替：它是字库里以折起笔、笔画最少的字。
-    /// 选折开局的玩家起手就是「刀」，比别的开局多一笔，算是这点小补偿。
+    /// 六种笔画各有自己的单笔画字，「折」用「乛」（横折）——
+    /// 它就是为了这件事专门加进字库的。
+    ///
+    /// 原来折借用「刀」，但刀是"折 + 撇"两画，
+    /// 教程展台上摆一个"刀"去教"折"会让人误解成"折就是这个形状"。
     /// </summary>
     public static string HanziForSingleStroke(StrokeType s)
     {
@@ -153,7 +207,7 @@ public static class GameData
             case StrokeType.Pie: return "丿";
             case StrokeType.Na: return "乀";
             case StrokeType.Dian: return "丶";
-            case StrokeType.Zhe: return "刀";
+            case StrokeType.Zhe: return "乛";
             default: return "一";
         }
     }

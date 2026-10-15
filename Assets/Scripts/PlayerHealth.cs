@@ -120,10 +120,10 @@ public class PlayerHealth : MonoBehaviour
 
     bool isDead;
 
-    /// <summary>没有 GameManager 时的兜底重开路径</summary>
+    /// <summary>没有 GameManager 时的兜底重开路径（和 GameManager.RestartRun 保持一致）</summary>
     void FallbackRestart()
     {
-        GameData.ResetAll();
+        GameData.RespawnAtRealRun();     // 回第一层、保留起手笔画
         Time.timeScale = 1f;
         UnityEngine.SceneManagement.SceneManager.LoadScene(
             GameManager.SceneForFloor(GameData.currentFloor));

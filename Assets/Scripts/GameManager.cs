@@ -157,8 +157,25 @@ public class GameManager : MonoBehaviour
     // ---------- 层数推进 ----------
     public void GoToNextFloor()
     {
+        int from = GameData.currentFloor;
+
         GameData.currentFloor++;
         currentFloor = GameData.currentFloor;
+
+        // 从教程层走进正式第一层：把玩家身上的东西全清掉。
+        //
+        // 必须在**切场景之前**清 —— 玩家一进 Level1，PlayerHealth.Start()
+        // 就会读 carriedHealth 把教程里剩下的血补上、ElementSystem 也会带着
+        // 教程吃的元素。等开局界面选完笔画再清就来不及了。
+        //
+        // 笔画和汉字那部分由 GameData.BeginRealRun 负责（选完起笔才算数），
+        // 这里只管"人身上的"：血量、元素、词条加成。
+        if (from <= 0 && GameData.currentFloor >= 1)
+        {
+            GameData.inTutorial = false;
+            GameData.ClearCarriedPlayerState();
+            GameLog.Info("离开教程层 —— 已清空携带状态，正式开局一无所有");
+        }
 
         string target = SceneForFloor(currentFloor);
         GameLog.Info($"===== 前往第 {currentFloor} 层（{target}）=====");
@@ -180,13 +197,18 @@ public class GameManager : MonoBehaviour
     }
 
     // ---------- 死亡 / 重开 ----------
-    // 真肉鸽：清空所有笔画，回到第 1 层
+    /// <summary>
+    /// 玩家死亡：回到**正式第一层**，保留开局选的起手笔画。
+    ///
+    /// 不回教程层 —— 教程是"学操作"的地方，死一次就要重看一遍提示太劝退。
+    /// 但血量、元素、词条、路上捡的笔画全部清空，死亡就是从头再来。
+    /// </summary>
     public void RestartRun()
     {
-        GameLog.Info("玩家死亡 —— 重置进度，从新手教程层重新开始");
+        GameLog.Info("玩家死亡 —— 清空进度，回到第 1 层");
 
-        GameData.ResetAll();
-        currentFloor = GameData.currentFloor;    // ResetAll 会把它设回 0（教程层）
+        GameData.RespawnAtRealRun();             // 内部会把 currentFloor 设成 1
+        currentFloor = GameData.currentFloor;
 
         Time.timeScale = 1f;
 

@@ -58,6 +58,18 @@ public static class GlyphPreview
     }
 
     /// <summary>
+    /// 导出教程展台用的六个"单笔画字"：一 丨 丿 乀 丶 乛。
+    ///
+    /// 这几张是玩家在教程里最先看到的东西，也是最容易被认错的 ——
+    /// 形状必须一眼能区分开（尤其「乛」作为折的代表，不能画得像别的字）。
+    /// 命令行：-executeMethod GlyphPreview.ExportStarterStrokes
+    /// </summary>
+    public static void ExportStarterStrokes()
+    {
+        ExportGameSize(new List<string> { "一", "丨", "丿", "乀", "丶", "乛" });
+    }
+
+    /// <summary>
     /// 按游戏实际纹理尺寸渲染，再用最近邻放大若干倍铺到画布上。
     ///
     /// 这样看到的**像素结构**与游戏里完全一致（不做任何插值），

@@ -198,6 +198,22 @@ public class HanziSystem : MonoBehaviour
             new List<string> { "straight" },
             1, 12f, "1发点射");
 
+        // 乀 / 乛 是另外两种笔画的"单笔画字"。
+        //
+        // 玩家平时拼不到它们（得先有对应的那一支笔画，而那要靠捡），
+        // 但它们必须在库里：开局选笔画界面和教程展台都要按名字取字形，
+        // 没有定义的话 FindByName 返回 null、开局会开不出来。
+        // 数值和别的单笔画字拉平，不构成额外优势。
+        AddHanzi("乀",
+            new List<StrokeType> { StrokeType.Na },
+            new List<string> { "vshape" },
+            1, 12f, "1发斜射");
+
+        AddHanzi("乛",
+            new List<StrokeType> { StrokeType.Zhe },
+            new List<string> { "straight" },
+            1, 12f, "1发折射");
+
         // ---------- 2 画 ----------
         AddHanzi("二",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng },
