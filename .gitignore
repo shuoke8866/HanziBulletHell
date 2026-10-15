@@ -73,3 +73,7 @@ Thumbs.db
 # Unity 鏋勫缓鎶ュ憡
 /[Bb]uildReports/
 /Library/LastBuild.buildreport
+
+# 字幕编辑器自动生成的备份
+*.cs.bak
+*.cs.bak.meta
