@@ -279,6 +279,121 @@ public static class SceneSmokeTest
 
         SimulatePickups(hanzi, inv);
         SimulateReversibleSwitch(hanzi, inv);
+        CheckTieredSpawning();
+    }
+
+    /// <summary>
+    /// 验证"敌人按层分层引入"真的生效。
+    ///
+    /// 为什么需要这个检查：光看场景配置是看不出问题的。
+    /// Room.SpawnOne 有两条互斥路径，战斗房如果同时配了 useDatabasePool
+    /// **和** enemyPrefabs，就会走"循环用固定预制体"那条，
+    /// 按层分层的 PickRandom **一次都不会被调用** —— 表现就是
+    /// "不管打到第几层，小怪种类都一模一样"。
+    ///
+    /// 这里直接按每一层跑一遍 EnemyDatabase.PickRandom，
+    /// 统计抽到哪些怪、有没有超出该层应有的范围。
+    /// </summary>
+    static void CheckTieredSpawning()
+    {
+        Debug.Log("[冒烟]   === 验证敌人分层 ===");
+
+        // 先检查模板预制体（清空 enemyPrefabs 后它必须存在，否则一只怪都刷不出）
+        var gm = UnityEngine.Object.FindObjectOfType<GameManager>();
+        if (gm != null)
+        {
+            if (gm.enemyTemplatePrefab == null)
+                Debug.LogError("[冒烟] GameManager.enemyTemplatePrefab 是空的 —— " +
+                               "数据库刷怪会失败，房间将一只怪都不刷！");
+            else
+                Debug.Log($"[冒烟]   刷怪模板 = {gm.enemyTemplatePrefab.name}");
+        }
+
+        // 检查战斗房有没有"卡在固定预制体路径"上
+        foreach (Room r in UnityEngine.Object.FindObjectsOfType<Room>())
+        {
+            if (r.roomType == RoomType.Boss || r.roomType == RoomType.Treasure ||
+                r.roomType == RoomType.Start) continue;
+
+            if (r.enemyPrefabs.Count > 0)
+                Debug.LogError($"[冒烟] 房间「{r.name}」配了 {r.enemyPrefabs.Count} 个 enemyPrefabs —— " +
+                               "会绕过数据库池，按层分层的刷怪不会生效！应当清空它。");
+        }
+
+        // 按层模拟抽取
+        int savedFloor = GameData.currentFloor;
+
+        try
+        {
+            // ---- 精英怪：第 1 层不该出，第 3 层必须能出 ----
+            for (int floor = 1; floor <= 3; floor++)
+            {
+                GameData.currentFloor = floor;
+
+                int eliteHits = 0;
+                const int eliteTrials = 200;
+                for (int i = 0; i < eliteTrials; i++)
+                {
+                    EnemyDef d = EnemyDatabase.PickRandom(true, 0.12f);
+                    if (d != null && d.isElite) eliteHits++;
+                }
+
+                Debug.Log($"[冒烟]   第 {floor} 层精英出现 {eliteHits}/{eliteTrials} 次");
+
+                if (floor == 1 && eliteHits > eliteTrials / 4)
+                    Debug.LogError($"[冒烟] 第 1 层精英出得太频繁（{eliteHits}/{eliteTrials}）—— " +
+                                   "精英的 minFloor 过滤可能没生效！");
+
+                if (floor == 3 && eliteHits == 0)
+                    Debug.LogError("[冒烟] 第 3 层完全不出精英 —— 精英可能被误过滤掉了！");
+            }
+
+            for (int floor = 1; floor <= 3; floor++)
+            {
+                GameData.currentFloor = floor;
+
+                var seen = new Dictionary<string, int>();
+                const int samples = 300;
+                for (int i = 0; i < samples; i++)
+                {
+                    EnemyDef d = EnemyDatabase.PickRandom(false, 0f);
+                    if (d == null) continue;
+                    if (!seen.ContainsKey(d.id)) seen[d.id] = 0;
+                    seen[d.id]++;
+                }
+
+                // 该层"应该"只出现 minFloor <= floor 的怪
+                var leaked = new List<string>();
+                string list = "";
+                foreach (var kv in seen)
+                {
+                    EnemyDef d = EnemyDatabase.Get(kv.Key);
+                    if (d != null && d.minFloor > floor) leaked.Add(d.displayName);
+
+                    if (list.Length > 0) list += " ";
+                    list += $"{d.displayName}×{kv.Value}";
+                }
+
+                Debug.Log($"[冒烟]   第 {floor} 层抽 {samples} 次 → {list}");
+
+                // 越级怪有 EarlyAppearChance 的概率放行，属于设计内，不算错。
+                // 但如果比例过高，说明过滤压根没生效。
+                int leakedCount = 0;
+                foreach (string k in leaked)
+                    if (seen.ContainsKey(k)) leakedCount++;
+
+                float ratio = leakedCount / (float)Mathf.Max(1, seen.Count);
+                if (ratio > 0.6f)
+                    Debug.LogError($"[冒烟] 第 {floor} 层出现 {leaked.Count} 种越级怪" +
+                                   $"（{string.Join("/", leaked.ToArray())}）—— 分层过滤可能没生效！");
+            }
+        }
+        finally
+        {
+            GameData.currentFloor = savedFloor;
+        }
+
+        Debug.Log("[冒烟]   === 敌人分层检查结束 ===");
     }
 
     /// <summary>

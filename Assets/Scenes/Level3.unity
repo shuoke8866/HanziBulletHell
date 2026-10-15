@@ -1634,11 +1634,7 @@ MonoBehaviour:
   - {fileID: 453549890}
   useDatabasePool: 1
   singleDefId: 
-  enemyPrefabs:
-  - {fileID: 7344781935549740770, guid: 99b040dba8e811d44bbfd5a4e1e1acdc, type: 3}
-  - {fileID: 7344781935549740770, guid: 2ee94dc29e5267f40b8a9fdfeb95a11c, type: 3}
-  - {fileID: 7344781935549740770, guid: 7b385f3d1b00a574883ddb6baf22a97c, type: 3}
-  - {fileID: 7344781935549740770, guid: 2c0652c4a76c3db4cba483e157bd72eb, type: 3}
+  enemyPrefabs: []
   enemySpawnPoints:
   - {fileID: 1556374435}
   - {fileID: 65782700}
@@ -4206,7 +4202,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   strokePickupPrefab: {fileID: 945719665988460050, guid: cb57931be0e26244ea873f4e489d1da6, type: 3}
   portalPrefab: {fileID: 258644837196506244, guid: bf3b2426c934ec24382c71b136695344, type: 3}
-  enemyTemplatePrefab: {fileID: 0}
+  enemyTemplatePrefab: {fileID: 7344781935549740770, guid: 28b40beb7ece185458797f935112e37f, type: 3}
   currentFloor: 2
   healthGrowthPerFloor: 0.3
   speedGrowthPerFloor: 0.06
@@ -5258,10 +5254,7 @@ MonoBehaviour:
   - {fileID: 2115811503}
   useDatabasePool: 1
   singleDefId: 
-  enemyPrefabs:
-  - {fileID: 7344781935549740770, guid: 99b040dba8e811d44bbfd5a4e1e1acdc, type: 3}
-  - {fileID: 7344781935549740770, guid: 2ee94dc29e5267f40b8a9fdfeb95a11c, type: 3}
-  - {fileID: 7344781935549740770, guid: 2c0652c4a76c3db4cba483e157bd72eb, type: 3}
+  enemyPrefabs: []
   enemySpawnPoints:
   - {fileID: 471867003}
   - {fileID: 2051377800}
