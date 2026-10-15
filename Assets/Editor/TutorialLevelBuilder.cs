@@ -75,29 +75,39 @@ public static class TutorialLevelBuilder
         Debug.Log($"[教程] 清掉 {doomed.Count} 个旧对象，保留 {keep.Count} 类核心对象");
 
         // ---- 2) 建房间 ----
+        //
+        // 房间间距 = RoomW + DoorGap，和正式关卡保持一致：
+        // 相邻两间之间只留 DoorGap 的空隙，门正好落在里面。
+        // 之前把间距写成 24（= 房间 14 + 空隙 10），门就被放在
+        // 10 单位空隙的正中，两边房间的墙都够不着，等于没有门。
+        const float DoorGap = 2f;
+        const float Pitch = RoomW + DoorGap;      // 14 + 2 = 16
+
+        float x0 = -3f * Pitch * 0.5f;            // 四间房整体居中
+
         var rooms = new List<Room>();
 
-        rooms.Add(MakeRoom("Room1_Start", new Vector2(-36f, 0f), RoomType.Start, 0));
-        rooms.Add(MakeRoom("Room2_Collect", new Vector2(-12f, 0f), RoomType.Combat, 1));
-        rooms.Add(MakeRoom("Room3_Swap", new Vector2(12f, 0f), RoomType.Combat, 1));
-        rooms.Add(MakeRoom("Room4_Boss", new Vector2(36f, 0f), RoomType.Boss, 1));
+        rooms.Add(MakeRoom("Room1_Start", new Vector2(x0 + Pitch * 0f, 0f), RoomType.Start, 0));
+        rooms.Add(MakeRoom("Room2_Collect", new Vector2(x0 + Pitch * 1f, 0f), RoomType.Combat, 1));
+        rooms.Add(MakeRoom("Room3_Swap", new Vector2(x0 + Pitch * 2f, 0f), RoomType.Combat, 1));
+        rooms.Add(MakeRoom("Room4_Boss", new Vector2(x0 + Pitch * 3f, 0f), RoomType.Boss, 1));
 
-        // ---- 3) 门（相邻房间共用同一扇） ----
-        MakeDoor("Door_1to2", new Vector2(-24f, 0f), rooms[0], rooms[1]);
-        MakeDoor("Door_2to3", new Vector2(0f, 0f), rooms[1], rooms[2]);
-        MakeDoor("Door_3to4", new Vector2(24f, 0f), rooms[2], rooms[3]);
+        // ---- 3) 门（相邻房间共用同一扇，正好落在两间房之间的缝隙里） ----
+        MakeDoor("Door_1to2", new Vector2(x0 + Pitch * 0.5f, 0f), rooms[0], rooms[1]);
+        MakeDoor("Door_2to3", new Vector2(x0 + Pitch * 1.5f, 0f), rooms[1], rooms[2]);
+        MakeDoor("Door_3to4", new Vector2(x0 + Pitch * 2.5f, 0f), rooms[2], rooms[3]);
 
         // ---- 4) 墙体 ----
-        BuildWalls(new Vector2(-12f, 0f));
-        BuildWalls(new Vector2(12f, 0f));
-        BuildWalls(new Vector2(36f, 0f));
+        // 和正式关卡共用同一套规则：每个房间封成一整圈墙，
+        // 门只是墙上 3 单位的小口。这样四个关卡的结构完全一致。
+        RoomWallBuilder.RebuildAll(verbose: false);
 
         // ---- 5) 敌人与刷怪点 ----
-        AddSpawnPoint(rooms[1], "Spawn_C1", new Vector2(-14f, 2f));
-        AddSpawnPoint(rooms[1], "Spawn_C2", new Vector2(-10f, -2f));
-        AddSpawnPoint(rooms[2], "Spawn_S1", new Vector2(10f, 2f));
-        AddSpawnPoint(rooms[2], "Spawn_S2", new Vector2(14f, -2f));
-        AddSpawnPoint(rooms[3], "BossSpawn", new Vector2(36f, 0f));
+        AddSpawnPoint(rooms[1], "Spawn_C1", new Vector2(x0 + Pitch * 1f - 2f, 2f));
+        AddSpawnPoint(rooms[1], "Spawn_C2", new Vector2(x0 + Pitch * 1f + 2f, -2f));
+        AddSpawnPoint(rooms[2], "Spawn_S1", new Vector2(x0 + Pitch * 2f - 2f, 2f));
+        AddSpawnPoint(rooms[2], "Spawn_S2", new Vector2(x0 + Pitch * 2f + 2f, -2f));
+        AddSpawnPoint(rooms[3], "BossSpawn", new Vector2(x0 + Pitch * 3f, 0f));
 
         // 教程关的怪要弱：血量砍到 40%，玩家不会一开始就死
         rooms[1].enemyHealthOverride = 4;
@@ -106,19 +116,19 @@ public static class TutorialLevelBuilder
         rooms[2].waveCount = 1;
 
         // ---- 6) 宝箱 / 笔画 ----
-        AddStrokeChest(new Vector2(12f, 0f));
+        AddStrokeChest(new Vector2(x0 + Pitch * 2f, 0f));
 
         // ---- 7) BOSS 与传送门 ----
-        AddBoss(rooms[3], new Vector2(36f, 0f));
-        AddPortal(new Vector2(34f, 0f));
+        AddBoss(rooms[3], new Vector2(x0 + Pitch * 3f, 0f));
+        AddPortal(new Vector2(x0 + Pitch * 3f - 2f, 0f));
 
         // ---- 8) 教程提示 ----
-        AddHints();
+        AddHints(x0, Pitch);
 
         // ---- 9) 玩家落点 ----
         GameObject player = GameObject.Find("Player");
         if (player != null)
-            player.transform.position = new Vector3(-36f, 0f, 0f);
+            player.transform.position = new Vector3(x0, 0f, 0f);
 
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
@@ -166,11 +176,14 @@ public static class TutorialLevelBuilder
         GameObject go = new GameObject(name);
         go.transform.position = new Vector3(pos.x, pos.y, 0f);
 
-        // 门是横着的（连接左右两个房间），所以压扁、拉长
-        go.transform.localScale = new Vector3(0.5f, RoomH, 1f);
+        // 门是竖着的（连接左右两个房间），尺寸和正式关卡统一：
+        // 短边 = 墙厚，长边 = 门洞宽。具体数值由 RoomWallBuilder 决定，
+        // 这里先给个占位，RebuildAll 会把它摆正。
+        go.transform.localScale = new Vector3(RoomWallBuilder.DoorThickness,
+                                              RoomWallBuilder.DoorSpan, 1f);
 
         SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = LoadSquareSprite();
+        sr.sprite = RoomWallBuilder.SquareSprite;
         sr.color = new Color(0.6f, 0.4f, 0.2f, 1f);
         sr.sortingOrder = 5;
 
@@ -187,56 +200,6 @@ public static class TutorialLevelBuilder
         // 相邻两个房间都登记这扇门：谁在打，门就关着
         a.doors.Add(door);
         b.doors.Add(door);
-    }
-
-    // ============================================================
-    //  墙体
-    // ============================================================
-
-    // 每个房间留出上下两个缺口作为门的通道，其余用实体墙围起来。
-    // 房间尺寸 14×8，门在左右两侧的中间（高度 2）。
-    static void BuildWalls(Vector2 center)
-    {
-        float halfW = RoomW * 0.5f;
-        float halfH = RoomH * 0.5f;
-        const float thickness = 1f;
-        const float gate = 2f;    // 门洞高度
-
-        // 上下两条完整的墙
-        AddWall($"Wall_Top_{center.x}", new Vector2(center.x, center.y + halfH + thickness * 0.5f),
-                new Vector2(RoomW + thickness * 2f, thickness));
-        AddWall($"Wall_Bottom_{center.x}", new Vector2(center.x, center.y - halfH - thickness * 0.5f),
-                new Vector2(RoomW + thickness * 2f, thickness));
-
-        // 左右两侧：被门洞分成两段
-        float segH = (RoomH - gate) * 0.5f;
-        float segY = center.y + (gate + segH) * 0.5f;
-        float segY2 = center.y - (gate + segH) * 0.5f;
-
-        AddWall($"Wall_L_U_{center.x}", new Vector2(center.x - halfW - thickness * 0.5f, segY),
-                new Vector2(thickness, segH));
-        AddWall($"Wall_L_D_{center.x}", new Vector2(center.x - halfW - thickness * 0.5f, segY2),
-                new Vector2(thickness, segH));
-        AddWall($"Wall_R_U_{center.x}", new Vector2(center.x + halfW + thickness * 0.5f, segY),
-                new Vector2(thickness, segH));
-        AddWall($"Wall_R_D_{center.x}", new Vector2(center.x + halfW + thickness * 0.5f, segY2),
-                new Vector2(thickness, segH));
-    }
-
-    static void AddWall(string name, Vector2 pos, Vector2 size)
-    {
-        GameObject go = new GameObject(name);
-        go.tag = "Wall";
-        go.transform.position = new Vector3(pos.x, pos.y, 0f);
-        go.transform.localScale = new Vector3(size.x, size.y, 1f);
-
-        SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = LoadSquareSprite();
-        sr.color = new Color(0.22f, 0.24f, 0.32f, 1f);
-        sr.sortingOrder = 4;
-
-        BoxCollider2D box = go.AddComponent<BoxCollider2D>();
-        box.size = Vector2.one;
     }
 
     // ============================================================
@@ -305,29 +268,29 @@ public static class TutorialLevelBuilder
         hint.lineDuration = 7f;
     }
 
-    static void AddHints()
+    static void AddHints(float x0, float pitch)
     {
         // Room1：先教最基础的两件事，别的都先别说
-        AddHint("Hint_Start", new Vector2(-36f, 0f), new Vector2(13f, 7f),
+        AddHint("Hint_Start", new Vector2(x0, 0f), new Vector2(RoomW - 1f, RoomH - 1f),
             "用 W A S D 走动。",
             "鼠标指着哪边，字就往哪边打。按住左键就能一直打。",
             "屏幕上飞来飞去的方块别硬接 —— 碰一下掉血，血空了就得重来。");
 
         // Room2：教收集与自动合成
-        AddHint("Hint_Collect", new Vector2(-14f, 0f), new Vector2(12f, 7f),
+        AddHint("Hint_Collect", new Vector2(x0 + pitch * 1f, 0f), new Vector2(RoomW - 2f, RoomH - 1f),
             "打倒这些家伙，地上会掉笔画。走过去就自动捡。",
             "笔画攒够了，你的字会自己变成更复杂的字 —— 字越复杂，打得越狠。",
             "顺手按 F 把宝箱开了，里面有笔画。");
 
         // Room3：教换字与背包
-        AddHint("Hint_Swap", new Vector2(12f, 0f), new Vector2(13f, 7f),
+        AddHint("Hint_Swap", new Vector2(x0 + pitch * 2f, 0f), new Vector2(RoomW - 1f, RoomH - 1f),
             "屏幕底下那排字，按 1-9 就能换过去。",
             "打不动了就换个大字试试，火力完全不一样。",
             "按 E 打开背包，A / D 翻页，里面是你现在能拼出来的所有字。",
             "换错了也不要紧，笔画不会丢，随时能换回来。");
 
         // Room4：BOSS 前的最后一句
-        AddHint("Hint_Boss", new Vector2(26f, 0f), new Vector2(8f, 7f),
+        AddHint("Hint_Boss", new Vector2(x0 + pitch * 2.5f, 0f), new Vector2(6f, RoomH - 1f),
             "前面是个难缠的家伙，注意躲它那道横扫的刀光。",
             "打赢了会出现传送门 —— 走过去按 F，就正式开始了。");
     }
@@ -336,22 +299,5 @@ public static class TutorialLevelBuilder
     //  工具
     // ============================================================
 
-    /// <summary>取一个纯白方块 Sprite（和项目里其他地方用的是同一张）</summary>
-    static Sprite LoadSquareSprite()
-    {
-        // Level1 的墙/门就是用这张：Square (1).prefab / 内置 sprite
-        GameObject square = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Square (1).prefab");
-        if (square != null)
-        {
-            SpriteRenderer sr = square.GetComponent<SpriteRenderer>();
-            if (sr != null && sr.sprite != null) return sr.sprite;
-        }
-
-        SpriteRenderer any = Object.FindObjectOfType<SpriteRenderer>();
-        if (any != null && any.sprite != null) return any.sprite;
-
-        Debug.LogWarning("[教程] 找不到可用的方块 Sprite，墙和门会是空白的");
-        return null;
-    }
 }
 #endif
