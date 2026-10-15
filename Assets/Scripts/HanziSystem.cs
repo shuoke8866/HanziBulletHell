@@ -1947,72 +1947,29 @@ public class HanziSystem : MonoBehaviour
         return StrokeAt(currentHanziDef.strokes, index);
     }
 
-    /// <summary>按指定形态摆放 n 发子弹，每发的形状取自 strokeOf 给出的笔画</summary>
+    /// <summary>
+    /// 按指定形态摆放 n 发子弹，每发的形状取自 strokeOf 给出的笔画。
+    ///
+    /// 方向/位置/速度/尺寸的计算已经抽到 <see cref="BulletShapes.Compute"/> ——
+    /// 这样编辑器预览和敌人弹幕可以复用同一套形态，不会出现两份实现漂移。
+    /// 这里只负责"把算出来的结果实例化成子弹"。
+    /// </summary>
     void SpawnShape(string shape, int n, Vector3 firePos, Vector3 baseDir,
                     float speed, int dmg, float scale, bool pierce,
                     System.Func<int, StrokeType> strokeOf)
     {
-        // baseDir 是 XY 平面向量，Vector3.Cross(baseDir, forward) 的 XY 分量为 0
-        // 会导致子弹完全重叠，所以统一用 2D 垂直向量 (-y, x)。
-        Vector3 side = new Vector3(-baseDir.y, baseDir.x, 0f).normalized;
+        var shots = BulletShapes.Compute(shape, n,
+            new Vector2(firePos.x, firePos.y),
+            new Vector2(baseDir.x, baseDir.y),
+            speed, scale);
 
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i < shots.Count; i++)
         {
             StrokeType st = strokeOf != null ? strokeOf(i) : StrokeType.Heng;
-            Vector3 dir = baseDir;
-            Vector3 pos = firePos;      // 注意：不能改 firePos 本身，否则偏移会逐发累加
-            float spd = speed;
-            float sc = scale;
 
-            switch (shape)
-            {
-                case "straight":
-                    break;
-
-                case "parallel":
-                    pos = firePos + side * ((i - (n - 1) / 2f) * 0.4f);
-                    break;
-
-                case "cross":
-                    dir = Quaternion.Euler(0, 0, 90f * (i % 4)) * baseDir;
-                    break;
-
-                case "vshape":
-                    dir = Quaternion.Euler(0, 0, (i % 2 == 0) ? 45f : -45f) * baseDir;
-                    break;
-
-                case "diagonal":
-                    float[] diag = { 30f, -30f, 150f, -150f };
-                    dir = Quaternion.Euler(0, 0, diag[i % 4]) * baseDir;
-                    break;
-
-                case "scatter":
-                    float ts = n > 1 ? (float)i / (n - 1) : 0.5f;
-                    dir = Quaternion.Euler(0, 0, -40f + 80f * ts) * baseDir;
-                    break;
-
-                case "omni":
-                    dir = Quaternion.Euler(0, 0, 360f / n * i) * baseDir;
-                    break;
-
-                case "ring":
-                    dir = Quaternion.Euler(0, 0, 360f / n * i) * baseDir;
-                    spd = speed * 0.7f;
-                    sc = scale * 0.8f;
-                    break;
-
-                case "shotgun":
-                    float tp = n > 1 ? (float)i / (n - 1) : 0.5f;
-                    dir = Quaternion.Euler(0, 0, -15f + 30f * tp) * baseDir;
-                    spd = speed * 0.6f;
-                    sc = scale * 0.8f;
-                    break;
-
-                default:
-                    break;
-            }
-
-            SpawnBullet(pos, dir, spd, dmg, sc, pierce, st, true);
+            SpawnBullet(new Vector3(shots[i].position.x, shots[i].position.y, firePos.z),
+                        new Vector3(shots[i].direction.x, shots[i].direction.y, 0f),
+                        shots[i].speed, dmg, shots[i].scale, pierce, st, true);
         }
     }
 

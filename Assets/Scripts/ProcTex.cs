@@ -145,6 +145,106 @@ public static class ProcTex
         return Build(key, size, shape, false);
     }
 
+    // ================= 敌人底形 =================
+    //
+    // 敌人原来只有身上的汉字，外形无从区分。这里用代码画几个多边形垫在背后 ——
+    // 不需要任何美术资源，换个形状就是换个函数。
+
+    /// <summary>按 <see cref="EnemyBodyShape"/> 取底形贴图</summary>
+    public static Sprite ForBodyShape(EnemyBodyShape shape)
+    {
+        switch (shape)
+        {
+            case EnemyBodyShape.Circle: return BodyCircle;
+            case EnemyBodyShape.Square: return BodySquare;
+            case EnemyBodyShape.Diamond: return BodyDiamond;
+            case EnemyBodyShape.Triangle: return BodyTriangle;
+            case EnemyBodyShape.Hexagon: return BodyHexagon;
+            case EnemyBodyShape.Star: return BodyStar;
+            case EnemyBodyShape.Ring: return BodyRing;
+            default: return null;      // None → 不加底形
+        }
+    }
+
+    // 多边形判定用"极坐标 + 边数"统一写：把角度映射到一个凸多边形上，
+    // 比逐个手写半平面判定短得多，也好加新形状。
+    static float Polygon(float nx, float ny, int sides, float innerRadius)
+    {
+        float r = Mathf.Sqrt(nx * nx + ny * ny);
+        if (r < 0.0001f) return 1f;
+
+        float ang = Mathf.Atan2(ny, nx);
+        float seg = Mathf.PI * 2f / sides;
+
+        // 把角度折到 [-seg/2, seg/2] 再取余，得到这个方向上多边形的边界半径
+        float a = Mathf.Repeat(ang + seg * 0.5f, seg) - seg * 0.5f;
+        float edge = innerRadius * Mathf.Cos(seg * 0.5f) / Mathf.Cos(a);
+
+        return Mathf.Clamp01((edge - r) * 40f);   // 抗锯齿靠这个陡峭的过渡
+    }
+
+    public static Sprite BodyCircle
+    {
+        get { return Build("body_circle", 64, (x, y) => Polygon(x, y, 32, 1f), false); }
+    }
+
+    public static Sprite BodySquare
+    {
+        get { return Build("body_square", 64, (x, y) => Polygon(x, y, 4, 1f), false); }
+    }
+
+    public static Sprite BodyDiamond
+    {
+        get { return Build("body_diamond", 64, (x, y) => Polygon(x, y, 4, 0.72f), false); }
+    }
+
+    public static Sprite BodyTriangle
+    {
+        get { return Build("body_triangle", 64, (x, y) => Polygon(x, y, 3, 1f), false); }
+    }
+
+    public static Sprite BodyHexagon
+    {
+        get { return Build("body_hexagon", 64, (x, y) => Polygon(x, y, 6, 1f), false); }
+    }
+
+    /// <summary>五角星：外圈用 5 边形，内圈挖掉一圈</summary>
+    public static Sprite BodyStar
+    {
+        get
+        {
+            return Build("body_star", 64, (x, y) =>
+            {
+                float outer = Polygon(x, y, 5, 1f);
+
+                // 内圈（半径 0.45 的 5 边形）挖空
+                float r = Mathf.Sqrt(x * x + y * y);
+                float ang = Mathf.Atan2(y, x);
+                float seg = Mathf.PI * 2f / 5f;
+                float a = Mathf.Repeat(ang + seg * 0.5f, seg) - seg * 0.5f;
+                float innerEdge = 0.45f * Mathf.Cos(seg * 0.5f) / Mathf.Cos(a);
+                float inner = Mathf.Clamp01((r - innerEdge) * 40f);
+
+                return outer * inner;
+            }, false);
+        }
+    }
+
+    /// <summary>空心圆环</summary>
+    public static Sprite BodyRing
+    {
+        get
+        {
+            return Build("body_ring", 64, (x, y) =>
+            {
+                float r = Mathf.Sqrt(x * x + y * y);
+                float outer = Mathf.Clamp01((1f - r) * 40f);
+                float inner = Mathf.Clamp01((r - 0.62f) * 40f);
+                return outer * inner;
+            }, false);
+        }
+    }
+
     static Sprite Build(string key, int size, System.Func<float, float, float> shape, bool roundMask)
     {
         Sprite cached;

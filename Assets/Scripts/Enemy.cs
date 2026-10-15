@@ -131,10 +131,14 @@ public class Enemy : MonoBehaviour, IDamageable
 
         transform.localScale = def.bodyScale;
 
-        // 本体方块不再显示：敌人看起来就是它代表的那个汉字
+        // 本体方块不再显示：敌人的"脸"就是它代表的那个汉字
         SpriteRenderer sr = GetComponent<SpriteRenderer>();
         if (sr != null)
             sr.enabled = false;
+
+        // 底形（可选）：垫在汉字背后的一层程序生成形状。
+        // 有了它，同样写「一」的两种敌人也能一眼分开。
+        EnsureBodyShape(def);
 
         // 精英稍大一点，便于一眼区分
         if (glyphRoot != null)
@@ -143,11 +147,52 @@ public class Enemy : MonoBehaviour, IDamageable
         SetGlyph(def.glyph, def.bodyColor);
     }
 
+    // ---------- 底形 ----------
+    private Transform shapeRoot;
+    private SpriteRenderer shapeRenderer;
+
+    void EnsureBodyShape(EnemyDef d)
+    {
+        Sprite sprite = ProcTex.ForBodyShape(d.bodyShape);
+
+        if (sprite == null)
+        {
+            // None：有就关掉，没有就不建
+            if (shapeRoot != null) shapeRoot.gameObject.SetActive(false);
+            return;
+        }
+
+        if (shapeRoot == null)
+        {
+            var go = new GameObject("BodyShape");
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = new Vector3(0f, 0f, 0.1f);   // 垫在汉字后面
+            shapeRenderer = go.AddComponent<SpriteRenderer>();
+            shapeRenderer.sortingOrder = -1;
+            shapeRoot = go.transform;
+        }
+
+        shapeRoot.gameObject.SetActive(true);
+        shapeRenderer.sprite = sprite;
+        shapeRenderer.color = d.shapeColor;
+        shapeRoot.localScale = Vector3.one * Mathf.Max(0.1f, d.shapeScale);
+    }
+
+    /// <summary>底形缓慢自转（shapeSpin &gt; 0 时）</summary>
+    void UpdateShapeSpin()
+    {
+        if (shapeRoot == null || def == null) return;
+        if (Mathf.Abs(def.shapeSpin) < 0.01f) return;
+
+        shapeRoot.Rotate(0f, 0f, def.shapeSpin * Time.deltaTime);
+    }
+
     void Update()
     {
         if (player == null) return;
 
         UpdateStatusTimers();
+        UpdateShapeSpin();
 
         Vector2 toPlayer = (player.position - transform.position);
         float dist = toPlayer.magnitude;

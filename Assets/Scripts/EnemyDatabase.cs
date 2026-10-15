@@ -11,6 +11,28 @@ public enum EnemyBehavior
     Turret      // 固定不动，只射击
 }
 
+// ============ 敌人外形 ============
+/// <summary>
+/// 敌人本体的底形。
+///
+/// 原来敌人**只有身上的汉字**（Enemy.ApplyDefinition 里把 SpriteRenderer 关掉了），
+/// 于是外形只能在"体型大小 + 颜色 + 写什么字"里调，种类一多就分不清。
+///
+/// 现在加一层程序生成的底形垫在汉字后面 —— 不需要任何美术资源，
+/// 用 ProcTex 现场画多边形。
+/// </summary>
+public enum EnemyBodyShape
+{
+    None,       // 只有汉字，不加底形（原来的样子）
+    Circle,
+    Square,
+    Diamond,
+    Triangle,
+    Hexagon,
+    Star,
+    Ring        // 空心圆环
+}
+
 // ============ 弹幕形态 ============
 public enum EnemyShotPattern
 {
@@ -44,6 +66,39 @@ public class EnemyDef
 
     public Vector3 bodyScale = new Vector3(0.8f, 0.8f, 1f);
     public Color bodyColor = new Color(1f, 1f, 1f, 1f);
+
+    // ---------- 外形（程序生成，不需要美术资源）----------
+    /// <summary>汉字后面的底形</summary>
+    public EnemyBodyShape bodyShape = EnemyBodyShape.None;
+
+    /// <summary>底形颜色（None 时无效）</summary>
+    public Color shapeColor = new Color(0.35f, 0.38f, 0.5f, 0.9f);
+
+    /// <summary>底形相对本体的尺寸倍率</summary>
+    public float shapeScale = 1.35f;
+
+    /// <summary>底形缓慢自转速度（度/秒），0 = 不转</summary>
+    public float shapeSpin = 0f;
+
+    // ---------- 弹幕：可选"复用玩家的形态原语" ----------
+    /// <summary>
+    /// 勾上之后不用 <see cref="shotPattern"/>，改用
+    /// <see cref="shapeTags"/> + <see cref="shotCount"/> 描述弹幕 ——
+    /// 和玩家汉字用的是**同一套原语**（见 BulletShapes）。
+    ///
+    /// 这样敌人弹幕和玩家弹幕共享一套实现，加新形态两边同时受益。
+    /// 不勾就还是用老的 7 种固定形态。
+    /// </summary>
+    public bool usePlayerShapes = false;
+
+    /// <summary>形态标签（straight / ring / scatter ... 见 BulletShapes.All）</summary>
+    public List<string> shapeTags = new List<string>();
+
+    /// <summary>一轮打几发（usePlayerShapes 时是权威总数）</summary>
+    public int shotCount = 3;
+
+    /// <summary>子弹尺寸倍率</summary>
+    public float shotScale = 1f;
 
     public int scoreWeight = 1;             // 权重（用于随机抽取）
     public bool isElite = false;
