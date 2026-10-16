@@ -39,8 +39,17 @@ public class TutorialCoach : MonoBehaviour
     /// <summary>文字相对提示点的偏移：**左上角**（玩家要求）</summary>
     static readonly Vector3 TextOffset = new Vector3(-0.35f, 0.42f, -0.1f);
 
-    /// <summary>文字缩放（FloatingTip 的字号 4.6 × 这个值）</summary>
-    const float TextScale = 0.62f;
+/// <summary>
+    /// 文字缩放（FloatingTip 的基准字号 4.6 × 这个值）。
+    ///
+    /// **1.0 = 和拾取飘字一样大** —— 那个大小是玩家确认过能看清的。
+    ///
+    /// 原来设的 0.62 是为了配合那个小圆点的大小，结果实际字号只有
+    /// 4.6 × 0.62 = 2.85，玩家反馈「教程提示句太小了」。
+    /// 当时是按「看起来协调」调的，没有对照一个已知能看清的基准 ——
+    /// 现在直接和拾取飘字对齐。
+    /// </summary>
+    const float TextScale = 1.0f;
 
     /// <summary>
     /// 文字颜色：亮黄白。
