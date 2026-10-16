@@ -121,6 +121,20 @@ public static class GameText
         {
             return $"© {System.DateTime.Now.Year} shuoke8866　保留所有权利";
         }
+
+        /// <summary>
+        /// 背景音乐署名。
+        ///
+        /// **这是 CC BY 4.0 的合规要求，不是可选装饰** ——
+        /// 该许可允许自由使用（含商业用途），唯一义务就是署名。
+        /// 删掉这行就不再合规。
+        /// </summary>
+        public static string 音乐署名()
+        {
+            return "BGM: \"Dentaneosuchus Hunt\" Kevin MacLeod (incompetech.com)　" +
+                   "CC BY 4.0";
+        }
+
         public static string 开局说明() { return "哦～很大胆的选择呢"; }
 
         /// <summary>

@@ -69,7 +69,16 @@ public class StartScreen : MonoBehaviour
         // 颜色刻意压暗（0.45 灰）：玩家不会去注意它，但截图里看得清。
         var copyright = UIBuild.Text(full, "Copyright", GameText.Panel.版权声明(),
             22f, TextAlignmentOptions.Center, new Color(0.62f, 0.64f, 0.70f));
-        UIBuild.AnchorBottom(copyright.rectTransform, 26f, 900f, 34f);
+        UIBuild.AnchorBottom(copyright.rectTransform, 52f, 1100f, 30f);
+
+        // ---- 背景音乐署名 ----
+        //
+        // **这不是可选装饰，是 CC BY 4.0 的合规要求。**
+        // 该许可允许自由使用（含商业用途），唯一义务就是署名 —— 删掉就不再合规。
+        // 字号更小、颜色更暗：玩家不会注意，但截图/录屏里在。
+        var musicCredit = UIBuild.Text(full, "MusicCredit", GameText.Panel.音乐署名(),
+            17f, TextAlignmentOptions.Center, new Color(0.50f, 0.52f, 0.58f));
+        UIBuild.AnchorBottom(musicCredit.rectTransform, 26f, 1100f, 28f);
     }
 
     void MakeStartButton(RectTransform parent)
