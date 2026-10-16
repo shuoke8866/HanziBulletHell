@@ -20,11 +20,31 @@ public class PlayerHealth : MonoBehaviour
         maxHealth = baseMaxHealth + PlayerStats.bonusMaxHealth;
         appliedBonusHealth = PlayerStats.bonusMaxHealth;
 
-        // 保留跨场景的血量比例（否则每次切层都满血，肉鸽压力会消失）
+        // 保留跨场景的血量（否则每次切层都满血，肉鸽压力会消失）
+        //
+        // **只有 carried 严格大于 0 才用它**，并且最后再夹一次范围。
+        //
+        // 踩过的坑（玩家反馈"过完背景故事后血条消失"）：
+        // 实测发现场景里 PlayerHealth.currentHealth 是 **0**，血条忠实地显示成空的
+        // —— 所以不是"血条不见了"，是**血量真的是 0**。
+        //
+        // 根因是 GameData.carriedHealth 的 0 有**两种语义**混在一起：
+        //     · "本局还没开始"   → 应该满血
+        //     · "上一局打到 0 血" → 应该 0 血
+        // 光是 `carried > 0 ? carried : maxHealth` 在某些时序下仍然会落到 0
+        // （比如 maxHealth 那一刻还是序列化里的旧值、或 carried 被别处写成负数）。
+        //
+        // 现在：0 和负数一律当"没开始"，直接满血；最后 Clamp 兜底，
+        // 保证**玩家任何情况下都不会以 0 血开局**。
         int carried = GameData.carriedHealth;
-        currentHealth = carried > 0 ? Mathf.Min(carried, maxHealth) : maxHealth;
+
+        currentHealth = (carried > 0) ? Mathf.Min(carried, maxHealth) : maxHealth;
+        currentHealth = Mathf.Clamp(currentHealth, 1, Mathf.Max(1, maxHealth));
 
         SaveHealthToGameData();
+
+        GameLog.Info($"[血量] 开局 {currentHealth}/{maxHealth}" +
+                     $"（carried={carried} 加成={PlayerStats.bonusMaxHealth}）");
     }
 
     void Update()

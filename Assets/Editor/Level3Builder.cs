@@ -397,6 +397,18 @@ public static class Level3Builder
         var box = go.AddComponent<BoxCollider2D>();
         box.size = new Vector2(RoomW, RoomH);
 
+        // **必须显式设 isTrigger** —— 不能指望 Room.Reset() 帮我们设。
+        //
+        // 踩过的坑（玩家反馈"第三层开局卡墙里"）：
+        // Room.Reset() 里有一句 `box.isTrigger = true`，看起来"加了组件就是触发器"。
+        // 但 Unity 的 Reset() **只在"通过 Inspector 添加组件"时才会被自动调用** ——
+        // 脚本里 AddComponent **不会**触发它。
+        //
+        // 其它三层的房间是手动在编辑器里建的 → Reset 跑了 → isTrigger = true ✓
+        // 第三层是用这个脚本建的 → Reset 没跑 → isTrigger 保持默认 false ✗
+        // 结果玩家一出生就在一个**实心盒子**里，被自己的房间卡住动不了。
+        box.isTrigger = true;
+
         var room = go.AddComponent<Room>();
         room.roomType = spec.type;
         room.waveCount = spec.waveCount;

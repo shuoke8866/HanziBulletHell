@@ -106,8 +106,11 @@ public class BackgroundFx : MonoBehaviour
         cam.backgroundColor = Color.black;
 
         BuildBackdrop();
-        BuildGrid();
-        BuildDots();
+
+        // 网格层和星点层暂时不做 —— 玩家要求"先跟第 1、2 层一样，用一大块纯色"。
+        // 代码留着（BuildGrid / BuildDots 还在下面），想要的时候把这两行取消注释即可。
+        // BuildGrid();
+        // BuildDots();
 
         lastCamPos = cam.transform.position;
     }
