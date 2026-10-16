@@ -75,20 +75,6 @@ public class TutorialCoach : MonoBehaviour
 
     Transform dot;
     SpriteRenderer dotSprite;
-
-    // ============================================================
-    //  门控：说完话之前不给开门
-    // ============================================================
-    //
-    // 玩家要求：「在小球说完对应房间的话之前不能开对应房间的门」。
-    //
-    // 做法：给每扇门挂一个 HoldOpen 委托（见 Door.cs）。
-    // 门自己想开时如果委托返回 true，就挂起不真开；
-    // 条件解除后门自己会开 —— Room 那边一行都不用改。
-    readonly List<Door> gatedDoors = new List<Door>();
-
-    /// <summary>已经说完话的房间。玩家在里面时才拦门。</summary>
-    readonly HashSet<Room> spokenRooms = new HashSet<Room>();
     /// <summary>当前显示的那行教程文字（FloatingTip 的句柄）</summary>
     FloatingTip.Handle textHandle;
 
@@ -150,12 +136,28 @@ public class TutorialCoach : MonoBehaviour
         startPos = player.position;
 
         // 门控：说完话之前不给开门（见 Door.cs 的 HoldOpen）
+        HoldDoorsUntilTaught = true;
         RegisterDoorGates();
 
         BuildDot();
 
         ShowStep(0, true);      // 一进教程层就把第一条说了
     }
+    /// <summary>
+    /// 教学层第一间房的教学做完之前，先别放玩家走。
+    ///
+    /// 玩家要求：「在教学层的第一间完成教学之后再开门」—— 就这一件事。
+    ///
+    ///     开局 = true              → 教学层的门先都别开
+    ///     第一间房那一步说完 = false → 放行
+    ///     正式关卡 = 一直是 false    → 门完全不受影响
+    ///
+    /// 上一版用的是「玩家在某间房里 && 那间房没说过话」，
+    /// 结果正式关卡的每一扇门都可能被拦住 —— 那是过度设计。
+    /// 需求只有一句话，实现也该只有一件事。
+    /// </summary>
+    public static bool HoldDoorsUntilTaught;
+
 
     // ============================================================
     //  建造
@@ -174,49 +176,25 @@ public class TutorialCoach : MonoBehaviour
     /// </summary>
     void RegisterDoorGates()
     {
-        gatedDoors.Clear();
+        int n = 0;
 
         foreach (Door d in Object.FindObjectsOfType<Door>(true))
         {
             if (d == null) continue;
 
             d.HoldOpen = ShouldHoldDoors;
-            gatedDoors.Add(d);
+            n++;
         }
 
-        GameLog.Info($"[教程] 已给 {gatedDoors.Count} 扇门挂上门控");
+        GameLog.Info($"[教程] 已给 {n} 扇门挂上「教学未完先别开」的条件");
     }
 
     /// <summary>现在要不要拦着门不让开</summary>
-    bool ShouldHoldDoors()
+    /// <summary>现在要不要拦着门。**正式关卡里恒为 false。**</summary>
+    static bool ShouldHoldDoors()
     {
-        Room here = CurrentRoomOfPlayer();
-        if (here == null) return false;          // 不在任何房间里 → 不拦
-        return !spokenRooms.Contains(here);      // 这间房的话还没说完 → 拦
-    }
-
-    /// <summary>玩家现在在哪间房里（不在任何房间就返回 null）</summary>
-    static Room CurrentRoomOfPlayer()
-    {
-        Transform pt = PlayerRef.Transform;
-        if (pt == null) return null;
-
-        foreach (Room r in Object.FindObjectsOfType<Room>())
-        {
-            var box = r.GetComponent<Collider2D>();
-            if (box == null) continue;
-            if (box.bounds.Contains(pt.position)) return r;
-        }
-        return null;
-    }
-
-    /// <summary>把玩家当前所在房间标记为「话已说完」</summary>
-    void MarkCurrentRoomSpoken()
-    {
-        Room here = CurrentRoomOfPlayer();
-        if (here == null) return;
-        if (spokenRooms.Add(here))
-            GameLog.Info($"[教程] 「{here.name}」的话说完了，这间房的门可以开了");
+        if (!GameData.inTutorial) return false;   // 正式关卡：不拦
+        return HoldDoorsUntilTaught;
     }
 
     void BuildDot()
@@ -429,7 +407,7 @@ public class TutorialCoach : MonoBehaviour
     void EndStep()
     {
         // 这一步说完了 → 玩家当前所在的房间「话已说完」，对应的门可以开了
-        MarkCurrentRoomSpoken();
+        HoldDoorsUntilTaught = false;   // 教学做完了，放玩家走
 
         currentStep = -1;
         currentLine = 0;
