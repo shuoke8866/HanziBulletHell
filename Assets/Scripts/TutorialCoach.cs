@@ -37,8 +37,8 @@ public class TutorialCoach : MonoBehaviour
     const float DotSize = 0.34f;
     // 气泡加大：玩家反馈"教程的字又小又不明显"。
     // 原值 4.6×1.25 / 字号 2.05 —— 在 1280×720 下小得几乎看不清。
-    const float BubbleWidth = 7.6f;
-    const float BubbleHeight = 2.1f;
+    const float BubbleWidth = 8.6f;
+    const float BubbleHeight = 2.4f;
     const float BubbleFontSize = 3.6f;
 
     // ---------- 节奏 ----------
@@ -151,7 +151,10 @@ public class TutorialCoach : MonoBehaviour
         bubbleBg = go.AddComponent<SpriteRenderer>();
         bubbleBg.sprite = SolidSprite.White;
         // 不透明一点，避免和背景混在一起看不清
-        bubbleBg.color = new Color(0.04f, 0.05f, 0.10f, 0.96f);
+        // 气泡底色压到**近黑**，和亮黄文字拉到最大对比。
+        // 原来文字是米白 (1, 0.97, 0.9)、气泡是深蓝灰 (0.04, 0.05, 0.10) ——
+        // 两者都偏亮，在深色背景上混在一起看不清（玩家反馈"看不清楚"）。
+        bubbleBg.color = new Color(0.015f, 0.02f, 0.05f, 0.98f);
         bubbleBg.sortingOrder = 149;
 
         go.transform.localScale = new Vector3(BubbleWidth, BubbleHeight, 1f);
@@ -162,7 +165,9 @@ public class TutorialCoach : MonoBehaviour
         // 文字作为气泡的**子物体** —— 位置和缩放都跟着气泡走，不用每帧手动对齐。
         // （原来挂在气泡外面靠每帧算坐标，字体一放大就不再居中。）
         textGo.transform.SetParent(go.transform, false);
+        // 稍微收窄一点，给文字留出左右边距 —— 不然长句子会顶到气泡边上
         textGo.transform.localPosition = new Vector3(0f, 0f, -0.1f);
+        textGo.transform.localScale = new Vector3(1f / BubbleWidth, 1f / BubbleHeight, 1f) * 0.92f;
 
         // 父级有**非等比缩放**（气泡是 7.6×2.1 的长条），
         // 文字直接继承会被拉扁 —— 所以反向抵消掉，只保留位置。
@@ -171,8 +176,16 @@ public class TutorialCoach : MonoBehaviour
         bubbleText = textGo.AddComponent<TextMeshPro>();
         bubbleText.fontSize = BubbleFontSize;
         bubbleText.alignment = TextAlignmentOptions.Center;
-        bubbleText.color = new Color(1f, 0.97f, 0.9f);
+        // 文字用**亮黄**：和近黑气泡的对比最强，也够醒目
+        bubbleText.color = new Color(1f, 0.88f, 0.42f);
         bubbleText.enableWordWrapping = true;
+
+        // **自动缩小字号**：句子长了就自动变小，永远不会超出气泡。
+        // 玩家反馈"文字容易出到气泡外面" —— 光靠手调字号治不了，
+        // 因为文案长度会变；开自动缩放才是稳的。
+        bubbleText.enableAutoSizing = true;
+        bubbleText.fontSizeMin = 1.6f;
+        bubbleText.fontSizeMax = BubbleFontSize;
 
         bubble = go.transform;
         SetBubbleVisible(false);

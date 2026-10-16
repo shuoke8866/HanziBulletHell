@@ -41,12 +41,10 @@ public class BossGuan : MonoBehaviour, IDamageable
 
     void Start()
     {
-        // 字形：和普通敌人同一套渲染，保证显示的就是这个字
-        if (GetComponent<BossGlyph>() == null)
-        {
-            var bg = gameObject.AddComponent<BossGlyph>();
-            bg.character = glyphChar;
-        }
+// 字形已经在预制体上装好了（Tools/修 BOSS 字形 做的）。
+        // **不要在这里运行时 AddComponent** —— AddComponent 会把字段重置成默认值，
+        // 可能覆盖预制体上设好的字（第三关 BOSS 冒出「官」就是这个时序问题）。
+        if (glyphChar != null) { /* 字段保留供编辑器查看 */ }
 
         currentHealth = maxHealth;
         player = PlayerRef.Transform;

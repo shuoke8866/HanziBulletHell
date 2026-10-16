@@ -66,12 +66,16 @@ public class BossHuang : MonoBehaviour, IDamageable
 
     void Start()
     {
-        // 字形：用和普通敌人同一套渲染，保证显示的就是这个字
-        if (GetComponent<BossGlyph>() == null)
-        {
-            var bg = gameObject.AddComponent<BossGlyph>();
-            bg.character = glyphChar;
-        }
+        // 字形**已经在预制体上装好了**（Tools/修 BOSS 字形 做的），
+        // 这里不再运行时 AddComponent。
+        //
+        // 为什么删掉：AddComponent 会**把字段重置成默认值**。
+        // BossGlyph.character 的默认值是「皇」，所以任何"运行时补挂"的路径
+        // 都可能把已经设好的字覆盖掉 —— 第三关 BOSS 身上冒出个「官」
+        // 就是这种时序问题造成的。
+        //
+        // 现在预制体上直接存着正确的字，没有任何运行时时序依赖。
+        if (glyphChar != null) { /* 保留字段供编辑器观察，运行时不使用 */ }
 
         currentHealth = maxHealth;
         player = PlayerRef.Transform;
