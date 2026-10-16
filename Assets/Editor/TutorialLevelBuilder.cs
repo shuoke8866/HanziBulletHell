@@ -144,6 +144,14 @@ public static class TutorialLevelBuilder
         AddBoss(rooms[3], new Vector2(x0 + Pitch * 3f, 0f));
         AddPortal(rooms[3], new Vector2(x0 + Pitch * 3f - 2f, 0f));
 
+        // ---- 7.5) 开场游戏介绍 ----
+        // 挂在场景里一个空对象上；它自己只在教程层弹一次。
+        // 文案在 GameText.Intro.正文()，改完不用重新生成场景。
+        GameObject intro = GameObject.Find("__OpeningIntro");
+        if (intro == null) intro = new GameObject("__OpeningIntro");
+        if (intro.GetComponent<OpeningIntroUI>() == null)
+            intro.AddComponent<OpeningIntroUI>();
+
         // ---- 8) 教程提示 ----
         AddHints(x0, Pitch);
 

@@ -55,13 +55,30 @@ public class GameManager : MonoBehaviour
     }
 
     // ---------- 层数难度倍率（Room / Enemy 生成时读取）----------
+    /// <summary>
+    /// 第 <see cref="GameBalance.BalanceFloor"/> 层的血量倍率。
+    ///
+    /// **注意用的是 BalanceFloor，不是 GameData.currentFloor。**
+    ///
+    /// 踩过的坑（玩家反馈"教程层小怪血量没跟着改、BOSS 血 400"）：
+    /// 原来这里写的是 `1 + (GameData.currentFloor - 1) * per`，
+    /// 而 currentFloor 是 **0 起**（教程层 = 0，第一层 = 1），
+    /// 于是教程层算出 `1 + (0-1)*0.3 = **0.7**` —— 比第一层还弱 30%。
+    ///
+    /// 这一处算错会连带影响：
+    ///   · 房间刷怪的血量（Room.ResolveHealth 乘的就是它）
+    ///   · BOSS 血量（PlayerPower.HealthForFight 会先除以它，等于把它放大）
+    ///
+    /// 这就是"0 起下标"和"1 起公式"混用（index base mismatch）。
+    /// BalanceFloor 就是专门为这件事存在的：把 0 起换算成 1 起。
+    /// </summary>
     public static float FloorHealthMultiplier
     {
         get
         {
             GameManager gm = Instance;
             float per = gm != null ? gm.healthGrowthPerFloor : 0.30f;
-            return 1f + (GameData.currentFloor - 1) * per;
+            return 1f + (GameBalance.BalanceFloor - 1) * per;
         }
     }
 
@@ -70,8 +87,9 @@ public class GameManager : MonoBehaviour
         get
         {
             GameManager gm = Instance;
+            // 同理用 BalanceFloor，别用 0 起的 currentFloor
             float per = gm != null ? gm.speedGrowthPerFloor : 0.06f;
-            return 1f + (GameData.currentFloor - 1) * per;
+            return 1f + (GameBalance.BalanceFloor - 1) * per;
         }
     }
 
@@ -82,7 +100,11 @@ public class GameManager : MonoBehaviour
             GameManager gm = Instance;
             int per = gm != null ? gm.extraEnemyPerFloor : 1;
             int cap = gm != null ? gm.maxExtraEnemies : 4;
-            return Mathf.Min((GameData.currentFloor - 1) * per, cap);
+
+            // 一样要用 BalanceFloor（见 FloorHealthMultiplier 的说明）。
+            // 原来是 (currentFloor - 1)：教程层算出 -1，被 Min 夹成负数 ——
+            // 目前靠 Room 那边再 Max(0, …) 兜住才没出问题，但那是巧合，不该依赖。
+            return Mathf.Clamp((GameBalance.BalanceFloor - 1) * per, 0, cap);
         }
     }
 

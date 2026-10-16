@@ -45,6 +45,14 @@ public static class GameText
         public static string 拾取存背包(string stroke) { return $"拾取 {stroke}（存背包）"; }
         public static string 背包已满(string stroke) { return $"背包已满，「{stroke}」留在地上"; }
 
+        /// <summary>
+        /// 玩家**头顶**飘的那行字 —— 拾取笔画 / 开宝箱时用。
+        ///
+        /// 刻意写得短：飘字的空间小、只停 1 秒左右，
+        /// 不像屏幕提示条那样能放长句子。
+        /// </summary>
+        public static string 获得笔画(string stroke) { return $"获得「{stroke}」"; }
+
         public static string 房间清理完成() { return "房间清理完成！"; }
         public static string 获得词条(string name, string desc) { return $"获得词条：{name} —— {desc}"; }
 
@@ -116,6 +124,34 @@ public static class GameText
 
         public static string 当前汉字标签() { return "当前汉字："; }
         public static string 背包空() { return "背包：空"; }
+    }
+
+    // ============================================================
+    //  四·五、开场游戏介绍
+    // ============================================================
+    //
+    //  **这是你要写的部分。**
+    //
+    //  在教程层之前显示一屏文字，玩家按空格/回车/点击继续。
+    //  数组里有几条就显示几页（现在只有一条占位）。
+    //
+    //  写的时候注意：
+    //    · 每条**不要太长**（4 行以内最好）—— 一屏放不下会挤
+    //    · 想换行直接在里面写 \n
+    //    · 改完存盘立刻生效，不用重新生成教程层
+    //    · 想加页就往数组里多加一条字符串
+    public static class Intro
+    {
+        public static string[] 正文()
+        {
+            return new[]
+            {
+                "这是一个汉字游戏",
+            };
+        }
+
+        public static string 继续() { return "空格 / 回车 / 点击 继续"; }
+        public static string 开始() { return "空格 / 回车 / 点击 开始"; }
     }
 
     // ============================================================

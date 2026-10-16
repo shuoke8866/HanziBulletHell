@@ -92,6 +92,11 @@ public class StrokePickup : MonoBehaviour
             // 合成演出放在玩家身上：笔画已被消耗，放在笔画原位置会显得脱节
             Fx.SynthesisBurst(other.transform.position, StrokeUtil.ColorOf(strokeType));
             Fx.Shake(0.10f);
+
+            // 玩家**头顶**飘字 —— 玩家视线在自己角色上，屏幕角落的提示条容易错过
+            FloatingTip.Show(GameText.Toast.获得笔画(StrokeUtil.NameOf(strokeType)),
+                             StrokeUtil.ColorOf(strokeType));
+
             Destroy(gameObject);
         }
         // 合成失败 → 进背包
@@ -102,6 +107,10 @@ public class StrokePickup : MonoBehaviour
             Sfx.PlayVaried(Sfx.Id.Pickup, 0.45f);
             Fx.PickupPop(transform.position, StrokeUtil.ColorOf(strokeType));
             GameToast.Show(GameText.Toast.拾取存背包(StrokeUtil.NameOf(strokeType)), StrokeUtil.ColorOf(strokeType));
+
+            FloatingTip.Show(GameText.Toast.获得笔画(StrokeUtil.NameOf(strokeType)),
+                             StrokeUtil.ColorOf(strokeType));
+
             Destroy(gameObject);
         }
         // 背包也满了 → 不拾取，笔画留在原地（可按 F 重试）

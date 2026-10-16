@@ -129,12 +129,22 @@ public static class GameBalance
 
     // ---------- BOSS ----------
     /// <summary>
-    /// BOSS 血量总倍率（调试用全局开关）。
+    /// BOSS 血量总倍率（全局开关，改这一行就能整体调 BOSS 难度）。
     ///
-    /// 0.35 = 测试模式，便于快速打到关底验证流程；
-    /// 1.0  = 正式数值，改这一行就能一键切换，不必去翻 Room.cs。
+    /// 玩家反馈"BOSS 血量过高" → 从 0.35 降到 0.20。
+    ///
+    /// 这一处的影响比看上去大 —— BOSS 血量不是简单地乘这个数：
+    ///   PlayerPower.HealthForFight 会先按"玩家 DPS × 目标秒数"反推血量，
+    ///   再**除以层数倍率**，最后才乘 bossMul。
+    /// 也就是说它同时被"玩家战力"和"层数倍率"影响过。
+    ///
+    /// 附带修的 bug：FloorHealthMultiplier 原来拿 0 起的 currentFloor
+    /// 去套 1 起的公式，教程层算成 0.7 —— 而 HealthForFight 内部要除以层数倍率，
+    /// 除以 0.7 等于把教程 BOSS 血量**又放大 1.43 倍**。教程 BOSS 血 400 就是这么来的。
+    ///
+    /// 参考：1.0 = 正式强度；0.35 = 旧的测试强度（太肉）；0.20 = 现在。
     /// </summary>
-    public const float BossHealthMultiplier = 0.35f;
+    public const float BossHealthMultiplier = 0.20f;
 
     /// <summary>
     /// 数值平衡用的层号：**教程层（0）算作第 1 档**。
