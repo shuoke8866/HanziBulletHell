@@ -84,19 +84,31 @@ public static class TutorialLevelBuilder
         const float DoorGap = 2f;
         const float Pitch = RoomW + DoorGap;      // 14 + 2 = 16
 
-        float x0 = -3f * Pitch * 0.5f;            // 四间房整体居中
+        // 五间房整体居中。
+        //
+        // 布局（x 从左到右）：
+        //   Room0_Doubt   开场房：背景故事之后玩家落在这里，
+        //                 随行小点在此出现、说出主角的疑虑、并指向笔画房
+        //   Room1_Start   笔画房：六种笔画的展台（教学点指向的就是这里）
+        //   Room2_Collect 收集房（战斗）
+        //   Room3_Swap    换字房（战斗）
+        //   Room4_Boss    BOSS 房
+        const int RoomCount = 5;
+        float x0 = -(RoomCount - 1) * Pitch * 0.5f;   // -2 * 16 = -32
 
         var rooms = new List<Room>();
 
-        rooms.Add(MakeRoom("Room1_Start", new Vector2(x0 + Pitch * 0f, 0f), RoomType.Start, 0));
-        rooms.Add(MakeRoom("Room2_Collect", new Vector2(x0 + Pitch * 1f, 0f), RoomType.Combat, 1));
-        rooms.Add(MakeRoom("Room3_Swap", new Vector2(x0 + Pitch * 2f, 0f), RoomType.Combat, 1));
-        rooms.Add(MakeRoom("Room4_Boss", new Vector2(x0 + Pitch * 3f, 0f), RoomType.Boss, 1));
+        rooms.Add(MakeRoom("Room0_Doubt", new Vector2(x0 + Pitch * 0f, 0f), RoomType.Start, 0));
+        rooms.Add(MakeRoom("Room1_Start", new Vector2(x0 + Pitch * 1f, 0f), RoomType.Start, 0));
+        rooms.Add(MakeRoom("Room2_Collect", new Vector2(x0 + Pitch * 2f, 0f), RoomType.Combat, 1));
+        rooms.Add(MakeRoom("Room3_Swap", new Vector2(x0 + Pitch * 3f, 0f), RoomType.Combat, 1));
+        rooms.Add(MakeRoom("Room4_Boss", new Vector2(x0 + Pitch * 4f, 0f), RoomType.Boss, 1));
 
         // ---- 3) 门（相邻房间共用同一扇，正好落在两间房之间的缝隙里） ----
-        MakeDoor("Door_1to2", new Vector2(x0 + Pitch * 0.5f, 0f), rooms[0], rooms[1]);
-        MakeDoor("Door_2to3", new Vector2(x0 + Pitch * 1.5f, 0f), rooms[1], rooms[2]);
-        MakeDoor("Door_3to4", new Vector2(x0 + Pitch * 2.5f, 0f), rooms[2], rooms[3]);
+        MakeDoor("Door_0to1", new Vector2(x0 + Pitch * 0.5f, 0f), rooms[0], rooms[1]);
+        MakeDoor("Door_1to2", new Vector2(x0 + Pitch * 1.5f, 0f), rooms[1], rooms[2]);
+        MakeDoor("Door_2to3", new Vector2(x0 + Pitch * 2.5f, 0f), rooms[2], rooms[3]);
+        MakeDoor("Door_3to4", new Vector2(x0 + Pitch * 3.5f, 0f), rooms[3], rooms[4]);
 
         // ---- 4) 墙体 ----
         // 和正式关卡共用同一套规则：每个房间封成一整圈墙，
@@ -104,45 +116,47 @@ public static class TutorialLevelBuilder
         RoomWallBuilder.RebuildAll(verbose: false);
 
         // ---- 5) 敌人与刷怪点 ----
-        AddSpawnPoint(rooms[1], "Spawn_C1", new Vector2(x0 + Pitch * 1f - 2f, 2f));
-        AddSpawnPoint(rooms[1], "Spawn_C2", new Vector2(x0 + Pitch * 1f + 2f, -2f));
-        AddSpawnPoint(rooms[2], "Spawn_S1", new Vector2(x0 + Pitch * 2f - 2f, 2f));
-        AddSpawnPoint(rooms[2], "Spawn_S2", new Vector2(x0 + Pitch * 2f + 2f, -2f));
-        AddSpawnPoint(rooms[3], "BossSpawn", new Vector2(x0 + Pitch * 3f, 0f));
+        // 注意：多了 Room0_Doubt 这个开场房，所以下标全部后移一位
+        //   收集房 = rooms[2]、换字房 = rooms[3]、BOSS 房 = rooms[4]
+        AddSpawnPoint(rooms[2], "Spawn_C1", new Vector2(x0 + Pitch * 2f - 2f, 2f));
+        AddSpawnPoint(rooms[2], "Spawn_C2", new Vector2(x0 + Pitch * 2f + 2f, -2f));
+        AddSpawnPoint(rooms[3], "Spawn_S1", new Vector2(x0 + Pitch * 3f - 2f, 2f));
+        AddSpawnPoint(rooms[3], "Spawn_S2", new Vector2(x0 + Pitch * 3f + 2f, -2f));
+        AddSpawnPoint(rooms[4], "BossSpawn", new Vector2(x0 + Pitch * 4f, 0f));
 
         // 教程关的小怪血量：**和第一层完全一样**（不设 override，走数据库 × 全局倍率）。
         //
         // 踩过两次坑，都记下来：
         //
         //   1. 原来写死 enemyHealthOverride = 4 / 5，
-        //      而其他层是 `数据库24 × 全局倍率3 = 72` → 差 18 倍，小怪一碰就没。
+        //      而其他层是 `数据库24 × 全局倍率` → 差十几倍，小怪一碰就没。
         //
         //   2. 我第一次修的时候按"教程应该更简单"改成了 24 / 30 —— **还是错的**。
         //
         // 为什么"教程更简单"这个直觉本身就不对：
-        // 教程层起始房摆了六种笔画的展台，玩家**一进教程就能拿全六种笔画**，
+        // 笔画房摆了六种笔画的展台，玩家**一进教程就能拿全六种笔画**，
         // 打完教程出来时反而比"刚进第一层的玩家"强得多。
         // 敌人却给得比第一层弱，难度曲线在这里凹下去 ——
         // 玩家的体感就是"教程的怪是纸糊的"。
         //
         // 结论：**难度要跟着玩家的战力走，不是跟着关卡序号走。**
         // 这里干脆不设 override，让教程层和第一层用同一套规则。
-        rooms[1].enemyHealthOverride = -1;
-        rooms[1].waveCount = 1;
         rooms[2].enemyHealthOverride = -1;
         rooms[2].waveCount = 1;
+        rooms[3].enemyHealthOverride = -1;
+        rooms[3].waveCount = 1;
 
         // ---- 6) 宝箱 / 笔画 ----
-        AddStrokeChest(new Vector2(x0 + Pitch * 2f, 0f));
+        AddStrokeChest(new Vector2(x0 + Pitch * 3f, 0f));
 
         // 教程的核心任务之一是"让玩家认全六种笔画"。
-        // 所以在起始房正中间摆一排六张展台，每种笔画一个，
-        // 玩家一进场就能一眼看全：横、竖、撇、捺、点、折各长什么样。
-        AddStrokeGallery(new Vector2(x0, 0f));
+        // 所以在**笔画房**（rooms[1]）正中间摆一排六张展台，每种笔画一个，
+        // 玩家从开场房走进来就能一眼看全：横、竖、撇、捺、点、折各长什么样。
+        AddStrokeGallery(new Vector2(x0 + Pitch * 1f, 0f));
 
         // ---- 7) BOSS 与传送门 ----
-        AddBoss(rooms[3], new Vector2(x0 + Pitch * 3f, 0f));
-        AddPortal(rooms[3], new Vector2(x0 + Pitch * 3f - 2f, 0f));
+        AddBoss(rooms[4], new Vector2(x0 + Pitch * 4f, 0f));
+        AddPortal(rooms[4], new Vector2(x0 + Pitch * 4f - 2f, 0f));
 
         // ---- 7.5) 开场游戏介绍 ----
         // 挂在场景里一个空对象上；它自己只在教程层弹一次。
@@ -152,10 +166,22 @@ public static class TutorialLevelBuilder
         if (intro.GetComponent<OpeningIntroUI>() == null)
             intro.AddComponent<OpeningIntroUI>();
 
-        // ---- 8) 教程提示 ----
-        AddHints(x0, Pitch);
+        // ---- 8) 教程提示（已停用）----
+        //
+        // 改成由 TutorialCoach（悬浮教学点）负责了 —— 它挂在场景里，
+        // 飘在玩家右上方，玩家做出对应行为时才弹气泡。
+        //
+        // 房间触发的那套（TutorialHint + 大触发盒）不再生成：
+        //   · 触发时机和玩家在干什么无关
+        //   · 触发盒盖住出生点时 OnTriggerEnter2D 不会触发（字幕不出现）
+        //   · 一个房间只有一组字，中间的过程教不到
+        //
+        // 代码保留着（AddHints 还在，只是不调用），想回退随时能加回来。
+        // AddHints(x0, Pitch);   // 已由 TutorialCoach 取代
 
         // ---- 9) 玩家落点 ----
+        // 落在**开场房**（rooms[0]）—— 背景故事看完后小点在这里出现、
+        // 说出主角的疑虑、并把玩家指向右边的笔画房。
         GameObject player = GameObject.Find("Player");
         if (player != null)
             player.transform.position = new Vector3(x0, 0f, 0f);
@@ -163,7 +189,7 @@ public static class TutorialLevelBuilder
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
 
-        Debug.Log($"[教程] {TargetScene} 生成完成：4 个房间 / 3 扇门 / 1 个 BOSS / 1 个传送门");
+        Debug.Log($"[教程] {TargetScene} 生成完成：5 个房间 / 4 扇门 / 1 个 BOSS / 1 个传送门");
     }
 
     // ============================================================

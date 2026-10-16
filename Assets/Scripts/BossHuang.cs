@@ -14,6 +14,12 @@ public class BossHuang : MonoBehaviour, IDamageable
 {
     [Header("属性")]
     public int maxHealth = 1100;
+
+    /// <summary>当前血量（BOSS 血条用）</summary>
+    public int CurrentHealth { get { return currentHealth; } }
+
+    /// <summary>最大血量（BOSS 血条用）</summary>
+    public int MaxHealth { get { return maxHealth; } }
     public float moveSpeed = 1.6f;
     public float keepDistance = 6f;
 

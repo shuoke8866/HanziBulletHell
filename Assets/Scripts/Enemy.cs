@@ -13,6 +13,12 @@ public class Enemy : MonoBehaviour, IDamageable
 
     [Header("运行时属性（由定义初始化，可被 Room 缩放/覆盖）")]
     public int maxHealth = 3;
+
+    /// <summary>当前血量（血条用）。IDamageable 的默认实现返回 -1，这里 override 掉</summary>
+    public int CurrentHealth { get { return currentHealth; } }
+
+    /// <summary>最大血量（血条用）</summary>
+    public int MaxHealth { get { return maxHealth; } }
     public float moveSpeed = 2f;
     public float shootInterval = 2f;
     public int bulletDamage = 1;
@@ -94,7 +100,14 @@ public class Enemy : MonoBehaviour, IDamageable
         player = PlayerRef.Transform;
         nextShootTime = Time.time + shootInterval + Random.Range(0f, 0.5f);
         nextSummonTime = Time.time + (def != null ? def.summonInterval : 8f);
+
+        // 头顶血条：满血时自动隐藏，受伤了才出现
+        if (healthBar == null)
+            healthBar = EnemyHealthBar.Attach(this);
     }
+
+    /// <summary>头顶血条（Start 时自动创建）</summary>
+    private EnemyHealthBar healthBar;
 
     // 建立/取得字形子物体。敌人本体不再画方块，改成显示自己的汉字。
     void EnsureGlyph()

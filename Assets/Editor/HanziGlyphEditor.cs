@@ -527,23 +527,106 @@ public class HanziGlyphEditor : EditorWindow
             return false;
         }
 
-        string code = BuildCode();
-        string insert = code + $"        Save(\"{ch}\");\n\n";
+        string code = BuildCode() + $"\n        Save(\"{ch}\");\n";
 
-        // 插到 marker 所在行的**行首**（保留缩进）
+        // 写盘前自检 —— 这是最后一道防线。
+        //
+        // 教训：上一版为了"让新字能写进去"就无条件追加，
+        // 结果把一段语法非法的代码（点数和构造函数不匹配）写进了 EnemyGlyphs.cs，
+        // 整个项目编译不过。
+        // 文本编辑器的底线是"**写出去的代码必须能编译**"，
+        // 而不是"我能不能找到插入点"。
+        string problem;
+        if (!LooksLikeValidCode(code, out problem))
+        {
+            status = $"生成的代码自检不过，**拒绝写入**：{problem}\n" +
+                     "请点「复制代码」自己检查后粘贴。";
+            Debug.LogError($"[字形编辑器] 拒绝写入「{ch}」：{problem}\n{code}");
+            return false;
+        }
+
+        // 逐行加缩进。
+        //
+        // 上一版直接把拼接串插进去，导致第一行之后的所有行都顶到第 0 列
+        // （C# 不介意缩进，但代码会变得很难读，而且下一次的"整块定位"
+        //   是按缩进找构造器行的，缩进乱了就定位不到）。
+        var indented = new StringBuilder();
+        foreach (string line in code.Split('\n'))
+            indented.Append(line.Length == 0 ? "\n" : "        " + line + "\n");
+
         int lineStart = text.LastIndexOf('\n', markerAt) + 1;
-        text = text.Substring(0, lineStart) + insert + text.Substring(lineStart);
+        text = text.Substring(0, lineStart) + indented + text.Substring(lineStart);
 
-        // 把改好的内容写回文件 —— 走和整块替换一样的收尾流程
         string full = System.IO.Path.Combine(
             System.IO.Directory.GetParent(Application.dataPath).FullName,
             SourceFileFor(glyphSet));
 
+        // 备份（和别的写盘操作保持一致）
+        System.IO.File.WriteAllText(full + ".bak", 
+            System.IO.File.ReadAllText(full, Encoding.UTF8), new UTF8Encoding(false));
+
         System.IO.File.WriteAllText(full, text, new UTF8Encoding(false));
         AssetDatabase.Refresh();
 
-        status = $"「{ch}」是敌人字库里的新字，已**追加**到 EnemyGlyphs.cs（{insert.Split('\n').Length - 1} 行）。";
-        return false;   // 返回 false：内容已经自己写完了，外层不用再替换
+        status = $"「{ch}」是敌人字库里的新字，已**追加**到 {SourceFileFor(glyphSet)}。" +
+                 "（备份在同名 .bak）";
+        return false;   // 内容已经自己写完了，外层不用再替换
+    }
+
+    /// <summary>
+    /// 粗检生成的代码是不是合法的构造器调用。
+    ///
+    /// 检查的是**最容易出错、也最容易静默写坏文件**的那一点：
+    /// 点数和构造器名是否匹配。
+    ///   H/V/D/DS/Z → 固定点数
+    ///   P3/P4/P5   → 分别要求 3/4/5 个点
+    ///   AddPoly    → 任意点数
+    /// 这个错误 C# 编译时会报，但**报的时候文件已经被写坏了** ——
+    /// 所以必须在写之前拦住。
+    /// </summary>
+    static bool LooksLikeValidCode(string code, out string problem)
+    {
+        problem = null;
+
+        if (string.IsNullOrEmpty(code)) { problem = "生成的代码是空的"; return false; }
+
+        foreach (string raw in code.Split('\n'))
+        {
+            string line = raw.Trim();
+            if (line.Length == 0 || line.StartsWith("//")) continue;
+
+            if (!(line.StartsWith("H(") || line.StartsWith("V(") || line.StartsWith("D(") ||
+                  line.StartsWith("DS(") || line.StartsWith("Z(") || line.StartsWith("P") ||
+                  line.StartsWith("AddPoly(") || line.StartsWith("Save(")))
+            {
+                problem = $"出现不认识的语句：{line}";
+                return false;
+            }
+
+            // P3/P4/P5 的点数必须对得上
+            if (line.StartsWith("P") && line.Length > 2 && char.IsDigit(line[1]))
+            {
+                int want = line[1] - '0';
+                int commas = 0;
+                int open = line.IndexOf('{');
+                int close = line.IndexOf('}');
+                if (open >= 0 && close > open)
+                {
+                    foreach (char c in line.Substring(open, close - open))
+                        if (c == ',') commas++;
+                    // 每个点写成 "x, y"，所以逗号数 = 点数 * 2 - 1
+                    int got = (commas + 1) / 2;
+                    if (got != want)
+                    {
+                        problem = $"P{want} 需要 {want} 个点，但生成了 {got} 个 —— " +
+                                  "点数和构造函数不匹配，会编译不过：" + line;
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
     }
 
     static void CheckGaps(List<float> vals, string name, List<string> warns)

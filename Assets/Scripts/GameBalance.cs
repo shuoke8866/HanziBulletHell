@@ -170,9 +170,9 @@ public static class GameBalance
     /// 放那儿会让"召唤出来的怪"和"房间刷出来的怪"血量规则不一致。
     /// 放在 ApplyDefinition 才能保证不管怎么生出来的怪，规则都一样。
     ///
-    /// 历史：玩家反馈小怪太脆 → 先调 2.5，又要求"所有小怪血量提升三倍" → 现在 3。
+    /// 历史：玩家反馈小怪太脆 → 2.5 → "提升三倍" → 3 → **实战太肉 → 现在 1.5**。
     /// </summary>
-    public const float EnemyHealthMultiplier = 3f;
+    public const float EnemyHealthMultiplier = 1.5f;
 
     /// <summary>
     /// 各层的**额外**血量倍率，索引 0 = 教程层。

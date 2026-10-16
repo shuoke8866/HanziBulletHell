@@ -57,39 +57,58 @@ public static class RoomWallBuilder
     /// <summary>墙的颜色（和原场景里的墙一致）</summary>
     static readonly Color WallColor = new Color(0.3f, 0.3f, 0.3f, 1f);
 
-    /// <summary>墙的贴图：和原场景里用的是同一张内置白方块</summary>
+    /// <summary>墙的贴图（程序生成，见 SquareSprite）</summary>
     static Sprite _square;
 
-    /// <summary>墙/门用的方块贴图（先从场景里已有的墙上借，保证视觉一致）</summary>
+    /// <summary>
+    /// 墙体用的贴图 —— **程序生成一张白方块**，不依赖任何美术资源。
+    ///
+    /// ## 为什么改成程序生成
+    ///
+    /// 原来这条链是"从已有墙借 → 读 Assets/Square (1).prefab → 场景里随便找一张"。
+    /// 玩家反馈"level0 没有墙体结构"，排查发现：
+    ///
+    ///   场景里墙的 SpriteRenderer 引用 guid `311925a0...`，
+    ///   而这个 guid **在整个项目里根本不存在**（git 历史里也没有，
+    ///   Assets 下一个图片文件都没有）。也就是说墙一直是
+    ///   **悬空引用（missing reference）** —— 看着有 sprite，实际渲染不出来，
+    ///   所以整圈墙对玩家来说是隐形的。
+    ///
+    /// 更糟的是那条"兜底"：它只判断 `sprite != null`，
+    /// 而**悬空引用在 Unity 里依然是非 null 的假对象**，
+    /// 于是兜底照样返回一个渲染不出来的 sprite，把问题完整掩盖了。
+    ///
+    /// 现在自己画一张：4×4 纯白，最外一圈略暗（做出极淡描边，
+    /// 免得整片墙糊成一块看不出边界）。想改观感就在这里改像素。
+    /// </summary>
     public static Sprite SquareSprite
     {
         get
         {
             if (_square != null) return _square;
 
-            // 优先从已有墙体上借一张，保证视觉完全一致
-            foreach (SpriteRenderer sr in Object.FindObjectsOfType<SpriteRenderer>())
+            var tex = new Texture2D(4, 4, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Point;
+            tex.wrapMode = TextureWrapMode.Clamp;
+
+            var px = new Color[16];
+            for (int y = 0; y < 4; y++)
             {
-                if (sr.gameObject.CompareTag("Wall") && sr.sprite != null)
+                for (int x = 0; x < 4; x++)
                 {
-                    _square = sr.sprite;
-                    return _square;
+                    bool edge = x == 0 || y == 0 || x == 3 || y == 3;
+                    px[y * 4 + x] = edge
+                        ? new Color(0.80f, 0.80f, 0.80f, 1f)
+                        : Color.white;
                 }
             }
 
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Square (1).prefab");
-            if (prefab != null)
-            {
-                SpriteRenderer sr = prefab.GetComponent<SpriteRenderer>();
-                if (sr != null) _square = sr.sprite;
-            }
+            tex.SetPixels(px);
+            tex.Apply();
 
-            // 最后兜底：场景里任意一张
-            if (_square == null)
-            {
-                SpriteRenderer any = Object.FindObjectOfType<SpriteRenderer>();
-                if (any != null) _square = any.sprite;
-            }
+            _square = Sprite.Create(tex, new Rect(0, 0, 4, 4),
+                                    new Vector2(0.5f, 0.5f), 4f);
+            _square.name = "WallSquare";
 
             return _square;
         }

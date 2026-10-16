@@ -142,16 +142,149 @@ public static class GameText
     //    · 想加页就往数组里多加一条字符串
     public static class Intro
     {
+        /// <summary>
+        /// 开场背景故事。**玩家看完才能开始游戏**（显示时 Time.timeScale = 0）。
+        ///
+        /// 数组里有几条就是几页，每页按 空格 / 回车 / 点击 翻下一页。
+        /// 最后一条之后按键即开始游戏。
+        ///
+        /// 写作建议（想改的话可以参考）：
+        ///   · 一页 3~5 行最舒服，太多会挤（字号 34，画布 900×320）
+        ///   · 悬念留在**最后一句**，不要一开始就把"跌落的笔画"说透
+        ///   · 换行直接写 \n
+        /// </summary>
         public static string[] 正文()
         {
             return new[]
             {
-                "这是一个汉字游戏",
+                "汉字国建立的第四千九百年，新上任的皇不理朝政，一心钻研武艺。\n" +
+                "他搜集民间群众汉字们的各类笔画，提炼其核心。",
+
+                "一时间民不聊生，灾难四起。\n" +
+                "民众身上布满被强行剥夺笔画后的癔症。",
+
+                "然而我们的皇不思悔改，特立独行，\n" +
+                "自以为无人可威胁他的统治。",
+
+                "……然而他没想到，\n" +
+                "在押送笔画的路上，有一笔蕴含民众心中反抗之力的笔画掉落其中，\n" +
+                "生出了自己的灵智。",
+
+                "更让高高在上的皇想不到的是，\n" +
+                "这枚掉落的笔画，竟会在后来威胁他的统治……",
             };
         }
 
         public static string 继续() { return "空格 / 回车 / 点击 继续"; }
         public static string 开始() { return "空格 / 回车 / 点击 开始"; }
+    }
+
+    // ============================================================
+    //  四·六、悬浮教学点（点 + 气泡）
+    // ============================================================
+    //
+    //  取代原来"走进某个房间就弹一屏字"的做法。
+    //  现在是一个小点飘在玩家右上方，玩家**做出对应行为**时才弹气泡。
+    //
+    //  ## 怎么写
+    //
+    //  每一步 = 一个触发条件 + 一组文案：
+    //      new CoachStep(触发, "文案1", "文案2", ...)
+    //
+    //  触发条件（Trigger 枚举）：
+    //      OnStart      一进教程层
+    //      Moved        移动超过一定距离
+    //      FirstShot    第一次开枪
+    //      GotStroke    第一次拿到笔画（捡到 / 开箱）
+    //      StrokeCount  当前字笔画数达到 N（用 Num 字段指定）
+    //      OpenedBag    第一次按 E 开背包
+    //      SwappedHanzi 第一次换字成功
+    //      EnteredBoss  走进 BOSS 房
+    //      BossKilled   BOSS 被打死
+    //
+    //  顺序就是显示顺序；每一步只弹一次。
+    //  **改文案不用重新生成场景**，存盘立刻生效。
+    public enum CoachTrigger
+    {
+        None,
+        OnStart,
+        Doubt,
+        Moved,
+        FirstShot,
+        GotStroke,
+        StrokeCount,
+        OpenedBag,
+        SwappedHanzi,
+        EnteredBoss,
+        BossKilled,
+    }
+
+    public struct CoachStep
+    {
+        public CoachTrigger trigger;
+        public int num;              // StrokeCount 用：需要几画
+        public string[] lines;
+
+        public CoachStep(CoachTrigger t, params string[] ls)
+        {
+            trigger = t; num = 0; lines = ls;
+        }
+
+        public CoachStep(CoachTrigger t, int n, params string[] ls)
+        {
+            trigger = t; num = n; lines = ls;
+        }
+    }
+
+    public static CoachStep[] 教学步骤()
+    {
+        return new[]
+        {
+            // ---- 开场房：主角的疑虑 + 随行小点出现 ----
+            //
+            // 这一段是新加的：背景故事看完之后，玩家落在一个空房里，
+            // 小点在这里"出现"，并表达主角的疑虑，然后指向笔画房。
+            new CoachStep(CoachTrigger.OnStart,
+                "……",
+                "这里是哪里？我为什么会在这里？"),
+
+            new CoachStep(CoachTrigger.Doubt,
+                "（一个小小的墨点从你身上浮起，悬在你身旁）",
+                "喂，你能听懂我说话吗？",
+                "……看来是能的。那就跟我来吧。",
+                "前面那间屋子里散落着许多笔画 —— 先去把它们收起来。"),
+
+            // ---- 进入笔画房之后 ----
+            new CoachStep(CoachTrigger.Moved,
+                "地上这一排是汉字的基本笔画，共六种：横、竖、撇、捺、点、折",
+                "在这个世界内的汉字都是这六种拼出来的"),
+
+            new CoachStep(CoachTrigger.FirstShot,
+                "试着通过键盘上的 ↑ ↓ ← → 来控制射击方向吧"),
+
+            new CoachStep(CoachTrigger.GotStroke,
+                "打倒一些特殊的敌人或许会有意外收获？"),
+
+            new CoachStep(CoachTrigger.StrokeCount, 3,
+                "随着笔画增多，你可以按 E 打开背包进行更换"),
+
+            new CoachStep(CoachTrigger.OpenedBag,
+                "在背包页面你可以通过 A / D 翻页，里面是你现在能拼出来的所有字"),
+
+            new CoachStep(CoachTrigger.SwappedHanzi,
+                "通过数字键切换到你想要的汉字吧",
+                "想换回来也可以哦，笔画不会丢，随时能换到目前能组成的所有汉字"),
+
+            new CoachStep(CoachTrigger.StrokeCount, 5,
+                "越复杂的汉字或许实力越强？"),
+
+            new CoachStep(CoachTrigger.EnteredBoss,
+                "前面是。。？帝国的走狗？好在他落单了",
+                "打败他，让我们传送到世界中"),
+
+            new CoachStep(CoachTrigger.BossKilled,
+                "可恶，受到时空乱流影响，我们得从头开始了"),
+        };
     }
 
     // ============================================================
