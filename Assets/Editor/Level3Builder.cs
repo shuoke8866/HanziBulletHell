@@ -119,69 +119,73 @@ public static class Level3Builder
     ///   两条路在 R6 前哨汇合，再打 BOSS。
     ///   战斗房的波次比下路多 —— 走上面打得凶但快，走下面稳但慢，玩家自己权衡。
     /// </summary>
+    /// <summary>
+    /// 第三层的房间布局 —— **坐标系统照抄 Level1**（已验证能玩）。
+    ///
+    /// ## 照抄的规格（从 Level1 实测出来的）
+    ///
+    ///   房间尺寸           14 × 8
+    ///   横向间距 PitchX    16  （房间宽 14 + 间隙 2）
+    ///   纵向间距 PitchY    10  （房间高 8 + 间隙 2）
+    ///   门尺寸             恒为 0.5 × 3，**不旋转**
+    ///   门的坐标           左右相邻 → x 取两房边界的中点（= 左房右边界 + 1）
+    ///                      上下相邻 → 给门的 BoxCollider2D 设 size=(3, 0.5)，
+    ///                                 并把整个门转 90°（Level2 的 Door_heng2-1 就是这么做的）
+    ///
+    /// Level1 实测：Room1 x[-15,-1] / Room2 x[1,15] / Room3 x[17,31] / Room4 x[33,47]，
+    /// 门在 x=0 / 16 / 32 —— 即"间隙正中"，和我们算的一致。
+    ///
+    /// ## 布局（9 房，3×3 网格，蛇形）
+    ///
+    ///   gy=2   [起点] ── [战斗] ── [宝箱]
+    ///                               │
+    ///   gy=1   [战斗] ── [精英] ── [战斗]
+    ///            │
+    ///   gy=0   [宝箱] ── [BOSS]
+    ///
+    /// 相邻只差一格（横向差 1 列 或 纵向差 1 行），门的坐标就是确定值，不用猜。
+    /// </summary>
     static readonly RoomSpec[] Rooms =
     {
         //  名字          列  行   类型              波次  说明
-        //  --- 上层：从左往右 ---
         new RoomSpec("Room1_Start",  0,  2, RoomType.Start,    0, "起点"),
-        new RoomSpec("Room2_Fight",  1,  2, RoomType.Combat,   2, "主路战斗 1"),
-        new RoomSpec("Room3_Fight",  2,  2, RoomType.Combat,   2, "主路战斗 2"),
-        new RoomSpec("Room4_Chest",  3,  2, RoomType.Treasure, 1, "上层宝箱"),
+        new RoomSpec("Room2_Fight",  1,  2, RoomType.Combat,   2, "上层战斗 1"),
+        new RoomSpec("Room3_Chest",  2,  2, RoomType.Treasure, 1, "上层宝箱"),
 
-        //  --- 折返：从右往左 ---
-        new RoomSpec("Room5_Chest",  3,  1, RoomType.Treasure, 1, "折返宝箱"),
-        new RoomSpec("Room6_Fight",  2,  1, RoomType.Combat,   3, "下层战斗 1（波次最多）"),
-        new RoomSpec("Room7_Elite",  1,  1, RoomType.Elite,    2, "下层精英"),
-        new RoomSpec("Room8_Fight",  0,  1, RoomType.Combat,   3, "下层战斗 2"),
+        new RoomSpec("Room4_Fight",  2,  1, RoomType.Combat,   3, "中层战斗（波次最多）"),
+        new RoomSpec("Room5_Elite",  1,  1, RoomType.Elite,    2, "中层精英"),
+        new RoomSpec("Room6_Chest",  0,  1, RoomType.Treasure, 1, "中层宝箱"),
 
-        //  --- 再折返：从左往右 ---
-        new RoomSpec("Room9_Chest",  0,  0, RoomType.Treasure, 1, "底层宝箱"),
-        new RoomSpec("Room10_Boss",  1,  0, RoomType.Boss,     1, "关底 BOSS「皇」"),
+        new RoomSpec("Room7_Chest",  0,  0, RoomType.Treasure, 1, "下层宝箱"),
+        new RoomSpec("Room8_Fight",  1,  0, RoomType.Combat,   3, "下层战斗"),
+        new RoomSpec("Room9_Boss",   2,  0, RoomType.Boss,     1, "关底 BOSS「皇」"),
     };
 
     /// <summary>
-    /// 门：相邻两间房的网格坐标。
+    /// 门：只写"哪两间房相连"，坐标全部由构建器按 Level1 的规格算出来。
     ///
-    /// 蛇形路径 —— 每一段都是正交相邻（曼哈顿距离 1）：
-    ///   上层 (0,2)→(1,2)→(2,2)→(3,2)   向右
-    ///   下行  (3,2)→(3,1)              同一列
-    ///   中层 (3,1)→(2,1)→(1,1)→(0,1)   向左
-    ///   下行  (0,1)→(0,0)              同一列
-    ///   底层 (0,0)→(1,0)               向右 → BOSS
-    ///
-    /// ## 血泪教训：门必须连在**正交相邻**的两间房之间
-    ///
-    /// 门位置 = 两间房的**中点**。斜着排的两间房（如 (1,2) 和 (2,1)，距离 2）
-    /// 中点在两间房之间的空白处 —— 门孤立在虚空里，两边都够不着。
-    ///
-    /// 我**连续三版**都踩了这个：
-    ///   1. 斜着连
-    ///   2. 以为"上下挂"就行，但垂直分支的列号没跟主路对齐
-    ///   3. 加了"中层"之后，转折点的列号又没对齐
-    ///
-    /// 现在表格下面有 <see cref="Validate"/> 自动检查每一条，
-    /// 再有这种错会直接报出来，不会带进场景。
+    /// 每条都必须是**正交相邻**（横向差 1 列、纵向差 0 行；或反之），
+    /// 自检会检查 —— 斜着连的门会落在房间外面的空中。
     /// </summary>
     static readonly string[,] Links =
     {
-        // 上层：向右
+        // 上层：从左往右
         { "Room1_Start", "Room2_Fight" },
-        { "Room2_Fight", "Room3_Fight" },
-        { "Room3_Fight", "Room4_Chest" },
+        { "Room2_Fight", "Room3_Chest" },
 
-        // 折返下行
-        { "Room4_Chest", "Room5_Chest" },
+        // 右侧下来一层
+        { "Room3_Chest", "Room4_Fight" },
 
-        // 中层：向左
-        { "Room5_Chest", "Room6_Fight" },
-        { "Room6_Fight", "Room7_Elite" },
-        { "Room7_Elite", "Room8_Fight" },
+        // 中层：从右往左
+        { "Room4_Fight", "Room5_Elite" },
+        { "Room5_Elite", "Room6_Chest" },
 
-        // 再折返下行
-        { "Room8_Fight", "Room9_Chest" },
+        // 左侧再下来一层
+        { "Room6_Chest", "Room7_Chest" },
 
-        // 底层：向右 → BOSS
-        { "Room9_Chest", "Room10_Boss" },
+        // 下层：从左往右 → BOSS
+        { "Room7_Chest", "Room8_Fight" },
+        { "Room8_Fight", "Room9_Boss" },
     };
     static readonly string[] KeepRoots =
     {
@@ -229,15 +233,30 @@ public static class Level3Builder
                           $"波次={spec.waveCount}  ({spec.role})");
         }
 
-        // ---- 3) 建门（位置由两间房的中点算出来，不用手填） ----
+        // ---- 3) 建门 ----
+        //
+        // 坐标按 **Level1 的规格**算（实测过、能玩）：
+        //   左右相邻 → 门在 x = 两房边界的中点，尺寸 0.5×3，旋转 0
+        //   上下相邻 → 门在 y = 两房边界的中点，**碰撞盒改成 3×0.5** 并旋转 90°
+        //             （Level2 的 Door_heng2-1 就是这么做的）
+        //
+        // 两间房中心差正好是 PitchX 或 PitchY，所以"中点"一定落在 2 单位的
+        // 间隙正中，墙上的门洞（3 单位）也正好以它为中心。
         int doorCount = 0;
         for (int i = 0; i < Links.GetLength(0); i++)
         {
             Room a = byName[Links[i, 0]];
             Room b = byName[Links[i, 1]];
 
-            Vector2 mid = (Vector2)(a.transform.position + b.transform.position) * 0.5f;
-            MakeDoor($"Door_{doorCount}", mid, a, b);
+            Vector2 ca = a.transform.position;
+            Vector2 cb = b.transform.position;
+
+            bool horizontalPair = Mathf.Abs(ca.y - cb.y) < 0.01f;
+
+            // 中点 = 两房中心的中点，正好在间隙正中
+            Vector2 mid = (ca + cb) * 0.5f;
+
+            MakeDoor($"Door_{doorCount}", mid, horizontalPair);
             doorCount++;
         }
         sb.AppendLine($"  建了 {doorCount} 扇门");
@@ -268,14 +287,14 @@ public static class Level3Builder
         }
 
         // ---- 6) BOSS / 传送门 / 宝箱 ----
-        Room bossRoom = byName["Room10_Boss"];
+        Room bossRoom = byName["Room9_Boss"];
         AddBoss(bossRoom);
         AddPortal(bossRoom, new Vector2(bossRoom.transform.position.x - 2f,
                                         bossRoom.transform.position.y));
 
         // 宝箱房各放一个宝箱
         // 三间宝箱房各放一个宝箱
-        foreach (string chestRoom in new[] { "Room4_Chest", "Room5_Chest", "Room9_Chest" })
+        foreach (string chestRoom in new[] { "Room3_Chest", "Room6_Chest", "Room7_Chest" })
         {
             if (!byName.ContainsKey(chestRoom)) continue;
             Vector3 cp = byName[chestRoom].transform.position;
@@ -365,7 +384,7 @@ public static class Level3Builder
             foreach (string nxt in adj[cur]) stack.Push(nxt);
         }
 
-        sb.AppendLine(visited.Contains("Room10_Boss")
+        sb.AppendLine(visited.Contains("Room9_Boss")
             ? $"  ✓ 从起点能走到 BOSS（连通 {visited.Count}/{Rooms.Length} 间房）"
             : "  ✗ **从起点走不到 BOSS** —— 关卡无法通关！");
 
@@ -420,7 +439,16 @@ public static class Level3Builder
         return room;
     }
 
-    static void MakeDoor(string name, Vector2 pos, Room a, Room b)
+    /// <summary>
+    /// 造一扇门。**尺寸和朝向照抄 Level1 / Level2 的已验证做法。**
+    ///
+    /// <paramref name="horizontalPair"/> = 两间房是左右相邻的。
+    ///   true  → 门堵的是**竖墙**上的洞：竖条 0.5×3，不旋转
+    ///   false → 门堵的是**横墙**上的洞：碰撞盒改成 3×0.5 并旋转 90°
+    ///           （只旋转不够 —— 碰撞盒是 0.5×3 的竖条，转 90° 后是 3×0.5，
+    ///             和 Level2 的做法一致）
+    /// </summary>
+    static void MakeDoor(string name, Vector2 pos, bool horizontalPair)
     {
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Door.prefab");
         if (prefab == null) { Debug.LogWarning("[第三层] 找不到 Door.prefab"); return; }
@@ -429,13 +457,15 @@ public static class Level3Builder
         go.name = name;
         go.transform.position = new Vector3(pos.x, pos.y, 0f);
 
-        // 门是竖着还是横着，取决于两间房是左右相邻还是上下相邻
-        bool horizontal = Mathf.Abs(a.transform.position.y - b.transform.position.y) < 0.01f;
+        if (!horizontalPair)
+        {
+            // 上下相邻：门要横过来堵住横墙的洞
+            go.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
 
-        // 门洞 3 单位：横向门要竖过来（玩家从左右走过）
-        go.transform.localRotation = horizontal
-            ? Quaternion.identity
-            : Quaternion.Euler(0f, 0f, 90f);
+            var box = go.GetComponent<BoxCollider2D>();
+            if (box != null) box.size = new Vector3(3f, 0.5f, 1f);
+        }
+        // 左右相邻时保持预制体原样（0.5×3，旋转 0）—— 和 Level1 完全一致
     }
 
     static void AddSpawnPoint(Room room, string name, Vector2 pos)
