@@ -30,6 +30,8 @@ public class BossHealthBarUI : MonoBehaviour
     TextMeshProUGUI nameText;
     TextMeshProUGUI hpText;
     RectTransform rootRect;
+    /// <summary>真正要隐藏的那一层（所有可见的子物体都挂在这下面）</summary>
+    RectTransform contentRoot;
 
     float shownRatio = 1f;
     Component currentBoss;      // 缓存当前正在显示血条的 BOSS
@@ -80,9 +82,18 @@ public class BossHealthBarUI : MonoBehaviour
         rootRect.sizeDelta = new Vector2(BarWidth + 12f, BarHeight + 46f);
         rootRect.anchoredPosition = new Vector2(0f, -TopMargin);
 
+        // 「内容」容器 —— 显示/隐藏只切这一层，不动自己
+        var contentGo = new GameObject("Content");
+        contentGo.transform.SetParent(transform, false);
+        contentRoot = contentGo.AddComponent<RectTransform>();
+        contentRoot.anchorMin = Vector2.zero;
+        contentRoot.anchorMax = Vector2.one;
+        contentRoot.offsetMin = Vector2.zero;
+        contentRoot.offsetMax = Vector2.zero;
+
         // 名字（血条上方）
         var nameGo = new GameObject("BossName");
-        nameGo.transform.SetParent(transform, false);
+        nameGo.transform.SetParent(contentGo.transform, false);
         nameText = nameGo.AddComponent<TextMeshProUGUI>();
         nameText.fontSize = 26f;
         nameText.alignment = TextAlignmentOptions.Center;
@@ -97,7 +108,7 @@ public class BossHealthBarUI : MonoBehaviour
 
         // 血条容器
         var barGo = new GameObject("Bar");
-        barGo.transform.SetParent(transform, false);
+        barGo.transform.SetParent(contentGo.transform, false);
         var barRect = barGo.AddComponent<RectTransform>();
         barRect.anchorMin = new Vector2(0.5f, 0f);
         barRect.anchorMax = new Vector2(0.5f, 0f);
@@ -148,10 +159,24 @@ public class BossHealthBarUI : MonoBehaviour
         rt.offsetMax = new Vector2(pad, pad);
     }
 
+    /// <summary>
+    /// 显示/隐藏血条 —— **只隐藏子物体，不要禁用自己的 GameObject**。
+    ///
+    /// 踩过的坑（玩家反馈"BOSS 血条看不到"）：
+    /// 原来这里写的是 `rootRect.gameObject.SetActive(v)`，
+    /// 而 rootRect 就是**这个组件自己所在的 GameObject**。
+    /// Start() 里调 SetVisible(false) → 整个对象被禁用 →
+    /// **Update() 也就不再执行** → 永远发现不了 BOSS，血条永远不出现。
+    ///
+    /// 这是自锁：用"禁用自己"来隐藏，就把"重新显示自己"的能力一起禁掉了。
+    ///
+    /// 正确做法：自己始终保持启用（好让 Update 一直跑），只切换子物体。
+    /// </summary>
     void SetVisible(bool v)
     {
-        if (rootRect != null && rootRect.gameObject.activeSelf != v)
-            rootRect.gameObject.SetActive(v);
+        if (contentRoot == null) return;
+        if (contentRoot.gameObject.activeSelf != v)
+            contentRoot.gameObject.SetActive(v);
     }
 
     void Update()
