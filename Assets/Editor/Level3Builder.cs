@@ -256,7 +256,22 @@ public static class Level3Builder
             // 中点 = 两房中心的中点，正好在间隙正中
             Vector2 mid = (ca + cb) * 0.5f;
 
-            MakeDoor($"Door_{doorCount}", mid, horizontalPair);
+            Door d = MakeDoor($"Door_{doorCount}", mid, horizontalPair);
+
+            // **关键一步：把门登记到两边的房间上。**
+            //
+            // RoomWallBuilder 是靠 room.doors 来决定"哪一面、哪个位置要留门洞"的。
+            // 我在第一版漏了这一步 → room.doors 是空的 → 铺墙时不知道要留洞
+            // → 墙全铺满 → **门被埋在实体墙里，玩家过不去**。
+            //
+            // 玩家截图里看到的就是这个：墙是完整的矩形，门只是画在墙上的装饰。
+            // 教程层（TutorialLevelBuilder）一直有这两行，我照抄布局时漏抄了。
+            if (d != null)
+            {
+                a.doors.Add(d);
+                b.doors.Add(d);
+            }
+
             doorCount++;
         }
         sb.AppendLine($"  建了 {doorCount} 扇门");
@@ -448,10 +463,10 @@ public static class Level3Builder
     ///           （只旋转不够 —— 碰撞盒是 0.5×3 的竖条，转 90° 后是 3×0.5，
     ///             和 Level2 的做法一致）
     /// </summary>
-    static void MakeDoor(string name, Vector2 pos, bool horizontalPair)
+    static Door MakeDoor(string name, Vector2 pos, bool horizontalPair)
     {
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Door.prefab");
-        if (prefab == null) { Debug.LogWarning("[第三层] 找不到 Door.prefab"); return; }
+        if (prefab == null) { Debug.LogWarning("[第三层] 找不到 Door.prefab"); return null; }
 
         GameObject go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
         go.name = name;
@@ -466,6 +481,8 @@ public static class Level3Builder
             if (box != null) box.size = new Vector3(3f, 0.5f, 1f);
         }
         // 左右相邻时保持预制体原样（0.5×3，旋转 0）—— 和 Level1 完全一致
+
+        return go.GetComponent<Door>();
     }
 
     static void AddSpawnPoint(Room room, string name, Vector2 pos)
