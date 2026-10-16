@@ -366,7 +366,7 @@ public static class EnemyDatabase
             health = 161, moveSpeed = 0.8f, shootInterval = 3.2f,
             bulletSpeed = 5f, bulletDamage = 1,
             bodyScale = new Vector3(1.6f, 1.6f, 1f),
-            bodyColor = new Color(0.6f, 1f, 0.85f),
+            bodyColor = new Color(0.6f, 1f, 0.85f, 1f),
             scoreWeight = 2
         });
 

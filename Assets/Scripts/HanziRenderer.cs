@@ -430,12 +430,26 @@ public partial class HanziRenderer : MonoBehaviour
         return true;
     }
 
-    /// <summary>重建字形表（丢弃运行时改动的另一种写法）</summary>
+    /// <summary>
+    /// 重建**两套**字库，并清空贴图缓存。
+    ///
+    /// 注意是"两套" —— 原来只重建了玩家字库（`defs = BuildDefinitions()`），
+    /// 敌人字库留在内存里不动。后果：字形编辑器的"丢弃改动重载"，
+    /// 以及写回源码之后调用它，玩家那边恢复了、**敌人那边还是旧的内存数据**，
+    /// 看起来就像"敌人的编辑没生效"。
+    ///
+    /// 这类 bug 叫**状态不完整重置** —— 有多个状态源时只重置了一部分。
+    /// </summary>
     public static void RebuildAll()
     {
-        defs = null;
+        // 两套都清掉；下一次访问时 SetOf 会自动重建
+        sets.Remove(SetPlayer);
+        sets.Remove(SetEnemy);
+
         spriteCache.Clear();
-        defs = BuildDefinitions();
+
+        // 立刻重建玩家库：大量调用点紧接着就要取字形
+        defs = BuildDefinitions(SetPlayer);
     }
 
     /// <summary>
