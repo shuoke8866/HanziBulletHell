@@ -81,7 +81,7 @@ public class OpeningIntroUI : MonoBehaviour
         var bodyGo = new GameObject("Body");
         bodyGo.transform.SetParent(go.transform, false);
         bodyText = bodyGo.AddComponent<TextMeshProUGUI>();
-        bodyText.fontSize = 34f;
+        bodyText.fontSize = 44f;
         bodyText.alignment = TextAlignmentOptions.Center;
         bodyText.color = new Color(1f, 0.97f, 0.9f);
         bodyText.enableWordWrapping = true;
@@ -97,7 +97,7 @@ public class OpeningIntroUI : MonoBehaviour
         var hintGo = new GameObject("Hint");
         hintGo.transform.SetParent(go.transform, false);
         hintText = hintGo.AddComponent<TextMeshProUGUI>();
-        hintText.fontSize = 22f;
+        hintText.fontSize = 28f;
         hintText.alignment = TextAlignmentOptions.Center;
         hintText.color = new Color(0.75f, 0.8f, 0.95f);
 

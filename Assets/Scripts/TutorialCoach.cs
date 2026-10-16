@@ -35,9 +35,11 @@ public class TutorialCoach : MonoBehaviour
 
     // ---------- 外观 ----------
     const float DotSize = 0.34f;
-    const float BubbleWidth = 4.6f;
-    const float BubbleHeight = 1.25f;
-    const float BubbleFontSize = 2.05f;
+    // 气泡加大：玩家反馈"教程的字又小又不明显"。
+    // 原值 4.6×1.25 / 字号 2.05 —— 在 1280×720 下小得几乎看不清。
+    const float BubbleWidth = 7.6f;
+    const float BubbleHeight = 2.1f;
+    const float BubbleFontSize = 3.6f;
 
     // ---------- 节奏 ----------
     /// <summary>一条文案停留多久（最后一条之后气泡收起）</summary>
@@ -148,26 +150,29 @@ public class TutorialCoach : MonoBehaviour
         // 底：一块半透明深色板
         bubbleBg = go.AddComponent<SpriteRenderer>();
         bubbleBg.sprite = SolidSprite.White;
-        bubbleBg.color = new Color(0.06f, 0.08f, 0.15f, 0.9f);
+        // 不透明一点，避免和背景混在一起看不清
+        bubbleBg.color = new Color(0.04f, 0.05f, 0.10f, 0.96f);
         bubbleBg.sortingOrder = 149;
 
         go.transform.localScale = new Vector3(BubbleWidth, BubbleHeight, 1f);
 
         // 文字
         var textGo = new GameObject("Text");
+
+        // 文字作为气泡的**子物体** —— 位置和缩放都跟着气泡走，不用每帧手动对齐。
+        // （原来挂在气泡外面靠每帧算坐标，字体一放大就不再居中。）
         textGo.transform.SetParent(go.transform, false);
+        textGo.transform.localPosition = new Vector3(0f, 0f, -0.1f);
+
+        // 父级有**非等比缩放**（气泡是 7.6×2.1 的长条），
+        // 文字直接继承会被拉扁 —— 所以反向抵消掉，只保留位置。
+        textGo.transform.localScale = new Vector3(1f / BubbleWidth, 1f / BubbleHeight, 1f);
 
         bubbleText = textGo.AddComponent<TextMeshPro>();
         bubbleText.fontSize = BubbleFontSize;
         bubbleText.alignment = TextAlignmentOptions.Center;
         bubbleText.color = new Color(1f, 0.97f, 0.9f);
         bubbleText.enableWordWrapping = true;
-
-        // TextMeshPro 的默认字体大小是"世界单位"，配合父物体的 scale 会很怪，
-        // 所以文字挂在气泡**外面**（不继承那块板的缩放），自己定尺寸。
-        textGo.transform.SetParent(transform, false);
-        var tr = textGo.GetComponent<RectTransform>();
-        if (tr != null) tr.sizeDelta = new Vector2(4.4f, 1.2f);
 
         bubble = go.transform;
         SetBubbleVisible(false);
@@ -216,13 +221,6 @@ public class TutorialCoach : MonoBehaviour
             // 气泡放在点的**左侧**（点在玩家右上，气泡再往左就不会跑出屏幕）
             bubble.localPosition = new Vector3(-BubbleWidth * 0.62f, 0.15f, 0f);
             bubble.localScale = new Vector3(BubbleWidth, BubbleHeight, 1f);
-        }
-
-        if (bubbleText != null)
-        {
-            Vector3 p = transform.position + new Vector3(-BubbleWidth * 0.62f, 0.15f, -0.1f);
-            bubbleText.transform.position = p;
-            bubbleText.transform.rotation = Quaternion.identity;
         }
 
         CheckTriggers();

@@ -27,6 +27,12 @@ public class PlayerHealthBarUI : MonoBehaviour
     const float BarHeight = 26f;
     const float Margin = 28f;
 
+    /// <summary>
+    /// 血条的渲染层级 —— **必须高于开场故事面板（500）**，
+    /// 否则故事一显示血条就被盖住。独立成一个常量方便以后调。
+    /// </summary>
+    const int HealthBarSortingOrder = 1000;
+
     static PlayerHealthBarUI instance;
 
     Image fill;
@@ -114,10 +120,23 @@ public class PlayerHealthBarUI : MonoBehaviour
             scaler.referenceResolution = new Vector2(1280f, 720f);
             scaler.matchWidthOrHeight = 0.5f;
             cgo.AddComponent<GraphicRaycaster>();
+
+            // 层级要**高于开场故事面板**（它用 500 全屏遮罩）。
+            // 否则故事一显示，血条就被压在下面看不见 ——
+            // 玩家看到的就是"血量和背景故事挤在同一个 UI 里"。
+            canvas.sortingOrder = HealthBarSortingOrder;
         }
 
         hostCanvas = canvas;
         transform.SetParent(canvas.transform, false);
+
+        // 场景里的 Canvas 是 sortingOrder=0，盖不过开场故事的 500。
+        // 给**血条自己**加一个 Canvas 组件并开 overrideSorting，
+        // 这样只有血条这一小块被抬到最上层，不用动整个场景 Canvas 的层级。
+        var own = gameObject.GetComponent<Canvas>();
+        if (own == null) own = gameObject.AddComponent<Canvas>();
+        own.overrideSorting = true;
+        own.sortingOrder = HealthBarSortingOrder;
 
         var root = gameObject.AddComponent<RectTransform>();
         root.anchorMin = new Vector2(0f, 0f);

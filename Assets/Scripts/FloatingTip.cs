@@ -64,7 +64,8 @@ public static class FloatingTip
 
         var tmp = go.AddComponent<TextMeshPro>();
         tmp.text = text;
-        tmp.fontSize = 3.4f;
+        // 放大：原来 3.4 在 1280×720 下偏小
+        tmp.fontSize = 4.6f;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = color;
         tmp.sortingOrder = 120;          // 盖住大部分东西

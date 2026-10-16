@@ -23,6 +23,9 @@ public class BossHealthBarUI : MonoBehaviour
     const float BarHeight = 22f;
     const float TopMargin = 26f;
 
+    /// <summary>见 PlayerHealthBarUI.HealthBarSortingOrder 的说明</summary>
+    const int HealthBarSortingOrder = 1000;
+
     static BossHealthBarUI instance;
 
     Image fill;
@@ -99,10 +102,23 @@ public class BossHealthBarUI : MonoBehaviour
             scaler.referenceResolution = new Vector2(1280f, 720f);
             scaler.matchWidthOrHeight = 0.5f;
             cgo.AddComponent<GraphicRaycaster>();
+
+            // 层级要**高于开场故事面板**（它用 500 全屏遮罩）。
+            // 否则故事一显示，血条就被压在下面看不见 ——
+            // 玩家看到的就是"血量和背景故事挤在同一个 UI 里"。
+            canvas.sortingOrder = HealthBarSortingOrder;
         }
 
         hostCanvas = canvas;
         transform.SetParent(canvas.transform, false);
+
+        // 场景里的 Canvas 是 sortingOrder=0，盖不过开场故事的 500。
+        // 给**血条自己**加一个 Canvas 组件并开 overrideSorting，
+        // 这样只有血条这一小块被抬到最上层，不用动整个场景 Canvas 的层级。
+        var own = gameObject.GetComponent<Canvas>();
+        if (own == null) own = gameObject.AddComponent<Canvas>();
+        own.overrideSorting = true;
+        own.sortingOrder = HealthBarSortingOrder;
         rootRect = gameObject.AddComponent<RectTransform>();
         rootRect.anchorMin = new Vector2(0.5f, 1f);
         rootRect.anchorMax = new Vector2(0.5f, 1f);
