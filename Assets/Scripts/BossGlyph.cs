@@ -89,25 +89,29 @@ public class BossGlyph : MonoBehaviour
         glyph.textureSize = 96;
         glyph.pixelsPerUnit = 32f;
 
-        // ---- 必须显式指定字库 ----
+        // ---- 字库：用【玩家字库】 ----
         //
-        // 玩家反馈「第二层的官居然变成一了」。根因：
-        //   HanziRenderer.glyphSet 的默认值是**玩家字库**（SetPlayer），
-        //   而玩家字库里没有「官」（有「皇」「士」，偏偏缺这一个）。
+        // 玩家反馈「第二层的官变成一」→ 我改成敌人字库 →
+        // **第一关和教程层的「士」也变成一了**（我制造了回归）。
         //
-        // HanziRenderer.SetCharacter 遇到字库里没有的字时，行为是
-        // **打一条警告然后保持当前显示** —— 于是 BOSS 顶着上一个字（「一」）。
+        // 根因：EnemyGlyphs.BuildEnemyDefinitions() **现在故意返回空字典**
+        // （设计上让敌人回退到玩家字库，等玩家自己在字形编辑器里画）。
+        // 所以敌人字库里一个字都没有 —— 指定它等于把 BOSS 的字全屏蔽了。
         //
-        // 指定敌人字库后，三个 BOSS 的字都在库里（士 / 官 / 皇）。
-        glyph.glyphSet = HanziRenderer.SetEnemy;
+        // 正确做法：用玩家字库（HanziRenderer 的默认值本来就是它）。
+        glyph.glyphSet = HanziRenderer.SetPlayer;
 
-        // 缺字时**明确报错**，不要静默显示成别的字
-        if (!HanziRenderer.IsAllowed(character, HanziRenderer.SetEnemy))
+        // 缺字时**自动补一个占位字形**，而不是静默显示成别的字。
+        //
+        // HanziRenderer.SetCharacter 原来遇到缺字是「打警告 + 保持当前显示」，
+        // 表现就是 BOSS 顶着上一个字（「一」）—— 玩家完全看不出是缺字。
+        if (!HanziRenderer.IsAllowed(character, HanziRenderer.SetPlayer))
         {
-            Debug.LogError(
-                $"[BOSS 字形] 敌人字库里没有「{character}」，" +
-                "这个 BOSS 会显示成别的字。请把这个字加进 " +
-                "EnemyGlyphs.EnemyGlyphNames，或给 BossGlyph.character 换一个字。");
+            Debug.LogWarning(
+                $"[BOSS 字形] 玩家字库里没有「{character}」，已用占位字形补上。" +
+                "要显示正确的字，请在字形编辑器里画一个。");
+
+            HanziRenderer.EnsurePlaceholder(character);
         }
 
         glyph.SetCharacter(character);

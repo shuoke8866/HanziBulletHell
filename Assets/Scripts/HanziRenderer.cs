@@ -152,6 +152,37 @@ public partial class HanziRenderer : MonoBehaviour
         SetCharacter(character);
     }
 
+    /// <summary>
+    /// 给字库里没有的字补一个**占位字形**。
+    ///
+    /// SetCharacter 遇到缺字时的行为是「打警告 + **保持当前显示**」，
+    /// 表现是 BOSS 该显示「官」却顶着上一个字「一」—— 玩家看不出是缺字，
+    /// 只会觉得「字错了」。
+    ///
+    /// 补一个占位形状至少能看出「这个字还没画」，而不是误以为显示了别的字。
+    /// 玩家在字形编辑器里画好之后，RebuildAll 会把占位覆盖掉。
+    /// </summary>
+    public static void EnsurePlaceholder(string ch)
+    {
+        if (string.IsNullOrEmpty(ch)) return;
+
+        var set = SetOf(SetPlayer);
+        if (set.ContainsKey(ch)) return;
+
+        // 占位形状：一个方框 + 中间一横（像「缺字」的记号）
+        set[ch] = new Poly[]
+        {
+            new Poly(new Vector2[] { new Vector2(0.26f, 0.26f), new Vector2(0.74f, 0.26f) }, 0.085f),
+            new Poly(new Vector2[] { new Vector2(0.74f, 0.26f), new Vector2(0.74f, 0.74f) }, 0.085f),
+            new Poly(new Vector2[] { new Vector2(0.74f, 0.74f), new Vector2(0.26f, 0.74f) }, 0.085f),
+            new Poly(new Vector2[] { new Vector2(0.26f, 0.74f), new Vector2(0.26f, 0.26f) }, 0.085f),
+            new Poly(new Vector2[] { new Vector2(0.36f, 0.50f), new Vector2(0.64f, 0.50f) }, 0.075f),
+        };
+
+        // 贴图缓存是按「字库|字|尺寸|ppu|风格」做键的，加了新字要清一下
+        ClearAllCaches();
+    }
+
     public static bool IsAllowed(string ch)
     {
         return IsAllowed(ch, SetPlayer);
@@ -945,6 +976,26 @@ public partial class HanziRenderer : MonoBehaviour
         H(L, 0.20f, 0.82f, 0.53f);
         H(L, 0.35f, 0.67f, 0.27f);
         V(L, 0.51f, 0.25f, 0.85f);
+        // 官：宀（宝盖头）+ 两个口上下叠
+        H(L, 0.12f, 0.88f, 0.86f);      // 宀 长横
+        V(L, 0.50f, 0.88f, 0.78f);      // 宀 中间的点
+        H(L, 0.12f, 0.50f, 0.74f);      // 宀 左半横
+        H(L, 0.50f, 0.88f, 0.74f);      // 宀 右半横
+        V(L, 0.88f, 0.74f, 0.66f);      // 宀 右端下钩
+
+        // 上口
+        V(L, 0.33f, 0.60f, 0.36f);
+        V(L, 0.67f, 0.60f, 0.36f);
+        H(L, 0.33f, 0.67f, 0.60f);
+        H(L, 0.33f, 0.67f, 0.36f);
+
+        // 下口
+        V(L, 0.35f, 0.26f, 0.06f);
+        V(L, 0.65f, 0.26f, 0.06f);
+        H(L, 0.35f, 0.65f, 0.26f);
+        H(L, 0.35f, 0.65f, 0.06f);
+        Save("官");
+
         Save("士");
 
         // 土

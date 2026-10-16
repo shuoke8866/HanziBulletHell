@@ -362,7 +362,16 @@ public class TutorialCoach : MonoBehaviour
 
         // 换行就重建一条（对象很少，不值得做增量更新）
         FloatingTip.Clear(textHandle);
-        textHandle = FloatingTip.ShowAtOffset(text, TextColor, dot, TextOffset, TextScale);
+        // **faceCamera: false** —— 不能让 FaceCamera 覆盖缩放。
+        //
+        // 教程文字挂在圆点下面，而圆点在"说话"时会放大到 1.25 倍。
+        // FaceCamera 每帧执行 `transform.localScale = 初始父缩放 / 当前父缩放`，
+        // 于是它会**把这里设的 TextScale 写回去** ——
+        // 我把 TextScale 从 0.62 改成 1.0，字号却一点没变，就是这个原因。
+        //
+        // 关掉 FaceCamera 之后 TextScale 才是真正生效的字号。
+        textHandle = FloatingTip.ShowAtOffset(text, TextColor, dot, TextOffset, TextScale,
+                                              float.PositiveInfinity, faceCamera: false);
     }
 
     void HideLine()

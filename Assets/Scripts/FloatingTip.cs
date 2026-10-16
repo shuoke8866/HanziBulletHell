@@ -92,11 +92,12 @@ public static class FloatingTip
     /// </summary>
     public static Handle ShowAtOffset(string text, Color color, Transform anchor,
                                       Vector3 localOffset, float scale,
-                                      float holdSeconds = float.PositiveInfinity)
+                                      float holdSeconds = float.PositiveInfinity,
+                                      bool faceCamera = true)
     {
         if (string.IsNullOrEmpty(text) || anchor == null) return null;
 
-        GameObject go = CreateTip(text, color, anchor, 0f);
+        GameObject go = CreateTip(text, color, anchor, 0f, faceCamera);
         if (go == null) return null;
 
         go.transform.localPosition = localOffset;
@@ -120,7 +121,8 @@ public static class FloatingTip
     //  建对象
     // ============================================================
 
-    static GameObject CreateTip(string text, Color color, Transform anchor, float height)
+    static GameObject CreateTip(string text, Color color, Transform anchor, float height,
+                               bool faceCamera = true)
     {
         var go = new GameObject("FloatingTip");
         go.transform.SetParent(anchor, false);
@@ -139,9 +141,19 @@ public static class FloatingTip
         AddOutline(go, new Color(0.02f, 0.02f, 0.04f), 0.25f);
 
         // 抵消父物体的旋转与缩放（玩家的 transform 会水平翻转，不抵消字会镜像）
-        var face = go.AddComponent<FaceCamera>();
-        face.cancelParentRotation = true;
-        face.cancelParentScale = true;
+        //
+        // faceCamera = false 用于**常驻提示**（比如教程文字）：
+        // FaceCamera 每帧会 `transform.localScale = 初始父缩放 / 当前父缩放`，
+        // 那会把调用方设的缩放**覆盖掉**。
+        // 教程文字挂在会缩放的圆点下面（圆点在说话时放大 1.25 倍），
+        // 所以它的字号一直被 FaceCamera 写回去 —— 我把 TextScale 从 0.62
+        // 改成 1.0 却看不出任何变化，就是这个原因。
+        if (faceCamera)
+        {
+            var face = go.AddComponent<FaceCamera>();
+            face.cancelParentRotation = true;
+            face.cancelParentScale = true;
+        }
 
         return go;
     }
