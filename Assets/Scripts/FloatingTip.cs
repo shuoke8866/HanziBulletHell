@@ -81,10 +81,26 @@ public static class FloatingTip
     public static Handle ShowAt(string text, Color color, Transform anchor,
                                 float height = 1.2f, float holdSeconds = float.PositiveInfinity)
     {
+        return ShowAtOffset(text, color, anchor, new Vector3(0f, height, -0.5f), 1f, holdSeconds);
+    }
+
+    /// <summary>
+    /// 同 <see cref="ShowAt"/>，但可以**指定相对锚点的偏移和缩放**。
+    ///
+    /// 教程提示用这个：文字出现在提示点的**左上角**，并且缩小一点
+    /// （教程文字要贴着那个小圆点，不能像拾取飘字那么大）。
+    /// </summary>
+    public static Handle ShowAtOffset(string text, Color color, Transform anchor,
+                                      Vector3 localOffset, float scale,
+                                      float holdSeconds = float.PositiveInfinity)
+    {
         if (string.IsNullOrEmpty(text) || anchor == null) return null;
 
-        GameObject go = CreateTip(text, color, anchor, height);
+        GameObject go = CreateTip(text, color, anchor, 0f);
         if (go == null) return null;
+
+        go.transform.localPosition = localOffset;
+        go.transform.localScale = Vector3.one * Mathf.Max(0.01f, scale);
 
         var h = new Handle { go = go };
         go.AddComponent<Runner>().Init(holdSeconds, 0f, false);
@@ -118,12 +134,31 @@ public static class FloatingTip
         tmp.sortingOrder = 120;
         tmp.fontStyle = FontStyles.Bold;
 
+        // **亮字 + 深描边**：文字不管压在什么底色上都读得清。
+        // 光调颜色会在不同底色上失效（教程气泡就是这么反复出问题的）。
+        AddOutline(go, new Color(0.02f, 0.02f, 0.04f), 0.25f);
+
         // 抵消父物体的旋转与缩放（玩家的 transform 会水平翻转，不抵消字会镜像）
         var face = go.AddComponent<FaceCamera>();
         face.cancelParentRotation = true;
         face.cancelParentScale = true;
 
         return go;
+    }
+
+    /// <summary>给世界空间文字加深色描边（每个物体一份材质实例）</summary>
+    static void AddOutline(GameObject go, Color outlineColor, float width)
+    {
+        var tmp = go.GetComponent<TextMeshPro>();
+        if (tmp == null) return;
+
+        Material mat = new Material(tmp.fontSharedMaterial);
+        mat.EnableKeyword("OUTLINE_ON");
+        mat.SetColor("_OutlineColor", outlineColor);
+        mat.SetFloat("_OutlineWidth", width);
+
+        tmp.fontMaterial = mat;
+        tmp.characterSpacing = -1f;
     }
 
     /// <summary>驱动升起 + 淡出（或者只是"活着等 Clear"）</summary>

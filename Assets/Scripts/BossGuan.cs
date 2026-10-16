@@ -38,6 +38,18 @@ public class BossGuan : MonoBehaviour, IDamageable
     /// 而且贴图引用早就失效了）。
     /// </summary>
     public string glyphChar = "官";
+    /// <summary>
+    /// 挂上世界空间血条 —— 和小兵血条（EnemyHealthBar）同一套做法。
+    ///
+    /// 挂在 BOSS 自己身上，所以：
+    ///   BOSS 生成 → 血条出现；BOSS 死了 → 血条跟着销毁。
+    /// 不需要任何「什么时候显示」的判定，也不依赖 Canvas / 场景事件。
+    /// </summary>
+    void Awake()
+    {
+        if (GetComponentInChildren<BossWorldHealthBar>() == null)
+            BossWorldHealthBar.Attach(gameObject, this, glyphChar);
+    }
 
     void Start()
     {

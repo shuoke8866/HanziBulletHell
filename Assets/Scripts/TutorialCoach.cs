@@ -19,7 +19,7 @@ using TMPro;
 /// ## 结构
 ///
 ///   点（Dot）    常驻的小圆点，在玩家右上方**较远处**飘着
-///   气泡（Bubble）有话说时才展开，几秒后自动收起
+///   文字用 FloatingTip（和宝箱提示同一套）挂在提示点的**左上角**
 ///
 /// 两者都是**世界空间**的，所以跟着玩家走 —— 玩家一看就知道"这是跟我说话的"。
 ///
@@ -35,17 +35,21 @@ public class TutorialCoach : MonoBehaviour
 
     // ---------- 外观 ----------
     const float DotSize = 0.34f;
-    // 气泡加大：玩家反馈"教程的字又小又不明显"。
-    // 原值 4.6×1.25 / 字号 2.05 —— 在 1280×720 下小得几乎看不清。
-    const float BubbleWidth = 8.6f;
-    const float BubbleHeight = 2.4f;
-    const float BubbleFontSize = 3.6f;
+    // ---------- 文字 ----------
+    /// <summary>文字相对提示点的偏移：**左上角**（玩家要求）</summary>
+    static readonly Vector3 TextOffset = new Vector3(-0.35f, 0.42f, -0.1f);
 
-    /// <summary>气泡文字颜色：亮黄白。- 描边保证它在任何底色上都读得清</summary>
-    static readonly Color BubbleTextColor = new Color(1f, 0.96f, 0.80f);
+    /// <summary>文字缩放（FloatingTip 的字号 4.6 × 这个值）</summary>
+    const float TextScale = 0.62f;
 
-    /// <summary>文字描边颜色：近黑。和亮色字形成轮廓，不再依赖气泡底色</summary>
-    static readonly Color BubbleOutlineColor = new Color(0.02f, 0.02f, 0.04f);
+    /// <summary>
+    /// 文字颜色：亮黄白。
+    ///
+    /// 配合 FloatingTip 里的**深色描边**，不管压在什么底色上都读得清。
+    /// 这是浮字的稳定做法 —— 光调颜色会在不同底色上失效
+    /// （教程气泡反复出问题就是因为它靠手绘底板 + 调颜色）。
+    /// </summary>
+    static readonly Color TextColor = new Color(1f, 0.95f, 0.72f);
 
     // ---------- 节奏 ----------
     /// <summary>一条文案停留多久（最后一条之后气泡收起）</summary>
@@ -62,16 +66,14 @@ public class TutorialCoach : MonoBehaviour
 
     Transform dot;
     SpriteRenderer dotSprite;
-    Transform bubble;
-    SpriteRenderer bubbleBg;
-    TextMeshPro bubbleText;
+    /// <summary>当前显示的那行教程文字（FloatingTip 的句柄）</summary>
+    FloatingTip.Handle textHandle;
 
     GameText.CoachStep[] steps;
     int currentStep = -1;         // 正在显示的步骤（-1 = 空闲）
     int currentLine;
     float timer;
     float lastStepTime = -999f;
-    bool bubbleShown;
 
     // ---------- 触发用的记录 ----------
     Vector3 startPos;
@@ -125,7 +127,6 @@ public class TutorialCoach : MonoBehaviour
         startPos = player.position;
 
         BuildDot();
-        BuildBubble();
 
         ShowStep(0, true);      // 一进教程层就把第一条说了
     }
@@ -148,120 +149,6 @@ public class TutorialCoach : MonoBehaviour
         dot = go.transform;
     }
 
-    void BuildBubble()
-    {
-        var go = new GameObject("Bubble");
-        go.transform.SetParent(transform, false);
-
-        // 底：一块半透明深色板
-        bubbleBg = go.AddComponent<SpriteRenderer>();
-        bubbleBg.sprite = SolidSprite.White;
-        // 不透明一点，避免和背景混在一起看不清
-        // **深底 + 亮字 + 深色描边**。
-        //
-        // 玩家截图证明前两版都不行：
-        //   第一版：深底 + 米白字 → 两者都亮，糊在一起
-        //   第二版：浅底 + 深字   → 我把底改成浅米色、字改成深棕黑，
-        //                          结果字和底几乎同色，**整个气泡看起来是空的**
-        //
-        // 根因是"赌文字颜色和底色一深一浅"这件事本身不稳 ——
-        // 改一个忘了另一个就废。
-        //
-        // 现在用**描边**：亮色字 + 深色轮廓，不管压在什么底色上都读得清。
-        // 描边在 BuildBubble 里设置。
-        bubbleBg.color = new Color(0.04f, 0.055f, 0.11f, 0.97f);
-        bubbleBg.sortingOrder = 149;
-
-        go.transform.localScale = new Vector3(BubbleWidth, BubbleHeight, 1f);
-
-        // 气泡放在点的**左侧**（点在玩家右上，气泡再往左就不会跑出屏幕）。
-        // 位置在这里设一次 —— 父物体是 coach 本身，会跟着玩家走。
-        go.transform.localPosition = new Vector3(-BubbleWidth * 0.62f, 0.15f, 0f);
-
-        // 文字
-        var textGo = new GameObject("Text");
-
-        // 文字作为气泡的**子物体** —— 位置和缩放都跟着气泡走，不用每帧手动对齐。
-        // （原来挂在气泡外面靠每帧算坐标，字体一放大就不再居中。）
-        textGo.transform.SetParent(go.transform, false);
-        textGo.transform.localPosition = new Vector3(0f, 0f, -0.1f);
-
-        // 父级有**非等比缩放**（气泡是长条），文字直接继承会被拉扁 ——
-        // 反向抵消掉，只保留位置。再乘 0.92 给左右留边距，避免顶到气泡边上。
-        //
-        // （这里原来写了两遍 localScale，后一遍把前一遍覆盖了 —— 属于手误。）
-        textGo.transform.localScale =
-            new Vector3(1f / BubbleWidth, 1f / BubbleHeight, 1f) * 0.92f;
-
-        bubbleText = textGo.AddComponent<TextMeshPro>();
-        bubbleText.fontSize = BubbleFontSize;
-        bubbleText.alignment = TextAlignmentOptions.Center;
-        bubbleText.color = BubbleTextColor;
-        bubbleText.fontStyle = FontStyles.Bold;
-        bubbleText.enableWordWrapping = true;
-
-        // ---- **描边** ----
-        //
-        // 亮色字 + 深色轮廓。这样**不管压在什么底色上都读得清**。
-        //
-        // 前两版都是在"赌文字和底色一深一浅"：
-        //   第一版：深底 + 米白字 → 两者都亮，糊在一起
-        //   第二版：浅底 + 深字   → 改底的时候忘了字，结果同色，气泡看起来是空的
-        // 描边把这件事变成"不依赖底色"，就不会再互相牵扯。
-        AddOutline(textGo, BubbleOutlineColor, 0.22f);
-
-        // **自动缩小字号**：句子长了就自动变小，永远不会超出气泡。
-        // 玩家反馈"文字容易出到气泡外面" —— 光靠手调字号治不了，
-        // 因为文案长度会变；开自动缩放才是稳的。
-        bubbleText.enableAutoSizing = true;
-        bubbleText.fontSizeMin = 1.6f;
-        bubbleText.fontSizeMax = BubbleFontSize;
-
-        bubble = go.transform;
-        SetBubbleVisible(false);
-    }
-
-    /// <summary>
-    /// 给文字加描边。
-    ///
-    /// TMP 的描边走材质的 `_OutlineWidth` / `_OutlineColor` ——
-    /// **每个用到的物体需要自己的一个材质实例**，所以这里用 `For` 复制一份，
-    /// 不能直接改共享材质（那会把场景里所有 TMP 都改掉）。
-    ///
-    /// 描边宽度是**按字号比例**的（0.2 ≈ 字号的 20%），
-    /// 太小看不出轮廓，太大会把笔画糊在一起。
-    /// </summary>
-    static void AddOutline(GameObject target, Color outlineColor, float width)
-    {
-        var tmp = target.GetComponent<TextMeshPro>();
-        if (tmp == null) return;
-
-        // 复制一份材质，避免影响其他 TMP
-        Material mat = new Material(tmp.fontSharedMaterial);
-        mat.EnableKeyword("OUTLINE_ON");
-        mat.SetColor("_OutlineColor", outlineColor);
-        mat.SetFloat("_OutlineWidth", width);
-
-        tmp.fontMaterial = mat;
-
-        // 描边会让字形整体变粗，稍微收一点字距更耐看
-        tmp.characterSpacing = -1f;
-    }
-
-    void SetBubbleVisible(bool v)
-    {
-        if (bubbleShown == v) return;
-        bubbleShown = v;
-
-        if (bubbleBg != null) bubbleBg.enabled = v;
-        if (bubbleText != null) bubbleText.gameObject.SetActive(v);
-        if (bubble != null) bubble.gameObject.SetActive(v);
-    }
-
-    // ============================================================
-    //  跟随
-    // ============================================================
-
     void LateUpdate()
     {
         Transform player = PlayerRef.Transform;
@@ -280,19 +167,11 @@ public class TutorialCoach : MonoBehaviour
             dot.localPosition = new Vector3(0f, bob, 0f);
 
             // 有点话要说时点会放大一点，提示玩家看这边
-            float target = bubbleShown ? DotSize * 1.25f : DotSize;
+            float target = textHandle != null ? DotSize * 1.25f : DotSize;
             dot.localScale = Vector3.Lerp(dot.localScale,
                                           Vector3.one * target,
                                           Time.unscaledDeltaTime * 8f);
         }
-
-        // 气泡的 localPosition / localScale 在 BuildBubble 里设一次就够了 ——
-        // 它的父物体就是这个 coach 对象（本身跟着玩家走），所以不需要每帧重设。
-        //
-        // 原来这里每帧重设一遍，看起来无害，其实是"文字出到气泡外面"的成因之一：
-        // 文字的反向缩放是按 BubbleWidth / BubbleHeight 算的，
-        // 而这里每帧把气泡 scale 写回同一组值，两者就一直在互相拉扯。
-        // 同一份数据在两处维护 —— 改一处忘一处就出错。
 
         CheckTriggers();
         TickDisplay();
@@ -453,25 +332,40 @@ public class TutorialCoach : MonoBehaviour
             return;
         }
 
-        if (bubbleText != null)
-        {
-            bubbleText.text = lines[currentLine];
-
-            // 每次设完文字都**重新确认样式** —— 不依赖创建时机。
-            // （只设一次的话，任何后面发生的重置都会让样式丢掉。）
-            bubbleText.color = BubbleTextColor;
-            bubbleText.fontStyle = FontStyles.Bold;
-            bubbleText.fontSize = BubbleFontSize;
-        }
-
-        SetBubbleVisible(true);
+        ShowLine(lines[currentLine]);
     }
 
     void EndStep()
     {
         currentStep = -1;
         currentLine = 0;
-        SetBubbleVisible(false);
+        HideLine();
+    }
+
+    /// <summary>
+    /// 显示一行教程文字 —— **和宝箱提示是同一套**（FloatingTip）。
+    ///
+    /// 位置在提示点的**左上角**（玩家要求）。
+    /// </summary>
+    void ShowLine(string text)
+    {
+        if (dot == null || string.IsNullOrEmpty(text)) return;
+
+        // 换行就重建一条（对象很少，不值得做增量更新）
+        FloatingTip.Clear(textHandle);
+        textHandle = FloatingTip.ShowAtOffset(text, TextColor, dot, TextOffset, TextScale);
+    }
+
+    void HideLine()
+    {
+        FloatingTip.Clear(textHandle);
+        textHandle = null;
+    }
+
+    void OnDestroy()
+    {
+        // 对象被销毁时把文字也收掉 —— 不然会留一条孤儿提示在场景里
+        HideLine();
     }
 
     void TickDisplay()
