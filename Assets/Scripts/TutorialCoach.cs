@@ -41,6 +41,9 @@ public class TutorialCoach : MonoBehaviour
     const float BubbleHeight = 2.4f;
     const float BubbleFontSize = 3.6f;
 
+    /// <summary>气泡文字颜色：深棕黑，压在浅色气泡上</summary>
+    static readonly Color BubbleTextColor = new Color(0.09f, 0.06f, 0.04f);
+
     // ---------- 节奏 ----------
     /// <summary>一条文案停留多久（最后一条之后气泡收起）</summary>
     const float LineDuration = 3.4f;
@@ -151,10 +154,12 @@ public class TutorialCoach : MonoBehaviour
         bubbleBg = go.AddComponent<SpriteRenderer>();
         bubbleBg.sprite = SolidSprite.White;
         // 不透明一点，避免和背景混在一起看不清
-        // 气泡底色压到**近黑**，和亮黄文字拉到最大对比。
-        // 原来文字是米白 (1, 0.97, 0.9)、气泡是深蓝灰 (0.04, 0.05, 0.10) ——
-        // 两者都偏亮，在深色背景上混在一起看不清（玩家反馈"看不清楚"）。
-        bubbleBg.color = new Color(0.015f, 0.02f, 0.05f, 0.98f);
+        // **亮底深字** —— 在深色游戏背景上这是对比最强的组合。
+        //
+        // 之前试过"近黑底 + 亮黄字"，但玩家截图显示文字渲染出来是暗的
+        // （TMP 的着色在这种情况下不可靠）。
+        // 换成浅色底 + 纯黑粗体字，无论 TMP 怎么处理颜色都读得清。
+        bubbleBg.color = new Color(1f, 0.97f, 0.88f, 0.97f);
         bubbleBg.sortingOrder = 149;
 
         go.transform.localScale = new Vector3(BubbleWidth, BubbleHeight, 1f);
@@ -176,8 +181,9 @@ public class TutorialCoach : MonoBehaviour
         bubbleText = textGo.AddComponent<TextMeshPro>();
         bubbleText.fontSize = BubbleFontSize;
         bubbleText.alignment = TextAlignmentOptions.Center;
-        // 文字用**亮黄**：和近黑气泡的对比最强，也够醒目
-        bubbleText.color = new Color(1f, 0.88f, 0.42f);
+        // 深色字 + 粗体，压在浅色气泡上
+        bubbleText.color = BubbleTextColor;
+        bubbleText.fontStyle = FontStyles.Bold;
         bubbleText.enableWordWrapping = true;
 
         // **自动缩小字号**：句子长了就自动变小，永远不会超出气泡。
@@ -396,7 +402,15 @@ public class TutorialCoach : MonoBehaviour
         }
 
         if (bubbleText != null)
+        {
             bubbleText.text = lines[currentLine];
+
+            // 每次设完文字都**重新确认样式** —— 不依赖创建时机。
+            // （只设一次的话，任何后面发生的重置都会让样式丢掉。）
+            bubbleText.color = BubbleTextColor;
+            bubbleText.fontStyle = FontStyles.Bold;
+            bubbleText.fontSize = BubbleFontSize;
+        }
 
         SetBubbleVisible(true);
     }

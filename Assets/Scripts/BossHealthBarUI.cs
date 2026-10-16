@@ -35,6 +35,14 @@ public class BossHealthBarUI : MonoBehaviour
     /// <summary>层级高于开场故事（500）</summary>
     const int SortingOrder = 1000;
 
+    /// <summary>
+    /// 玩家离 BOSS 多远之内才显示血条（世界单位）。
+    ///
+    /// 房间是 14×8、相邻房间中心距 16 —— 取 22 意味着
+    /// "同一房间"和"隔一扇门"都会显示，"在别的区域"就收起来。
+    /// </summary>
+    const float ShowDistance = 22f;
+
     RectTransform contentRoot;      // 真正显示/隐藏的那一层
     Image fill;
     TextMeshProUGUI nameText;
@@ -202,6 +210,26 @@ public class BossHealthBarUI : MonoBehaviour
         }
 
         if (currentBoss == null) { SetVisible(false); return; }
+
+        // ---- **只在真正交战时才显示** ----
+        //
+        // 玩家反馈"明明没在打 BOSS，界面上方却有一根红色的血条"。
+        //
+        // 原因是"BOSS 存在"和"玩家在打 BOSS"是两件事：
+        //   · Level1 的 BOSS 房就在起点旁边，BOSS 一进房就生成
+        //   · Level0 教程层也有头目「士」
+        // 只要 BOSS 生成且在激活状态，旧逻辑就一直显示血条 ——
+        // 哪怕玩家还在别的房间清小怪。
+        //
+        // 现在加**距离判定**：玩家离得远就收起来。
+        // 阈值 22 个单位（房间 14×8，跨一格 16），
+        // 所以"同一房间"和"隔一扇门"都显示，"在别的区域"就收起来。
+        Transform pt = PlayerRef.Transform;
+        if (pt != null)
+        {
+            float dist = Vector2.Distance(pt.position, currentBoss.transform.position);
+            if (dist > ShowDistance) { SetVisible(false); return; }
+        }
 
         IDamageable dmg = currentBoss as IDamageable;
         if (dmg == null || dmg.MaxHealth <= 0) { SetVisible(false); return; }

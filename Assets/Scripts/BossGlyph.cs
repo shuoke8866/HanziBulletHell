@@ -45,6 +45,28 @@ public class BossGlyph : MonoBehaviour
 
     private HanziRenderer glyph;
 
+    void Awake()
+    {
+        // ---- **把碰撞体设成触发器** ----
+        //
+        // 玩家反馈"皇根本就不掉血"。排查发现三个 BOSS 预制体的碰撞体
+        // 都是 `isTrigger = 0`（实体碰撞体）：
+        //
+        //     Bullet.prefab      : Rigidbody2D + isTrigger = 1
+        //     Enemy_Bing.prefab  : 有 isTrigger = 1 的碰撞体  → 小怪能被打掉
+        //     Boss_Shi 1.prefab  : isTrigger = 0            → 打不掉
+        //     Boss_Guan.prefab   : isTrigger = 0            → 打不掉
+        //     Boss_Huang.prefab  : isTrigger = 0            → 打不掉
+        //
+        // Unity 的规则：**两个实体碰撞体之间只产生物理碰撞，不产生触发事件**。
+        // 子弹靠 `OnTriggerEnter2D` 打伤害，Boss 的碰撞体不是触发器，
+        // 所以那个回调一次都不会调用 —— 伤害代码没错，是压根没被触发。
+        //
+        // 在代码里改（而不是手改预制体）：
+        // 三个 BOSS 都走这一个组件，改一处就全对，也不会被以后重新生成预制体覆盖。
+        EnsureTriggerCollider();
+    }
+
     void Start()
     {
         Build();
@@ -105,6 +127,55 @@ public class BossGlyph : MonoBehaviour
         {
             glyph.SetCharacter(ch);
             glyph.SetStrokeColor(color);
+        }
+    }
+
+    /// <summary>
+    /// 保证 BOSS 身上有一个**触发器**碰撞体，否则子弹打不中它。
+    ///
+    /// 见 Awake 里的说明：三个 BOSS 预制体的碰撞体都是实体碰撞体，
+    /// 而子弹靠 OnTriggerEnter2D 打伤害 —— 实体 vs 实体不产生触发事件。
+    ///
+    /// 做法：
+    ///   · 已有的 Collider2D 全部改成 isTrigger = true
+    ///   · 如果一个都没有，补一个 BoxCollider2D
+    ///   · 顺便保证有个 Rigidbody2D（触发事件至少一方要有刚体才稳定）
+    /// </summary>
+    void EnsureTriggerCollider()
+    {
+        Collider2D[] cols = GetComponents<Collider2D>();
+
+        int fixedCount = 0;
+        foreach (Collider2D c in cols)
+        {
+            if (c == null || c.isTrigger) continue;
+            c.isTrigger = true;
+            fixedCount++;
+        }
+
+        if (cols.Length == 0)
+        {
+            var box = gameObject.AddComponent<BoxCollider2D>();
+            box.size = new Vector2(2.5f, 2.5f);
+            box.isTrigger = true;
+
+            Debug.LogWarning($"[BOSS] {name} 原本没有任何 Collider2D，已补一个 2.5×2.5 触发器" +
+                             "（否则子弹打不中）");
+        }
+        else if (fixedCount > 0)
+        {
+            Debug.Log($"[BOSS] {name} 的 {fixedCount} 个碰撞体已设为触发器" +
+                      "（原本是实体碰撞体，子弹的 OnTriggerEnter2D 不会触发 → 打不掉血）");
+        }
+
+        // 触发事件需要至少一方有 Rigidbody2D
+        if (GetComponent<Rigidbody2D>() == null)
+        {
+            var rb = gameObject.AddComponent<Rigidbody2D>();
+            rb.bodyType = RigidbodyType2D.Kinematic;
+            rb.simulated = true;
+
+            Debug.Log($"[BOSS] {name} 原本没有 Rigidbody2D，已补一个 Kinematic 的");
         }
     }
 }
