@@ -89,6 +89,16 @@ public class BossGlyph : MonoBehaviour
         //
         // 所以：**只要预制体上已经有 SpriteRenderer 子物体，就完全不碰它。**
         // 过程化字形只在"什么都没画"时才生成。
+        // 防回归：手画图形是不是**真的**画着这个字？
+        //
+        // 踩过的坑：Boss_Huang.prefab 是从 Boss_Guan.prefab 复制来的，
+        // 字形子物体一直画的是「官」。我从 git 历史恢复预制体时，
+        // 又把这个错误的字形一起恢复了 —— 关底 BOSS 于是"变回"了官。
+        //
+        // 这里做一道自检：如果这个 BOSS 的字和它的手画图形对不上，就在
+        // 控制台明确报出来，而不是让人盯着屏幕猜。
+        VerifyArtMatchesCharacter();
+
         if (HasHandDrawnArt())
         {
             if (hideLegacyArt)
@@ -141,6 +151,35 @@ public class BossGlyph : MonoBehaviour
 
         glyph.SetCharacter(character);
         glyph.SetStrokeColor(color);
+    }
+
+    /// <summary>
+    /// 手画图形和 <see cref="character"/> 对不上时报警。
+    ///
+    /// 判据用**已知的错配组合**：`Boss_Huang` 的字形子物体如果叫 `guan`
+    /// （从 Boss_Guan 复制来的残留），那它画的就不是「皇」。
+    ///
+    /// 这个检查很窄，但正好盖住实际发生过的那种错配 ——
+    /// 与其做一个"能识别任意汉字图形"的通用识别器（做不到），
+    /// 不如把已知的坑钉死。
+    /// </summary>
+    void VerifyArtMatchesCharacter()
+    {
+        if (character == "皇" && transform.Find("guan") != null)
+        {
+            Debug.LogError(
+                "[BOSS 字形] Boss_Huang 的字形子物体还叫 guan —— " +
+                "这个预制体是从 Boss_Guan 复制来的，画的是「官」不是「皇」。\n" +
+                "修法：把字形子物体的坐标改成「皇」的几何（白 + 王），" +
+                "或删掉它让 BossGlyph 用过程化字形。");
+        }
+
+        if (character == "官" && transform.Find("huang") != null)
+        {
+            Debug.LogError(
+                "[BOSS 字形] Boss_Guan 的字形子物体叫 huang —— " +
+                "两个 BOSS 的字形可能被搞反了。");
+        }
     }
 
     /// <summary>
