@@ -1,63 +1,67 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using TMPro;
 
 /// <summary>
-/// BOSS 血条 —— 固定在屏幕顶部中央的一条长血条 + 名字。
+/// BOSS 血条 —— 固定在屏幕**顶部中央**的长条 + 名字 + 数值。
 ///
-/// ## 为什么和 BOSS 头顶血条分开做
+/// ## 重做原因
 ///
-/// BOSS 体型大、位置在场上乱跑，头顶血条会跟着晃，读起来很累。
-/// 惯例做法是**固定在屏幕顶部**，玩家不用追着看。
+/// 旧版有三个问题叠在一起（玩家反馈"BOSS 血条不显现"）：
+///   1. 用 `[RuntimeInitializeOnLoadMethod(AfterSceneLoad)]` 创建 ——
+///      这个特性**只在游戏启动时跑一次**，换场景不再触发，
+///      所以从第 2 关开始就没有 BOSS 血条了
+///   2. `DontDestroyOnLoad` 但挂在场景 Canvas 下 —— 换场景时 Canvas 没了，
+///      血条也看不见
+///   3. `SetVisible` 关掉的是**自己所在的 GameObject** ——
+///      一关掉 `Update()` 就不跑了，永远发现不了 BOSS（自锁）
 ///
-/// ## 自动发现 BOSS
-///
-/// 不要求场景里配置 —— 每帧检查场上有没有活着的 BOSS（实现了 IDamageable
-/// 且 MaxHealth > 0 的敌人脚本），有就显示、没有就隐藏。
-/// 这样加新 BOSS 不用回来改这个文件。
+/// 这一版：
+///   · 用 `SceneManager.sceneLoaded` 创建（每次换场景都重建）
+///   · **不用 DontDestroyOnLoad** —— 随场景生灭
+///   · 自建 Canvas（`sortingOrder = 1000`，高于开场故事）
+///   · 隐藏时只关**子物体容器**，自己始终启用（不然 Update 停了）
+///   · 找 BOSS 时传 `includeInactive = true` —— 有些 BOSS 预制体
+///     在场景里是停用的，只在进房时由 Room 启用
 /// </summary>
 public class BossHealthBarUI : MonoBehaviour
 {
+    // ---------- 布局 ----------
     const float BarWidth = 620f;
     const float BarHeight = 22f;
     const float TopMargin = 26f;
 
-    /// <summary>见 PlayerHealthBarUI.HealthBarSortingOrder 的说明</summary>
-    const int HealthBarSortingOrder = 1000;
+    /// <summary>层级高于开场故事（500）</summary>
+    const int SortingOrder = 1000;
 
-    static BossHealthBarUI instance;
-
+    RectTransform contentRoot;      // 真正显示/隐藏的那一层
     Image fill;
-    Image back;
     TextMeshProUGUI nameText;
     TextMeshProUGUI hpText;
-    RectTransform rootRect;
-    /// <summary>真正要隐藏的那一层（所有可见的子物体都挂在这下面）</summary>
-    RectTransform contentRoot;
 
     float shownRatio = 1f;
-    Component currentBoss;      // 缓存当前正在显示血条的 BOSS
+    Component currentBoss;
+    bool visible;
     float lastTextUpdate;
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void AutoCreate()
+    // ============================================================
+    //  创建
+    // ============================================================
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    static void Register()
     {
-        // 和 PlayerHealthBarUI 一样：血条挂在场景里的 Canvas 下，
-        // 换场景时会被一起销毁。被销毁的对象是**假 null**，`!= null` 仍返回 true，
-        // 于是新场景里以为"已经有了"就跳过创建 → 血条永远不再出现。
-        // 必须用 ReferenceEquals 判真 null。
-        if (!ReferenceEquals(instance, null)) return;
-        Create();
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
-    public static void Create()
+    static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        if (!ReferenceEquals(instance, null)) return;
+        if (Object.FindObjectOfType<BossHealthBarUI>() != null) return;
 
-        GameObject go = new GameObject("BossHealthBar");
-        instance = go.AddComponent<BossHealthBarUI>();
-        DontDestroyOnLoad(go);
+        var go = new GameObject("BossHealthBarUI");
+        go.AddComponent<BossHealthBarUI>();
     }
 
     void Start()
@@ -66,121 +70,84 @@ public class BossHealthBarUI : MonoBehaviour
         SetVisible(false);
     }
 
-    /// <summary>当前挂靠的 Canvas（换场景后旧的会失效，要重新找）</summary>
-    Canvas hostCanvas;
-
-    void LateUpdate()
-    {
-        // 血条本体是 DontDestroyOnLoad，但必须挂在某个 Canvas 下才显示得出来。
-        // 换场景时旧的 Canvas 被销毁 → 重新找一个挂过去。
-        if (hostCanvas == null || hostCanvas.transform == null)
-        {
-            Canvas found = FindObjectOfType<Canvas>();
-            if (found != null)
-            {
-                hostCanvas = found;
-                transform.SetParent(hostCanvas.transform, false);
-            }
-            else return;
-        }
-        else if (transform.parent != hostCanvas.transform)
-        {
-            transform.SetParent(hostCanvas.transform, false);
-        }
-    }
-
     void Build()
     {
-        Canvas canvas = FindObjectOfType<Canvas>();
-        if (canvas == null)
-        {
-            var cgo = new GameObject("BossBarCanvas");
-            canvas = cgo.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            var scaler = cgo.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1280f, 720f);
-            scaler.matchWidthOrHeight = 0.5f;
-            cgo.AddComponent<GraphicRaycaster>();
+        // ---- 自己的 Canvas ----
+        var canvasGo = new GameObject("BossBarCanvas");
+        canvasGo.transform.SetParent(transform, false);
 
-            // 层级要**高于开场故事面板**（它用 500 全屏遮罩）。
-            // 否则故事一显示，血条就被压在下面看不见 ——
-            // 玩家看到的就是"血量和背景故事挤在同一个 UI 里"。
-            canvas.sortingOrder = HealthBarSortingOrder;
-        }
+        Canvas canvas = canvasGo.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = SortingOrder;
 
-        hostCanvas = canvas;
-        transform.SetParent(canvas.transform, false);
+        CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1280f, 720f);
+        scaler.matchWidthOrHeight = 0.5f;
 
-        // 场景里的 Canvas 是 sortingOrder=0，盖不过开场故事的 500。
-        // 给**血条自己**加一个 Canvas 组件并开 overrideSorting，
-        // 这样只有血条这一小块被抬到最上层，不用动整个场景 Canvas 的层级。
-        var own = gameObject.GetComponent<Canvas>();
-        if (own == null) own = gameObject.AddComponent<Canvas>();
-        own.overrideSorting = true;
-        own.sortingOrder = HealthBarSortingOrder;
-        rootRect = gameObject.AddComponent<RectTransform>();
-        rootRect.anchorMin = new Vector2(0.5f, 1f);
-        rootRect.anchorMax = new Vector2(0.5f, 1f);
-        rootRect.pivot = new Vector2(0.5f, 1f);
-        rootRect.sizeDelta = new Vector2(BarWidth + 12f, BarHeight + 46f);
-        rootRect.anchoredPosition = new Vector2(0f, -TopMargin);
+        canvasGo.AddComponent<GraphicRaycaster>();
 
-        // 「内容」容器 —— 显示/隐藏只切这一层，不动自己
+        // ---- 内容容器：显示/隐藏只切它，不切自己 ----
         var contentGo = new GameObject("Content");
-        contentGo.transform.SetParent(transform, false);
-        contentRoot = contentGo.AddComponent<RectTransform>();
-        contentRoot.anchorMin = Vector2.zero;
-        contentRoot.anchorMax = Vector2.one;
-        contentRoot.offsetMin = Vector2.zero;
-        contentRoot.offsetMax = Vector2.zero;
+        contentGo.transform.SetParent(canvasGo.transform, false);
 
-        // 名字（血条上方）
+        contentRoot = contentGo.AddComponent<RectTransform>();
+        contentRoot.anchorMin = new Vector2(0.5f, 1f);
+        contentRoot.anchorMax = new Vector2(0.5f, 1f);
+        contentRoot.pivot = new Vector2(0.5f, 1f);
+        contentRoot.sizeDelta = new Vector2(BarWidth + 12f, BarHeight + 46f);
+        contentRoot.anchoredPosition = new Vector2(0f, -TopMargin);
+
+        // ---- 名字（血条上方） ----
         var nameGo = new GameObject("BossName");
         nameGo.transform.SetParent(contentGo.transform, false);
+
         nameText = nameGo.AddComponent<TextMeshProUGUI>();
-        nameText.fontSize = 26f;
+        nameText.fontSize = 28f;
         nameText.alignment = TextAlignmentOptions.Center;
         nameText.color = new Color(1f, 0.92f, 0.7f);
         nameText.fontStyle = FontStyles.Bold;
-        var nr = nameGo.GetComponent<RectTransform>();
+
+        RectTransform nr = nameGo.GetComponent<RectTransform>();
         nr.anchorMin = new Vector2(0f, 1f);
         nr.anchorMax = new Vector2(1f, 1f);
         nr.pivot = new Vector2(0.5f, 1f);
-        nr.sizeDelta = new Vector2(0f, 32f);
-        nr.anchoredPosition = new Vector2(0f, 0f);
+        nr.sizeDelta = new Vector2(0f, 34f);
+        nr.anchoredPosition = Vector2.zero;
 
-        // 血条容器
+        // ---- 血条本体 ----
         var barGo = new GameObject("Bar");
         barGo.transform.SetParent(contentGo.transform, false);
-        var barRect = barGo.AddComponent<RectTransform>();
+
+        RectTransform barRect = barGo.AddComponent<RectTransform>();
         barRect.anchorMin = new Vector2(0.5f, 0f);
         barRect.anchorMax = new Vector2(0.5f, 0f);
         barRect.pivot = new Vector2(0.5f, 0f);
         barRect.sizeDelta = new Vector2(BarWidth, BarHeight);
-        barRect.anchoredPosition = new Vector2(0f, 0f);
+        barRect.anchoredPosition = Vector2.zero;
 
-        var border = NewImage("Border", barGo.transform, new Color(0f, 0f, 0f, 0.8f));
+        Image border = NewImage("Border", barGo.transform, new Color(0f, 0f, 0f, 0.85f));
         Stretch(border.rectTransform, -3f);
 
-        back = NewImage("Back", barGo.transform, new Color(0.22f, 0.08f, 0.10f, 1f));
+        Image back = NewImage("Back", barGo.transform, new Color(0.22f, 0.08f, 0.10f, 1f));
         Stretch(back.rectTransform, 0f);
 
-        fill = NewImage("Fill", barGo.transform, new Color(0.9f, 0.25f, 0.22f));
-        var fr = fill.rectTransform;
+        fill = NewImage("Fill", barGo.transform, new Color(0.88f, 0.26f, 0.22f, 1f));
+        RectTransform fr = fill.rectTransform;
         fr.anchorMin = new Vector2(0f, 0f);
         fr.anchorMax = new Vector2(1f, 1f);
         fr.pivot = new Vector2(0f, 0.5f);
         fr.offsetMin = Vector2.zero;
         fr.offsetMax = Vector2.zero;
 
-        // 血量数字（叠在血条中间）
         var hpGo = new GameObject("BossHp");
         hpGo.transform.SetParent(barGo.transform, false);
+
         hpText = hpGo.AddComponent<TextMeshProUGUI>();
-        hpText.fontSize = 15f;
+        hpText.fontSize = 16f;
         hpText.alignment = TextAlignmentOptions.Center;
-        hpText.color = new Color(1f, 1f, 1f, 0.92f);
+        hpText.color = Color.white;
+        hpText.fontStyle = FontStyles.Bold;
         Stretch(hpGo.GetComponent<RectTransform>(), 0f);
     }
 
@@ -188,10 +155,12 @@ public class BossHealthBarUI : MonoBehaviour
     {
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
-        var img = go.AddComponent<Image>();
+
+        Image img = go.AddComponent<Image>();
         img.sprite = SolidSprite.White;
         img.color = color;
         img.raycastTarget = false;
+
         return img;
     }
 
@@ -204,64 +173,56 @@ public class BossHealthBarUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 显示/隐藏血条 —— **只隐藏子物体，不要禁用自己的 GameObject**。
+    /// 显示/隐藏 —— **只切子物体容器，不动自己**。
     ///
-    /// 踩过的坑（玩家反馈"BOSS 血条看不到"）：
-    /// 原来这里写的是 `rootRect.gameObject.SetActive(v)`，
-    /// 而 rootRect 就是**这个组件自己所在的 GameObject**。
-    /// Start() 里调 SetVisible(false) → 整个对象被禁用 →
-    /// **Update() 也就不再执行** → 永远发现不了 BOSS，血条永远不出现。
-    ///
-    /// 这是自锁：用"禁用自己"来隐藏，就把"重新显示自己"的能力一起禁掉了。
-    ///
-    /// 正确做法：自己始终保持启用（好让 Update 一直跑），只切换子物体。
+    /// 旧版这里是 `rootRect.gameObject.SetActive(v)`，而 rootRect 就是
+    /// 这个组件自己所在的 GameObject。Start 里一调 SetVisible(false)，
+    /// 整个对象被禁用 → `Update()` 不再执行 → **永远发现不了 BOSS**。
+    /// 用"禁用自己"来隐藏，就把"重新显示自己"的能力一起禁掉了。
     /// </summary>
     void SetVisible(bool v)
     {
-        if (contentRoot == null) return;
-        if (contentRoot.gameObject.activeSelf != v)
-            contentRoot.gameObject.SetActive(v);
+        if (contentRoot == null || visible == v) return;
+        visible = v;
+        contentRoot.gameObject.SetActive(v);
     }
+
+    // ============================================================
+    //  每帧
+    // ============================================================
 
     void Update()
     {
-        if (fill == null) return;
+        if (fill == null || contentRoot == null) return;
 
-        // 找活着的 BOSS —— 静态缓存一份，找不到时才重新扫
         if (currentBoss == null || !IsAlive(currentBoss))
         {
             currentBoss = FindBoss();
             shownRatio = 1f;
         }
 
-        if (currentBoss == null)
-        {
-            SetVisible(false);
-            return;
-        }
+        if (currentBoss == null) { SetVisible(false); return; }
+
+        IDamageable dmg = currentBoss as IDamageable;
+        if (dmg == null || dmg.MaxHealth <= 0) { SetVisible(false); return; }
+
+        int max = dmg.MaxHealth;
+        int cur = Mathf.Clamp(dmg.CurrentHealth, 0, max);
 
         SetVisible(true);
 
-        IDamageable dmg = currentBoss as IDamageable;
-        int max = dmg.MaxHealth;
-        int cur = Mathf.Clamp(dmg.CurrentHealth, 0, max);
-        if (max <= 0) { SetVisible(false); return; }
-
         float target = (float)cur / max;
         shownRatio = Mathf.MoveTowards(shownRatio, target,
-                                       Time.unscaledDeltaTime * Mathf.Max(0.25f, shownRatio));
+                                       Time.unscaledDeltaTime * Mathf.Max(0.3f, shownRatio));
 
-        var fr = fill.rectTransform;
+        RectTransform fr = fill.rectTransform;
         fr.anchorMax = new Vector2(Mathf.Max(0.0001f, shownRatio), 1f);
 
         // 名字
-        Enemy enemy = currentBoss as Enemy;
-        string bossName = enemy != null ? enemy.DisplayName : currentBoss.GetType().Name;
+        string bossName = DisplayNameOf(currentBoss);
+        if (nameText != null && nameText.text != bossName) nameText.text = bossName;
 
-        if (nameText != null && nameText.text != bossName)
-            nameText.text = bossName;
-
-        // 数字不需要每帧刷新（TextMeshPro 重排文本有开销）
+        // 数值不用每帧刷（TMP 重排文本有开销）
         if (Time.unscaledTime - lastTextUpdate > 0.1f)
         {
             lastTextUpdate = Time.unscaledTime;
@@ -269,17 +230,34 @@ public class BossHealthBarUI : MonoBehaviour
         }
     }
 
-    /// <summary>场上还活着的 BOSS（实现了 IDamageable 且血量有效的）</summary>
+    static string DisplayNameOf(Component c)
+    {
+        Enemy e = c as Enemy;
+        if (e != null) return e.DisplayName;
+
+        if (c is BossShi) return "士";
+        if (c is BossGuan) return "官";
+        if (c is BossHuang) return "皇";
+
+        return c.GetType().Name;
+    }
+
+    /// <summary>
+    /// 找场上活着的 BOSS。
+    ///
+    /// `FindObjectsOfType(type, true)` 的第二个参数 = **包含未激活的对象**。
+    /// 有些 BOSS 预制体在场景里是停用的（只在进房时由 Room 启用），
+    /// 不传 true 就永远找不到它们 —— 这也是旧版"BOSS 血条不显现"的原因之一。
+    /// </summary>
     static Component FindBoss()
     {
-        // 三个 BOSS 脚本 + Enemy（精英也算"BOSS"待遇的话可以放开）
-        foreach (BossHuang b in Object.FindObjectsOfType<BossHuang>())
+        foreach (BossHuang b in Object.FindObjectsOfType<BossHuang>(true))
             if (b.MaxHealth > 0 && b.CurrentHealth > 0) return b;
 
-        foreach (BossGuan b in Object.FindObjectsOfType<BossGuan>())
+        foreach (BossGuan b in Object.FindObjectsOfType<BossGuan>(true))
             if (b.MaxHealth > 0 && b.CurrentHealth > 0) return b;
 
-        foreach (BossShi b in Object.FindObjectsOfType<BossShi>())
+        foreach (BossShi b in Object.FindObjectsOfType<BossShi>(true))
             if (b.MaxHealth > 0 && b.CurrentHealth > 0) return b;
 
         return null;
@@ -288,8 +266,10 @@ public class BossHealthBarUI : MonoBehaviour
     static bool IsAlive(Component c)
     {
         if (c == null) return false;
+
         IDamageable d = c as IDamageable;
         if (d == null) return false;
+
         return d.CurrentHealth > 0 && d.MaxHealth > 0;
     }
 }

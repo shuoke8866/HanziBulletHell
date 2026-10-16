@@ -210,6 +210,23 @@ public class Room : MonoBehaviour
     }
 
     // ================= 波次 =================
+    /// <summary>
+    /// 算出第 1 波会生成几只 —— **只给编辑器诊断用**，不改任何状态。
+    ///
+    /// 存在的意义：让诊断工具能"问真实逻辑"而不是自己复刻一遍公式。
+    /// （复刻过一次，结果我修了逻辑、工具还按老公式算，白折腾一轮。）
+    /// </summary>
+    public int PreviewFirstWaveCount()
+    {
+        int extra = GameManager.ExtraEnemyCount + extraEnemiesPerWave;
+        int baseCount = GetBaseEnemyCount();
+
+        if (roomType == RoomType.Elite) extra += 1;
+        if (roomType == RoomType.Boss) { extra = 0; baseCount = 1; }
+
+        return baseCount + extra;
+    }
+
     void StartNextWave()
     {
         currentWave++;
@@ -219,7 +236,31 @@ public class Room : MonoBehaviour
 
         // 最后一波按类型加成
         if (roomType == RoomType.Elite) extra += 1;
-        if (roomType == RoomType.Boss) extra = Mathf.Max(0, extra - 1);
+
+        // ============================================================
+        //  BOSS 房：**永远只生成 1 只**
+        // ============================================================
+        //
+        // 踩过的坑（玩家反馈"第二关会生成两个官"，而且改了多次没解决）：
+        //
+        // ExtraEnemyCount 是"按层数递增的额外敌人"——
+        //     floor1 → 1、floor2 → 2、floor3 → 3
+        // 这个设计是给**普通战斗房**加杂兵用的，但它**没有排除 BOSS 房**。
+        // 于是原来那行 `extra = Max(0, extra - 1)` 只是"减一个"：
+        //     floor1：1-1 = 0 → 1 只 ✓
+        //     floor2：2-1 = 1 → **2 只** ✗
+        //     floor3：3-1 = 2 → **3 只** ✗
+        //
+        // 层数越高 BOSS 越多 —— 而且不是"改几次就好"的问题，
+        // 因为根因在乘法而不是加法，之前调刷怪点/预制体都碰不到它。
+        //
+        // 现在直接**把额外数量清零**：BOSS 房就该只有 BOSS。
+        // 想要"BOSS + 杂兵"的话，应该用另一个字段显式配置，而不是靠层数递增加出来。
+        if (roomType == RoomType.Boss)
+        {
+            extra = 0;
+            baseCount = 1;
+        }
 
         int count = baseCount + extra;
 

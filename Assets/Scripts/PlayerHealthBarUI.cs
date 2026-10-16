@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// 玩家血条 —— **左上角**的常驻 HUD。
@@ -55,21 +56,38 @@ public class PlayerHealthBarUI : MonoBehaviour
     //  创建：每个场景加载后检查一次
     // ============================================================
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void EnsureExists()
+    // ============================================================
+    //  创建：监听"场景加载完成"事件
+    // ============================================================
+    //
+    // **不能用 [RuntimeInitializeOnLoadMethod]！**
+    //
+    // 玩家反馈"血条是否能出现取决于你在哪一层开始游戏，传送到下一层就没了" ——
+    // 根因就是这个特性**只在游戏启动时执行一次**，之后换场景不会再触发。
+    // 所以第一层有血条、传送后就没有了。
+    //
+    // SceneManager.sceneLoaded 是每次场景加载完成都会触发的事件，
+    // 这才是"每个场景都要有一个 HUD"的正确做法。
+    //
+    // 加 [RuntimeInitializeOnLoadMethod] 只是为了**注册这个事件**，
+    // 注册本身只需要一次。
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    static void Register()
     {
-        // **用场景查找判断，不用静态引用。**
-        // 静态引用在对象被销毁后会变成"假 null"，`!= null` 依然为真，
-        // 于是以为"已经有了"就跳过创建 —— 这正是之前血条消失的原因。
-        //
-        // 直接问"当前场景里有没有"最可靠：没有就建，有就不管。
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        // 每个场景都建一个自己的血条。
+        // 用场景查找判断"有没有"（不用静态引用 —— 那是假 null 陷阱的来源）。
         if (Object.FindObjectOfType<PlayerHealthBarUI>() != null) return;
 
         var go = new GameObject("PlayerHealthBarUI");
         go.AddComponent<PlayerHealthBarUI>();
 
-        // 注意：**没有 DontDestroyOnLoad**。
-        // 血条随场景一起生、一起灭，不跨场景保留任何东西。
+        // 注意：**没有 DontDestroyOnLoad** —— 血条随场景生灭，不跨场景保留状态。
     }
 
     void Start()

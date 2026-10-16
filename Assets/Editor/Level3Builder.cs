@@ -500,7 +500,16 @@ public static class Level3Builder
 
         GameObject go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
         go.name = "BossHuang";
-        go.SetActive(false);            // 由 Room 决定什么时候激活
+
+        // **必须保持激活！** 不能像传送门那样 SetActive(false)。
+        //
+        // 踩过的坑（玩家反馈"第三关关底 BOSS 不生成"）：
+        // Room.SpawnOne 走的是 Instantiate(prefab) —— 如果预制体是停用的，
+        // **实例化出来的克隆也是停用的**，于是 Enemy/Boss 的 Start() 不跑、
+        // 房间也永远"清不掉"，BOSS 等于不存在。
+        //
+        // 传送门可以停用（它由 Room.ActivatePortal 在清房时启用），
+        // 但 BOSS 不行 —— 它得先活着才能被打死。
         room.enemyPrefabs.Add(go);
     }
 
