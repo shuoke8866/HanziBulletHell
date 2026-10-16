@@ -40,14 +40,26 @@ public class PlayerHealthBarUI : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void AutoCreate()
     {
-        // 场景切换后会重建，所以每次都检查
-        if (instance != null) return;
+        // **必须用 ReferenceEquals 判真 null，不能用 `!= null`。**
+        //
+        // 踩过的坑（玩家反馈"正常玩的时候血条没有，只有开场/直接开某层才有"）：
+        // 血条挂在【场景里的】Canvas 下面（见 Build 里的 SetParent）。
+        // DontDestroyOnLoad 只对自己生效，**不会**保护它的父物体 ——
+        // 所以换场景时 Canvas 被销毁，血条跟着一起被销毁。
+        //
+        // 而这里原来写的是 `if (instance != null) return;`：
+        // 被销毁的对象在 Unity 里是**假 null** —— `!= null` 依然返回 true，
+        // 于是新场景里以为"已经有一个了"就跳过创建 → 血条永远不再出现。
+        //
+        // 这就是"第一个场景能看到、之后再也看不到"的完整原因。
+        if (!ReferenceEquals(instance, null)) return;
+
         Create();
     }
 
     public static void Create()
     {
-        if (instance != null) return;
+        if (!ReferenceEquals(instance, null)) return;
 
         GameObject go = new GameObject("PlayerHealthBar");
         instance = go.AddComponent<PlayerHealthBarUI>();
@@ -57,6 +69,35 @@ public class PlayerHealthBarUI : MonoBehaviour
     void Start()
     {
         Build();
+    }
+
+    /// <summary>当前挂靠的 Canvas（换场景后旧的会失效，要重新找）</summary>
+    Canvas hostCanvas;
+
+    void LateUpdate()
+    {
+        // ---- 场景切换后重新挂靠 ----
+        //
+        // 血条本体是 DontDestroyOnLoad，但它**必须挂在某个 Canvas 下**才显示得出来。
+        // 换场景时旧的 Canvas 被销毁 → 这里重新找一个并挂过去。
+        //
+        // 不做这一步的话：血条对象还活着（所以上面的 ReferenceEquals 判断
+        // 认为不用重建），但它的父物体没了 → 屏幕上看不到 → 又是一个"假活着"的坑。
+        if (hostCanvas == null || hostCanvas.transform == null)
+        {
+            Canvas found = FindObjectOfType<Canvas>();
+            if (found != null)
+            {
+                hostCanvas = found;
+                transform.SetParent(hostCanvas.transform, false);
+            }
+            else return;    // 还没有 Canvas，下一帧再试
+        }
+        else if (transform.parent != hostCanvas.transform)
+        {
+            // 被别的东西抢走了父级，抢回来
+            transform.SetParent(hostCanvas.transform, false);
+        }
     }
 
     void Build()
@@ -75,6 +116,7 @@ public class PlayerHealthBarUI : MonoBehaviour
             cgo.AddComponent<GraphicRaycaster>();
         }
 
+        hostCanvas = canvas;
         transform.SetParent(canvas.transform, false);
 
         var root = gameObject.AddComponent<RectTransform>();
@@ -140,9 +182,18 @@ public class PlayerHealthBarUI : MonoBehaviour
     /// 这里自己查一次并缓存，避免每帧 GetComponent。
     /// </summary>
     static PlayerHealth cached;
+
     static PlayerHealth PlayerHealthOf()
     {
-        if (cached != null) return cached;
+        // 同样要防假 null：玩家换场景后是**新对象**，旧的 cached 已经是死引用。
+        // 用 ReferenceEquals 判真 null，不然会一直返回那个死引用 → 血量不再刷新。
+        if (!ReferenceEquals(cached, null))
+        {
+            GameObject old = PlayerRef.GameObject;
+            if (old != null && ReferenceEquals(cached.gameObject, old)) return cached;
+        }
+
+        cached = null;
 
         GameObject p = PlayerRef.GameObject;
         if (p == null) return null;

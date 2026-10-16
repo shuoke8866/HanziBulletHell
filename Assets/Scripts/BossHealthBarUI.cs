@@ -40,13 +40,17 @@ public class BossHealthBarUI : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void AutoCreate()
     {
-        if (instance != null) return;
+        // 和 PlayerHealthBarUI 一样：血条挂在场景里的 Canvas 下，
+        // 换场景时会被一起销毁。被销毁的对象是**假 null**，`!= null` 仍返回 true，
+        // 于是新场景里以为"已经有了"就跳过创建 → 血条永远不再出现。
+        // 必须用 ReferenceEquals 判真 null。
+        if (!ReferenceEquals(instance, null)) return;
         Create();
     }
 
     public static void Create()
     {
-        if (instance != null) return;
+        if (!ReferenceEquals(instance, null)) return;
 
         GameObject go = new GameObject("BossHealthBar");
         instance = go.AddComponent<BossHealthBarUI>();
@@ -57,6 +61,29 @@ public class BossHealthBarUI : MonoBehaviour
     {
         Build();
         SetVisible(false);
+    }
+
+    /// <summary>当前挂靠的 Canvas（换场景后旧的会失效，要重新找）</summary>
+    Canvas hostCanvas;
+
+    void LateUpdate()
+    {
+        // 血条本体是 DontDestroyOnLoad，但必须挂在某个 Canvas 下才显示得出来。
+        // 换场景时旧的 Canvas 被销毁 → 重新找一个挂过去。
+        if (hostCanvas == null || hostCanvas.transform == null)
+        {
+            Canvas found = FindObjectOfType<Canvas>();
+            if (found != null)
+            {
+                hostCanvas = found;
+                transform.SetParent(hostCanvas.transform, false);
+            }
+            else return;
+        }
+        else if (transform.parent != hostCanvas.transform)
+        {
+            transform.SetParent(hostCanvas.transform, false);
+        }
     }
 
     void Build()
@@ -74,6 +101,7 @@ public class BossHealthBarUI : MonoBehaviour
             cgo.AddComponent<GraphicRaycaster>();
         }
 
+        hostCanvas = canvas;
         transform.SetParent(canvas.transform, false);
         rootRect = gameObject.AddComponent<RectTransform>();
         rootRect.anchorMin = new Vector2(0.5f, 1f);
