@@ -77,7 +77,10 @@ public class PlayerController : MonoBehaviour
             // 射击音效：轻音量 + 音高抖动，密集连射时不会吵
             Sfx.PlayVaried(Sfx.Id.Shoot, 0.35f, 0.10f);
             // 极轻的镜头回馈：连射时会形成节奏感，但量很小以免累加成晕眩
-            Fx.Shake(0.04f);
+            // 原来每开一枪都震一下 —— 射速 0.26 秒时相当于画面一直在抖，
+        // 玩家反馈"抖动太强烈"主要就是它。开枪的打击感靠枪口火花和音效已经够了，
+        // 不需要每发都晃屏幕。留一点点（0.012）保留手感但不明显。
+        Fx.Shake(0.012f);
 
             // 含「竖」→ 每次射击获得一层护罩
             if (StrokeTraits.Instance != null && StrokeTraits.Instance.ShieldOnFire)

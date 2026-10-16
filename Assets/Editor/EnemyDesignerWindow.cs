@@ -52,8 +52,12 @@ public class EnemyDesignerWindow : EditorWindow
         public bool usePlayerShapes;
         public List<string> shapeTags = new List<string>();
         public int shotCount;
+        public float shotScale = 1f;
         public int minFloor;
         public bool isElite;
+        public float glyphCorruption;
+        public float glyphJitter;
+        public float glyphSpin;
 
         public bool dirty;
 
@@ -112,8 +116,12 @@ public class EnemyDesignerWindow : EditorWindow
                 bulletDamage = d.bulletDamage,
                 usePlayerShapes = d.usePlayerShapes,
                 shotCount = d.shotCount,
+                shotScale = d.shotScale,
                 minFloor = d.minFloor,
-                isElite = d.isElite
+                isElite = d.isElite,
+                glyphCorruption = d.glyphCorruption,
+                glyphJitter = d.glyphJitter,
+                glyphSpin = d.glyphSpin
             };
             if (d.shapeTags != null) r.shapeTags.AddRange(d.shapeTags);
             r.orig = Snapshot(r);
@@ -132,7 +140,8 @@ public class EnemyDesignerWindow : EditorWindow
                $"{ColorUtility.ToHtmlStringRGBA(r.bodyColor)}|{r.bodyScale}|{r.glyph}|{r.behavior}|" +
                $"{r.shotPattern}|{r.health}|{r.moveSpeed}|{r.shootInterval}|{r.bulletSpeed}|" +
                $"{r.bulletDamage}|{r.usePlayerShapes}|{string.Join(",", r.shapeTags.ToArray())}|" +
-               $"{r.shotCount}|{r.minFloor}|{r.isElite}";
+               $"{r.shotCount}|{r.shotScale}|{r.minFloor}|{r.isElite}|" +
+               $"{r.glyphCorruption}|{r.glyphJitter}|{r.glyphSpin}";
     }
 
     void Select(int i)
@@ -160,7 +169,7 @@ public class EnemyDesignerWindow : EditorWindow
 
         if (r.usePlayerShapes)
         {
-            bulletPreview.Setup(r.shapeTags, r.shotCount, r.bulletSpeed, 1f, strokes);
+            bulletPreview.Setup(r.shapeTags, r.shotCount, r.bulletSpeed, r.shotScale, strokes);
         }
         else
         {
@@ -316,7 +325,20 @@ public class EnemyDesignerWindow : EditorWindow
         }
 
         // 汉字（用真实字形渲染，保证"编辑器里看到的"和"游戏里看到的"一致）
-        Sprite glyphSprite = HanziRenderer.CreateSpriteFor(r.glyph, 96, 48f);
+        //
+        // 破损风格也必须应用 —— 否则调"残缺度"滑块时预览毫无变化，
+        // 会让人以为功能没做（"编辑器和游戏不一致"这个坑踩过好几次）。
+        Sprite glyphSprite = HanziRenderer.CreateSpriteFor(r.glyph, 96, 48f,
+            new HanziRenderer.GlyphStyle
+            {
+                corruption = Mathf.Clamp01(r.glyphCorruption),
+                jitter = Mathf.Clamp01(r.glyphJitter),
+                spin = r.glyphSpin,
+                seed = Enemy.StableSeed(r.id + "|" + r.glyph)
+            },
+            HanziRenderer.IsAllowed(r.glyph, HanziRenderer.SetEnemy)
+                ? HanziRenderer.SetEnemy
+                : HanziRenderer.SetPlayer);
         if (glyphSprite != null)
         {
             float g = 64f;
@@ -375,9 +397,75 @@ public class EnemyDesignerWindow : EditorWindow
         r.glyph = EditorGUILayout.TextField(
             new GUIContent("身上的汉字", "敌人显示哪个字。可以是字库里任何一个字。"), r.glyph);
 
+        // ---- 字形选择器 + 一键打开字形编辑器 ----
+        EditorGUILayout.BeginHorizontal();
+
+        if (GUILayout.Button("从字库选…", GUILayout.Width(90f)))
+            ShowGlyphMenu(r);
+
+        if (HanziRenderer.IsAllowed(r.glyph, HanziRenderer.SetEnemy))
+        {
+            var old = GUI.color;
+            GUI.color = new Color(0.55f, 1f, 0.55f);
+            GUILayout.Label("✓ 用的你自己的敌人字形", EditorStyles.miniLabel);
+            GUI.color = old;
+        }
+        else
+        {
+            var old = GUI.color;
+            GUI.color = new Color(0.85f, 0.85f, 0.5f);
+            GUILayout.Label("○ 还没画，暂用玩家字形", EditorStyles.miniLabel);
+            GUI.color = old;
+        }
+
+        EditorGUILayout.EndHorizontal();
+
+        if (GUILayout.Button("打开字形编辑器（画新字 / 改这个字）", GUILayout.Height(22f)))
+        {
+            // 要"和字体编辑器一样自己编辑"，那就别让人去菜单里找 —— 直接开，并选中当前这个字
+            var w = GetWindow<HanziGlyphEditor>("字形拖动编辑器");
+            w.SelectGlyphByName(r.glyph);
+            w.Focus();
+        }
+
         r.bodyColor = EditorGUILayout.ColorField("汉字颜色", r.bodyColor);
         r.bodyScale = EditorGUILayout.Vector3Field(
             new GUIContent("体型", "汉字的缩放。横线怪是 2×0.5 这种扁的。"), r.bodyScale);
+
+        EditorGUILayout.Space(6f);
+
+        // ---- 破损风格 ----
+        EditorGUILayout.LabelField("字形破损（残缺 / 混乱）", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            "字库共用同一套字形，靠这三项做「这只怪的字段坏掉了」的观感。",
+            EditorStyles.miniLabel);
+
+        r.glyphCorruption = EditorGUILayout.Slider(
+            new GUIContent("残缺度", "每条笔画丢失的概率。0.3 ≈ 掉三成笔画，0.5 以上基本认不出。"),
+            r.glyphCorruption, 0f, 0.8f);
+
+        r.glyphJitter = EditorGUILayout.Slider(
+            new GUIContent("错位", "字在框里随机偏移的幅度，做「没对齐」的观感。"),
+            r.glyphJitter, 0f, 1f);
+
+        r.glyphSpin = EditorGUILayout.Slider(
+            new GUIContent("倾斜", "整体旋转角度（度）。"),
+            r.glyphSpin, -45f, 45f);
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("随机一下", GUILayout.Width(80f)))
+        {
+            r.glyphCorruption = Random.Range(0.15f, 0.45f);
+            r.glyphJitter = Random.Range(0.1f, 0.5f);
+            r.glyphSpin = Random.Range(-22f, 22f);
+        }
+        if (GUILayout.Button("恢复完整", GUILayout.Width(80f)))
+        {
+            r.glyphCorruption = 0f;
+            r.glyphJitter = 0f;
+            r.glyphSpin = 0f;
+        }
+        EditorGUILayout.EndHorizontal();
 
         if (EditorGUI.EndChangeCheck()) MarkDirty(r);
 
@@ -426,6 +514,10 @@ public class EnemyDesignerWindow : EditorWindow
 
             r.shotCount = EditorGUILayout.IntSlider("一轮几发", r.shotCount, 1, 16);
 
+            r.shotScale = EditorGUILayout.Slider(
+                new GUIContent("弹幕大小", "敌人子弹的尺寸倍率。1 = 标准。"),
+                r.shotScale, 0.4f, 2.5f);
+
             EditorGUILayout.LabelField("形态标签（顺序即优先级）", EditorStyles.miniLabel);
             for (int i = 0; i < r.shapeTags.Count; i++)
             {
@@ -467,6 +559,37 @@ public class EnemyDesignerWindow : EditorWindow
 
         EditorGUILayout.EndScrollView();
         EditorGUILayout.EndVertical();
+    }
+
+    /// <summary>弹出字库列表，点一个就把 r.glyph 换成它</summary>
+    void ShowGlyphMenu(Row r)
+    {
+        var menu = new GenericMenu();
+
+        // 列出**敌人可用的字**（EnemyGlyphNames），并标出哪些已经画过了。
+        //
+        // 为什么不直接列玩家字库：敌人有自己独立的字库（HanziRenderer.SetEnemy），
+        // 列玩家的字会让人以为"改这里能改敌人" —— 实际两套完全无关。
+        var names = new List<string>(HanziRenderer.EnemyGlyphNames);
+
+        foreach (string g in names)
+        {
+            string captured = g;
+            bool current = g == r.glyph;
+
+            // 敌人字库里已画的字标个记号，方便看出"哪些我已经改过了"
+            bool drawn = HanziRenderer.IsAllowed(g, HanziRenderer.SetEnemy);
+            string label = g + (drawn ? "  ✎已画" : "") + (current ? "   ← 当前" : "");
+
+            menu.AddItem(new GUIContent(label), current,
+                         () => { r.glyph = captured; MarkDirty(r); Repaint(); });
+        }
+
+        menu.AddSeparator("");
+        menu.AddItem(new GUIContent($"（{names.Count} 个可选 · ✎ = 敌人字库里有你自己的版本）"),
+                     false, () => { });
+
+        menu.ShowAsContext();
     }
 
     void MarkDirty(Row r)
@@ -572,7 +695,11 @@ public class EnemyDesignerWindow : EditorWindow
         edited = SetString(edited, "glyph", r.glyph);
         edited = SetBool(edited, "usePlayerShapes", r.usePlayerShapes);
         edited = SetInt(edited, "shotCount", r.shotCount);
+        edited = SetFloat(edited, "shotScale", r.shotScale);
         edited = SetTagList(edited, r.shapeTags);
+        edited = SetFloat(edited, "glyphCorruption", r.glyphCorruption);
+        edited = SetFloat(edited, "glyphJitter", r.glyphJitter);
+        edited = SetFloat(edited, "glyphSpin", r.glyphSpin);
 
         result = src.Substring(0, start) + edited + src.Substring(blockEnd);
         return true;

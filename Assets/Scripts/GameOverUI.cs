@@ -57,7 +57,7 @@ public class GameOverUI : MonoBehaviour
         MakeRestartButton(full, restartAction);
 
         Sfx.Play(Sfx.Id.PlayerHurt, 0.9f);
-        Fx.Shake(0.9f);
+        Fx.Shake(0.45f);
     }
 
     void MakeRestartButton(RectTransform parent, System.Action restartAction)

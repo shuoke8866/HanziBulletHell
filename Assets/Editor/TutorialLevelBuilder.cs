@@ -110,10 +110,26 @@ public static class TutorialLevelBuilder
         AddSpawnPoint(rooms[2], "Spawn_S2", new Vector2(x0 + Pitch * 2f + 2f, -2f));
         AddSpawnPoint(rooms[3], "BossSpawn", new Vector2(x0 + Pitch * 3f, 0f));
 
-        // 教程关的怪要弱：血量砍到 40%，玩家不会一开始就死
-        rooms[1].enemyHealthOverride = 4;
+        // 教程关的小怪血量：**和第一层完全一样**（不设 override，走数据库 × 全局倍率）。
+        //
+        // 踩过两次坑，都记下来：
+        //
+        //   1. 原来写死 enemyHealthOverride = 4 / 5，
+        //      而其他层是 `数据库24 × 全局倍率3 = 72` → 差 18 倍，小怪一碰就没。
+        //
+        //   2. 我第一次修的时候按"教程应该更简单"改成了 24 / 30 —— **还是错的**。
+        //
+        // 为什么"教程更简单"这个直觉本身就不对：
+        // 教程层起始房摆了六种笔画的展台，玩家**一进教程就能拿全六种笔画**，
+        // 打完教程出来时反而比"刚进第一层的玩家"强得多。
+        // 敌人却给得比第一层弱，难度曲线在这里凹下去 ——
+        // 玩家的体感就是"教程的怪是纸糊的"。
+        //
+        // 结论：**难度要跟着玩家的战力走，不是跟着关卡序号走。**
+        // 这里干脆不设 override，让教程层和第一层用同一套规则。
+        rooms[1].enemyHealthOverride = -1;
         rooms[1].waveCount = 1;
-        rooms[2].enemyHealthOverride = 5;
+        rooms[2].enemyHealthOverride = -1;
         rooms[2].waveCount = 1;
 
         // ---- 6) 宝箱 / 笔画 ----
@@ -126,7 +142,7 @@ public static class TutorialLevelBuilder
 
         // ---- 7) BOSS 与传送门 ----
         AddBoss(rooms[3], new Vector2(x0 + Pitch * 3f, 0f));
-        AddPortal(new Vector2(x0 + Pitch * 3f - 2f, 0f));
+        AddPortal(rooms[3], new Vector2(x0 + Pitch * 3f - 2f, 0f));
 
         // ---- 8) 教程提示 ----
         AddHints(x0, Pitch);
@@ -325,7 +341,15 @@ public static class TutorialLevelBuilder
         Debug.Log($"[教程] 笔画展台 + 可拾取笔画已放置：{all.Length} 种");
     }
 
-    static void AddPortal(Vector2 pos)
+    /// <summary>
+    /// 在 BOSS 房里放一个传送门，**初始隐藏**，并挂到房间的 portal 字段上。
+    ///
+    /// 为什么要绑到房间、而不是让它一开始就亮着：
+    ///   · 绑上去之后 GameManager 就知道"这个房间已经有门了"，不会再生成一个
+    ///     （原来两个来源各生成一个 → BOSS 房出现两个传送门）
+    ///   · 先隐藏是为了不让玩家**跳过 BOSS 战** —— 清房时 Room.ActivatePortal 才亮
+    /// </summary>
+    static void AddPortal(Room bossRoom, Vector2 pos)
     {
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Portal.prefab");
         if (prefab == null) { Debug.LogWarning("[教程] 找不到 Portal.prefab"); return; }
@@ -333,6 +357,15 @@ public static class TutorialLevelBuilder
         GameObject go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
         go.transform.position = new Vector3(pos.x, pos.y, 0f);
         go.name = "Portal_ToLevel1";
+
+        // 一开始藏起来，打完 BOSS 才出现
+        go.SetActive(false);
+
+        if (bossRoom != null)
+        {
+            bossRoom.portal = go;
+            EditorUtility.SetDirty(bossRoom);
+        }
     }
 
     // ============================================================

@@ -18,10 +18,32 @@ public class Fx : MonoBehaviour
 
     // ---------------- 屏幕震动参数 ----------------
     [Header("屏幕震动")]
-    public float maxOffset = 0.55f;
-    public float maxAngle = 2.2f;
-    public float decayPerSecond = 1.6f;
-    public float frequency = 22f;
+    //
+    // 玩家反馈"抖动太强烈了"。原因不是单次幅度大，而是**触发太频繁**：
+    // PlayerController 每开一枪就 Shake(0.04f)，射速 0.26 秒 —
+    // 等于每秒抖 22 次的震动几乎一直在触发，画面始终在晃。
+    //
+    // 所以除了把幅度调小，更要紧的是加一个**总开关**（shakeScale），
+    // 想彻底关掉就设 0，想微调只改这一个数，不用去追 19 个调用点。
+    //
+    // 当前值对比原来：
+    //   maxOffset  0.55  → 0.10   （画面位移，0.55 个世界单位在 1280x720 下约 30 像素，太夸张）
+    //   maxAngle   2.2°  → 0.45°  （旋转）
+    //   frequency  22Hz  → 11Hz   （22Hz 已经是"嗡嗡抖"，11Hz 更像"撞了一下"）
+    //   decay      1.6    → 3.2    （衰减快一倍，抖完立刻停）
+    public float maxOffset = 0.10f;
+    public float maxAngle = 0.45f;
+    public float decayPerSecond = 3.2f;
+    public float frequency = 11f;
+
+    /// <summary>
+    /// 震动总开关。1 = 正常，0 = **完全关闭**，0.5 = 减半。
+    ///
+    /// 单独留这个字段是因为"抖不抖"是纯口味问题，
+    /// 而调用点散在 19 处（开枪、命中、被打、开门、BOSS 入场…）——
+    /// 想关掉不该去改 19 个地方。
+    /// </summary>
+    [Range(0f, 2f)] public float shakeScale = 1f;
 
     const float KickDuration = 0.12f;
 
@@ -110,8 +132,9 @@ public class Fx : MonoBehaviour
         float ny = Mathf.PerlinNoise(self.seed + 37f, t) * 2f - 1f;
         float na = Mathf.PerlinNoise(self.seed + 71f, t) * 2f - 1f;
 
-        offset = new Vector3(nx, ny, 0f) * (self.maxOffset * shake);
-        angle = na * self.maxAngle * shake;
+        float total = self.shakeScale;
+        offset = new Vector3(nx, ny, 0f) * (self.maxOffset * shake * total);
+        angle = na * self.maxAngle * shake * total;
 
         if (self.kickTime > 0f)
         {

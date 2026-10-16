@@ -140,6 +140,20 @@ public class GameManager : MonoBehaviour
         }
 
         SpawnStrokePickup(strokePos, randomType);
+
+        // 传送门：**房间已经预放了就不再生成一个**。
+        //
+        // 原来无条件 SpawnPortal()，而教程层在场景里预放了一个 ——
+        // 于是 BOSS 房里出现两个传送门（玩家反馈的 bug）。
+        //
+        // 现在规矩：房间预放了 → 清房时它自己激活（见 Room.ActivatePortal）；
+        //           房间没预放 → 这里生成。保证永远只有一个。
+        if (room != null && room.portal != null)
+        {
+            GameLog.Info($"[传送门] 房间「{room.name}」已预放传送门，跳过运行时生成。");
+            return;
+        }
+
         SpawnPortal(portalPos);
     }
 

@@ -31,7 +31,7 @@ public class BossGuan : MonoBehaviour, IDamageable
         currentHealth = maxHealth;
         player = PlayerRef.Transform;
         // BOSS 入场演出：强烈的镜头震动 + 金色爆发，配合 HP 条的"压迫感"
-        Fx.Shake(0.85f);
+        Fx.Shake(0.42f);
         Fx.RoomClearBurst(transform.position);
         Sfx.Play(Sfx.Id.RoomClear, 0.8f);
         nextFanTime = Time.time + 1f;

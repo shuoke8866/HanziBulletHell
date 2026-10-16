@@ -150,6 +150,21 @@ public static class GameBalance
     }
 
     /// <summary>
+    /// **小怪血量总倍率** —— 想整体调难度只改这一个数。
+    ///
+    /// 乘以 EnemyDatabase 里每个 EnemyDef 的 health，在
+    /// <see cref="Enemy.ApplyDefinition"/> 里生效 —— 那是所有生成路径的
+    /// 唯一汇聚点（房间刷怪 / 数据库池刷怪 / 预制体刷怪 / BOSS 召唤，四条路都经过它）。
+    ///
+    /// 为什么不放在 Room.SetupEnemy 里：BOSS 召唤路径不经过那里，
+    /// 放那儿会让"召唤出来的怪"和"房间刷出来的怪"血量规则不一致。
+    /// 放在 ApplyDefinition 才能保证不管怎么生出来的怪，规则都一样。
+    ///
+    /// 历史：玩家反馈小怪太脆 → 先调 2.5，又要求"所有小怪血量提升三倍" → 现在 3。
+    /// </summary>
+    public const float EnemyHealthMultiplier = 3f;
+
+    /// <summary>
     /// 各层的**额外**血量倍率，索引 0 = 教程层。
     ///
     /// 设计意图：教程与一二层是"教学 BOSS"，应该脆一些，
@@ -164,7 +179,18 @@ public static class GameBalance
     /// 玩家在教程里死掉、被迫重看一遍提示，是最劝退的体验之一。
     /// 觉得太软或太硬就改这一个数。
     /// </summary>
-    public const float TutorialBossExtraMultiplier = 0.5f;
+    /// <summary>
+    /// 教程层 BOSS 的**额外**削减倍率。
+    ///
+    /// 现在是 1.0（= 不额外削）。原来写的是 0.5，理由是"教程死一次要重看提示"。
+    ///
+    /// 但玩家指出：教程层起始房摆了六种笔画的展台，**一进教程就拿全六种笔画**，
+    /// 玩家战力其实比刚进第一层的时候强。敌人反而更弱 → 难度曲线在这里凹下去。
+    /// 所以 BOSS 也跟着对齐，只保留 BossHealthPerFloor[0] = 0.60 那个"教程稍微轻一点"。
+    ///
+    /// 觉得还是太难就把这个数调回去（0.5 就是原来的强度）。
+    /// </summary>
+    public const float TutorialBossExtraMultiplier = 1.0f;
 
     /// <summary>教程层 BOSS 的最终倍率</summary>
     public static float TutorialBossMultiplier

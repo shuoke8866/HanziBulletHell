@@ -39,6 +39,16 @@ public class HanziGlyphEditor : EditorWindow
 
     // ---------------- 状态 ----------------
     List<string> glyphs = new List<string>();
+
+    /// <summary>当前编辑哪套字库：player = 玩家，enemy = 敌人</summary>
+    string glyphSet = HanziRenderer.SetPlayer;
+
+    string SourceFileFor(string set)
+    {
+        return set == HanziRenderer.SetEnemy
+            ? "Assets/Scripts/EnemyGlyphs.cs"
+            : "Assets/Scripts/HanziRenderer.cs";
+    }
     int selected;
     Vector2 glyphScroll;
 
@@ -68,9 +78,39 @@ public class HanziGlyphEditor : EditorWindow
 
     void OnEnable() { ReloadGlyphList(); }
 
+    /// <summary>
+    /// 从别的窗口跳过来时，直接选中指定的字。
+    ///
+    /// 敌人定义器里点"打开字形编辑器"会调它 —— 让人不用自己在下拉里翻。
+    /// 找不到这个字就留在原位（不然会跳到列表第一项，反而让人困惑）。
+    /// </summary>
+    public void SelectGlyphByName(string ch)
+    {
+        if (string.IsNullOrEmpty(ch)) return;
+
+        ReloadGlyphList();
+
+        int idx = glyphs.IndexOf(ch);
+        if (idx < 0)
+        {
+            Debug.LogWarning($"字形编辑器：字库里没有「{ch}」，先在下面这个列表里选一个再改，" +
+                             "或者用「新建字形」加一个。");
+            return;
+        }
+
+        selected = idx;
+        LoadGlyph();
+        Repaint();
+    }
+
     void ReloadGlyphList()
     {
-        glyphs = HanziRenderer.AllGlyphsSorted();
+        // 敌人字库是"标称字表"驱动的 —— 它一开始是空的，
+        // 但编辑器要能列出"可以画哪些字"，所以用 EnemyGlyphNames 而不是"已画的字"
+        glyphs = glyphSet == HanziRenderer.SetEnemy
+            ? new List<string>(HanziRenderer.EnemyGlyphNames)
+            : HanziRenderer.AllGlyphsSorted();
+
         if (glyphs.Count == 0) return;
         selected = Mathf.Clamp(selected, 0, glyphs.Count - 1);
         LoadGlyph();
@@ -79,7 +119,7 @@ public class HanziGlyphEditor : EditorWindow
     void LoadGlyph()
     {
         if (glyphs.Count == 0) return;
-        strokes = HanziRenderer.DebugStrokes(glyphs[selected]);
+        strokes = HanziRenderer.DebugStrokes(glyphs[selected], glyphSet);
         if (strokes == null) strokes = new List<HanziRenderer.StrokeInfo>();
         selectedStroke = strokes.Count > 0 ? 0 : -1;
         dragStroke = -1; dragPoint = -1;
@@ -106,6 +146,44 @@ public class HanziGlyphEditor : EditorWindow
     void DrawLeftPanel()
     {
         EditorGUILayout.BeginVertical(GUILayout.Width(320f));
+
+        // ---- 字库切换 ----
+        //
+        // 玩家和敌人是**两套独立的字库**。这里切换编辑哪一套 ——
+        // 改敌人的字绝不会影响玩家操控的汉字。
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("字库", EditorStyles.boldLabel, GUILayout.Width(34f));
+
+        bool wasPlayer = glyphSet == HanziRenderer.SetPlayer;
+        if (GUILayout.Toggle(wasPlayer, "  玩家  ", "Button", GUILayout.Width(80f)) != wasPlayer
+            && !wasPlayer)
+        {
+            glyphSet = HanziRenderer.SetPlayer;
+            ReloadGlyphList();
+        }
+
+        bool wasEnemy = glyphSet == HanziRenderer.SetEnemy;
+        if (GUILayout.Toggle(wasEnemy, "  敌人  ", "Button", GUILayout.Width(80f)) != wasEnemy
+            && !wasEnemy)
+        {
+            glyphSet = HanziRenderer.SetEnemy;
+            selected = 0;
+            ReloadGlyphList();
+        }
+
+        GUILayout.Label(glyphSet == HanziRenderer.SetEnemy
+            ? "→ 写入 Assets/Scripts/EnemyGlyphs.cs"
+            : "→ 写入 Assets/Scripts/HanziRenderer.cs", EditorStyles.miniLabel);
+        EditorGUILayout.EndHorizontal();
+
+        if (glyphSet == HanziRenderer.SetEnemy)
+        {
+            EditorGUILayout.HelpBox(
+                "正在编辑**敌人专用字库**。\n" +
+                "这里改的字只影响敌人，玩家操控的汉字不受任何影响。\n" +
+                "敌人字库一开始是空的 —— 敌人会先用玩家字库显示，你画一个就生效一个。",
+                MessageType.Info);
+        }
 
         EditorGUILayout.LabelField($"字形拖动编辑器（{selected + 1}/{glyphs.Count}）", EditorStyles.boldLabel);
 
@@ -866,7 +944,7 @@ public class HanziGlyphEditor : EditorWindow
 
     void ApplyToRuntime()
     {
-        if (HanziRenderer.ApplyStrokes(glyphs[selected], strokes))
+        if (HanziRenderer.ApplyStrokes(glyphs[selected], strokes, glyphSet))
         {
             foreach (var r in Object.FindObjectsOfType<HanziRenderer>())
                 r.SetCharacter(r.character);
@@ -899,7 +977,7 @@ public class HanziGlyphEditor : EditorWindow
         string ch = glyphs[selected];
         string full = System.IO.Path.Combine(
             System.IO.Directory.GetParent(Application.dataPath).FullName,
-            "Assets/Scripts/HanziRenderer.cs");
+            SourceFileFor(glyphSet));
 
         if (!System.IO.File.Exists(full))
         {

@@ -108,7 +108,7 @@ public class PlayerHealth : MonoBehaviour
 
         Sfx.Play(Sfx.Id.PlayerHurt, 1f);
         Fx.PlayerHit(transform.position);
-        Fx.Shake(0.9f);
+        Fx.Shake(0.45f);
 
         GameLog.Info($"玩家死亡！本轮成绩：{GameData.RunSummary()}");
 

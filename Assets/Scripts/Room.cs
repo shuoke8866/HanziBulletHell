@@ -411,35 +411,73 @@ public class Room : MonoBehaviour
         aliveEnemies.Add(enemy);
     }
 
-    void SetupEnemy(GameObject enemy)
+    /// <summary>
+    /// 给刚生成出来的敌人套上房间的配置（血量 / 移速 / 定义里的外形与弹幕）。
+    ///
+    /// 原来是 private，为了让实测工具能验证"这条链路算出来的血量是多少"，
+    /// 改成 public —— 探测工具**直接调用真实逻辑**，而不是自己复刻一遍。
+    /// （复刻过一次，结果改动没生效却显示"已修复"，白折腾一轮。）
+    /// </summary>
+    public void SetupEnemy(GameObject enemy)
     {
-        Enemy enemyScript = enemy.GetComponent<Enemy>();
-        if (enemyScript != null)
-        {
-            enemyScript.SetRoom(this);
+        Enemy e = enemy != null ? enemy.GetComponent<Enemy>() : null;
+        if (e == null) return;
 
-            float hpMul = GameManager.FloorHealthMultiplier;
-            int scaledHealth = Mathf.Max(1, Mathf.RoundToInt(enemyScript.maxHealth * hpMul));
+        e.SetRoom(this);
 
-            if (enemyHealthOverride > 0)
-                enemyScript.maxHealth = Mathf.Max(1, Mathf.RoundToInt(enemyHealthOverride * hpMul));
-            else
-                enemyScript.maxHealth = scaledHealth;
+        // 血量：一条路径算完
+        //   数据库 health × 全局倍率 × 层数倍率
+        // 房间有显式覆盖（教程层的教学怪）时用覆盖值代替数据库那一段。
+        e.EnsureDefinition();
+        e.maxHealth = ResolveHealth(e);
+        e.healthOverridden = true;
 
-            // 防止 Enemy.Start() 的定义默认值把它重写回去
-            enemyScript.healthOverridden = true;
-            enemyScript.moveSpeed *= GameManager.FloorSpeedMultiplier;
-        }
+        e.moveSpeed *= GameManager.FloorSpeedMultiplier;
 
-        // ---- BOSS 血量：按玩家战力动态缩放 ----
-        //
-        // 目标时长已包含层数倍率（HealthForFight 内部会除掉倍率），
-        // 所以这里只做一次乘法，不要再把倍率也喂给 HealthForFight，
-        // 否则倍率会被平方放大 —— 曾经就是这么写出 170 秒 BOSS 战的。
-        //
-        // 最后统一乘 GameBalance.BossHealthMultiplier：测试期调小便于快速打到关底，
-        // 正式数值把它改回 1.0 即可，不用动这里的代码。
+        // 血量已经算好，套用定义里其余属性（移速/射速/外形/底形/弹幕）时别再动它
+        e.ApplyDefinition(true);
 
+        // BOSS 用另一套血量规则：按玩家战力反推，让它落在目标时长区间
+        ApplyBossHealth(enemy);
+    }
+
+    /// <summary>
+    /// 算出这只怪最终该有多少血。
+    ///
+    /// **唯一真源是 EnemyDatabase**，不是预制体上序列化的值 ——
+    /// 所有战斗房共用一个模板 Enemy_Bing（旧值 5 血），
+    /// 读预制体的话你把数据库改到 400 也毫无作用（踩过这个坑）。
+    /// </summary>
+    int ResolveHealth(Enemy e)
+    {
+        float hpMul = GameManager.FloorHealthMultiplier;
+
+        if (enemyHealthOverride > 0)
+            return Mathf.Max(1, Mathf.RoundToInt(enemyHealthOverride * hpMul));
+
+        if (e.def != null && e.def.health > 0)
+            return Mathf.Max(1, Mathf.RoundToInt(Enemy.ScaledHealth(e.def.health) * hpMul));
+
+        // 数据库里没这个 id → 退回预制体值并告警
+        int fallback = Mathf.Max(1, e.maxHealth);
+        Debug.LogWarning(
+            $"「{name}」刷出的敌人 defId=\"{e.defId}\" 在数据库里找不到，" +
+            $"退回预制体血量 {fallback}。检查 EnemyDatabase 里有没有这个 id。");
+        return Mathf.Max(1, Mathf.RoundToInt(fallback * hpMul));
+    }
+
+    /// <summary>
+    /// BOSS 血量：按玩家战力动态缩放。
+    ///
+    /// 目标时长已包含层数倍率（HealthForFight 内部会除掉倍率），
+    /// 所以这里只做一次乘法，不要再把倍率也喂给 HealthForFight，
+    /// 否则倍率会被平方放大 —— 曾经就是这么写出 170 秒 BOSS 战的。
+    ///
+    /// 最后统一乘 GameBalance.BossHealthMultiplier：测试期调小便于快速打到关底，
+    /// 正式数值把它改回 1.0 即可，不用动这里的代码。
+    /// </summary>
+    void ApplyBossHealth(GameObject enemy)
+    {
         float bossMul = Mathf.Max(0.01f, GameBalance.BossHealthMultiplier)
                       * GameBalance.BossHealthForFloor(GameData.currentFloor);
 
@@ -513,7 +551,30 @@ public class Room : MonoBehaviour
         GameLog.Info($"「{name}」已清理！");
         GameToast.Show(GameText.Toast.房间清理完成(), new Color(0.6f, 1f, 0.7f));
 
+        ActivatePortal();
         GrantClearReward();
+    }
+
+    /// <summary>
+    /// 场景里预放的传送门（教程层用），一开始是隐藏的，清房后才亮出来。
+    ///
+    /// 为什么要有这个东西：
+    /// 原来传送门是 BOSS 死亡时由 GameManager **运行时生成**的。
+    /// 而教程层又在场景里**预放**了一个 —— 两个来源各来一个，
+    /// 结果 BOSS 房里同时出现两个传送门，玩家反馈的就是这个 bug。
+    ///
+    /// 现在规矩是：**房间自己预放了就用房间的，GameManager 不再重复生成。**
+    /// 好处是传送门的位置可以在编辑器里直接摆，不用靠代码算坐标。
+    /// </summary>
+    [Tooltip("场景里预放的传送门。填了它，BOSS 死亡时 GameManager 就不会再生成一个。")]
+    public GameObject portal;
+
+    void ActivatePortal()
+    {
+        if (portal == null) return;
+
+        portal.SetActive(true);
+        GameLog.Info($"「{name}」预放的传送门已激活。");
     }
 
     // 清房奖励：词条 + 可选笔画

@@ -80,6 +80,20 @@ public class EnemyDef
     /// <summary>底形缓慢自转速度（度/秒），0 = 不转</summary>
     public float shapeSpin = 0f;
 
+    // ---------- 字形破损风格（敌人专用的"残缺混乱"观感）----------
+    //
+    // 整条笔画有概率丢失 / 字整体错位 / 整体倾斜。
+    // 生成贴图时应用，所以调完立刻见效，不用重画字形。
+    // 想要"某些字彻底认不出"，就把 corruption 拉到 0.4~0.6。
+    /// <summary>残缺度：每条笔画丢失的概率（0 = 完整）</summary>
+    public float glyphCorruption = 0f;
+
+    /// <summary>错位：字在框里随机偏移的幅度（0.5 = 最多偏半个字）</summary>
+    public float glyphJitter = 0f;
+
+    /// <summary>倾斜：整体旋转角度</summary>
+    public float glyphSpin = 0f;
+
     // ---------- 弹幕：可选"复用玩家的形态原语" ----------
     /// <summary>
     /// 勾上之后不用 <see cref="shotPattern"/>，改用
@@ -255,7 +269,7 @@ public static class EnemyDatabase
             health = 24, moveSpeed = 2f, shootInterval = 2f,
             bulletSpeed = 7f, bulletDamage = 1,
             bodyScale = new Vector3(2f, 0.5f, 1f),
-            bodyColor = new Color(0.9f, 0.9f, 0.9f),
+            bodyColor = new Color(0.9f, 0.9f, 0.9f, 1f),
             scoreWeight = 4
         });
 
@@ -287,7 +301,7 @@ public static class EnemyDatabase
             health = 41, moveSpeed = 1f, shootInterval = 3f,
             bulletSpeed = 6f, bulletDamage = 1,
             bodyScale = new Vector3(1.5f, 1.5f, 1f),
-            bodyColor = new Color(1f, 0.85f, 0.4f),
+            bodyColor = new Color(1f, 0.85f, 0.4f, 1f),
             scoreWeight = 3
         });
 
@@ -304,7 +318,7 @@ public static class EnemyDatabase
             bulletSpeed = 8f, bulletDamage = 1,
             meleeDamage = 1f,
             bodyScale = new Vector3(0.8f, 0.8f, 1f),
-            bodyColor = new Color(1f, 0.6f, 0.3f),
+            bodyColor = new Color(1f, 0.6f, 0.3f, 1f),
             scoreWeight = 4
         });
 
@@ -320,7 +334,7 @@ public static class EnemyDatabase
             health = 80, moveSpeed = 0f, shootInterval = 2.4f,
             bulletSpeed = 8f, bulletDamage = 1,
             bodyScale = new Vector3(1.1f, 1.1f, 1f),
-            bodyColor = new Color(0.85f, 0.5f, 1f),
+            bodyColor = new Color(0.85f, 0.5f, 1f, 1f),
             scoreWeight = 2
         });
 
@@ -336,7 +350,7 @@ public static class EnemyDatabase
             health = 96, moveSpeed = 2.4f, shootInterval = 0.45f,
             bulletSpeed = 5.5f, bulletDamage = 1,
             bodyScale = new Vector3(1f, 1f, 1f),
-            bodyColor = new Color(0.5f, 0.9f, 0.5f),
+            bodyColor = new Color(0.5f, 0.9f, 0.5f, 1f),
             scoreWeight = 2
         });
 
@@ -421,7 +435,7 @@ public static class EnemyDatabase
             glyph = "兵",
             behavior = EnemyBehavior.Chase,
             shotPattern = EnemyShotPattern.Aimed,
-            health = 200, moveSpeed = 2.2f, shootInterval = 2.8f,
+            health = 65, moveSpeed = 2.2f, shootInterval = 2.8f,
             bulletSpeed = 5.5f, bulletDamage = 1,
             meleeDamage = 1f,
             bodyScale = new Vector3(1f, 1f, 1f),

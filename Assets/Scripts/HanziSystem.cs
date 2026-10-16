@@ -256,8 +256,8 @@ public class HanziSystem : MonoBehaviour
 
         AddHanzi("大",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Pie, StrokeType.Na },
-            new List<string> { "straight", "vshape" },
-            5, 10f, "5发扇形");
+            new List<string> { "parallel" },
+            2, 8.2f, "5发扇形", 2.5f);
 
         AddHanzi("工",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
@@ -267,12 +267,12 @@ public class HanziSystem : MonoBehaviour
         AddHanzi("干",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Shu },
             new List<string> { "parallel", "pierce" },
-            3, 10f, "3发穿透");
+            6, 10f, "3发穿透", 1.04f);
 
         AddHanzi("士",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
-            new List<string> { "cross" },
-            4, 11f, "4发十字");
+            new List<string> { "random" },
+            4, 11f, "4发十字", 1f);
 
         AddHanzi("土",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
@@ -281,24 +281,24 @@ public class HanziSystem : MonoBehaviour
 
         AddHanzi("口",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng },
-            new List<string> { "ring" },
-            6, 9f, "6发环形");
+            new List<string> { "omni" },
+            9, 9f, "6发环形", 0.76f);
 
         AddHanzi("兀",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Pie, StrokeType.Zhe },
-            new List<string> { "scatter" },
-            5, 10f, "5发扇形");
+            new List<string> { "diagonal" },
+            5, 10f, "5发扇形", 1f);
 
         // ---------- 4 画 ----------
         AddHanzi("王",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
             new List<string> { "parallel", "pierce" },
-            4, 10f, "4发穿透");
+            7, 10f, "4发穿透", 1.21f);
 
         AddHanzi("木",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Pie, StrokeType.Na },
-            new List<string> { "omni" },
-            6, 9f, "6发全方位");
+            new List<string> { "spiral" },
+            11, 9f, "6发全方位", 1f);
 
         AddHanzi("天",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Pie, StrokeType.Na },
@@ -312,13 +312,13 @@ public class HanziSystem : MonoBehaviour
 
         AddHanzi("日",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Heng },
-            new List<string> { "ring", "cross" },
-            6, 9f, "6发环形十字");
+            new List<string> { "ring" },
+            19, 9f, "6发环形十字", 1f);
 
         AddHanzi("中",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Shu },
-            new List<string> { "ring", "pierce" },
-            6, 9f, "6发环形穿透");
+            new List<string> { "shotgun" },
+            2, 9f, "6发环形穿透", 1.9f);
 
         AddHanzi("水",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Pie, StrokeType.Na },
@@ -346,14 +346,14 @@ public class HanziSystem : MonoBehaviour
         AddHanzi("白",
             new List<StrokeType> { StrokeType.Pie, StrokeType.Shu, StrokeType.Zhe,
                                    StrokeType.Heng, StrokeType.Heng },
-            new List<string> { "ring", "pierce" },
-            8, 8.5f, "8发环形穿透");
+            new List<string> { "shotgun", "pierce" },
+            8, 8.5f, "8发环形穿透", 1f);
 
         AddHanzi("田",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng,
                                    StrokeType.Heng, StrokeType.Shu },
             new List<string> { "ring", "cross" },
-            8, 8.5f, "8发环形十字");
+            11, 8.5f, "8发环形十字", 1f);
 
         AddHanzi("目",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng,
@@ -365,22 +365,22 @@ public class HanziSystem : MonoBehaviour
         AddHanzi("圭",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng,
                                    StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
-            new List<string> { "parallel", "pierce", "ring" },
-            8, 8.5f, "8发穿透环形");
+            new List<string> { "parallel", "ring", "pierce" },
+            11, 8.5f, "8发穿透环形", 1f);
 
         AddHanzi("里",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Heng,
                                    StrokeType.Shu, StrokeType.Heng, StrokeType.Heng },
             new List<string> { "omni", "pierce" },
-            8, 8.5f, "8发全方位穿透");
+            15, 11.9f, "8发全方位穿透", 1.46f);
 
         // ---------- 9 画：终极形态 ----------
         AddHanzi("皇",
             new List<StrokeType> { StrokeType.Pie, StrokeType.Shu, StrokeType.Zhe,
                                    StrokeType.Heng, StrokeType.Heng,
                                    StrokeType.Heng, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
-            new List<string> { "omni", "ring", "pierce" },
-            10, 9f, "皇：10发全方位穿透");
+            new List<string> { "omni", "wave", "parallel" },
+            24, 13.3f, "自定义弹幕", 1.73f);
 
         // ---------- 补充：字形库里已画好但此前没有弹幕定义的字 ----------
         // 这些字的折线坐标早就写在 HanziRenderer 里，只是漏了数据库登记，
