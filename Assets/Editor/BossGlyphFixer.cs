@@ -37,7 +37,7 @@ public static class BossGlyphFixer
         { "Assets/Boss_Huang.prefab", "皇" },
     };
 
-    [MenuItem("Tools/修 BOSS 字形")]
+    // ============================================================\n    //  ⚠ 警告：不要再让这个工具删除"残留图形"\n    // ============================================================\n    //\n    // 这里原来有一段"删掉手拼的残留图形（Square / guan 之类）"的逻辑。\n    // 我把它们当成"从别的预制体复制过来的残渣"删掉了 —— **这是错的**。\n    //\n    // 它们其实是**玩家自己画的这个字的形状**：\n    //     Boss_Shi 1    4 个 GameObject / 3 个 SpriteRenderer\n    //     Boss_Guan    12 个 GameObject / 11 个 SpriteRenderer\n    //     Boss_Huang   12 个 GameObject / 11 个 SpriteRenderer\n    //\n    // 删掉之后三个 BOSS 全变成"只有碰撞体、没有外观"。\n    // 已经用 git 历史恢复，并给 BossGlyph 加了"有手画图形就不碰"的保护。\n    //\n    // **这个工具现在只做一件事：确保碰撞体是触发器。**\n    [MenuItem("Tools/修 BOSS 字形")]
     public static void Run()
     {
         var sb = new StringBuilder();

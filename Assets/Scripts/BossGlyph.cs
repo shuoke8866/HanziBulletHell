@@ -76,6 +76,31 @@ public class BossGlyph : MonoBehaviour
     {
         if (string.IsNullOrEmpty(character)) return;
 
+        // ============================================================
+        //  **已经有手画图形 → 什么都不做**
+        // ============================================================
+        //
+        // 三个 BOSS 的手画字形（`Square*` / `guan` / `shi` / `huang` 等
+        // SpriteRenderer 子物体）是**玩家自己画的这个字的形状**，
+        // 每个字由 3~11 个 SpriteRenderer 拼成。
+        //
+        // 我在 54867f3 那次清理里把它们当成"从别的预制体复制过来的残渣"
+        // 删掉了 —— 这是错的。它们才是这几个 BOSS 该有的外观。
+        //
+        // 所以：**只要预制体上已经有 SpriteRenderer 子物体，就完全不碰它。**
+        // 过程化字形只在"什么都没画"时才生成。
+        if (HasHandDrawnArt())
+        {
+            if (hideLegacyArt)
+            {
+                Debug.LogWarning(
+                    $"[BOSS 字形] {name} 上有手画图形，hideLegacyArt 已自动关闭。" +
+                    "手画的形状比过程化字形好，不应该被隐藏或删除。");
+                hideLegacyArt = false;
+            }
+            return;
+        }
+
         if (hideLegacyArt) HideLegacyArt();
 
         if (glyph != null) return;
@@ -116,6 +141,25 @@ public class BossGlyph : MonoBehaviour
 
         glyph.SetCharacter(character);
         glyph.SetStrokeColor(color);
+    }
+
+    /// <summary>
+    /// 这个 BOSS 身上有没有**手画的图形**（SpriteRenderer 子物体）。
+    ///
+    /// 判据：子物体带 SpriteRenderer 且有 Sprite —— 那就是有人拼出来的字形。
+    /// 有的话就完全不动它。
+    /// </summary>
+    bool HasHandDrawnArt()
+    {
+        foreach (Transform child in transform)
+        {
+            if (child == null) continue;
+            if (child.name == "BossGlyph") continue;      // 自己生成的那个不算
+
+            var sr = child.GetComponent<SpriteRenderer>();
+            if (sr != null && sr.sprite != null) return true;
+        }
+        return false;
     }
 
     /// <summary>
