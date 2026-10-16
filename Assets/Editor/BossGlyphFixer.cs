@@ -98,13 +98,48 @@ public static class BossGlyphFixer
             glyph.character = ch;
             glyph.hideLegacyArt = true;
 
-            // ---- 3) 确保根上有碰撞体（不然打不中）----
-            if (root.GetComponent<Collider2D>() == null)
+            // ---- 3) 碰撞体必须是**触发器** ----
+            //
+            // 玩家反馈"皇根本就不掉血"。根因：
+            //   子弹靠 `OnTriggerEnter2D` 打伤害，而三个 BOSS 预制体的碰撞体
+            //   都是 `isTrigger = 0`（实体碰撞体）。
+            //   Unity 规则：**两个实体碰撞体之间只产生物理碰撞，不产生触发事件**
+            //   → 那个回调一次都不会调用 → 伤害代码压根没被执行。
+            //
+            // 运行时 BossGlyph.Awake 里也会兜一道，但**预制体上直接改好更可靠**：
+            // 不依赖任何运行时执行顺序，而且这里能验证。
+            Collider2D[] cols = root.GetComponents<Collider2D>();
+            int fixedCount = 0;
+            foreach (Collider2D c in cols)
+            {
+                if (c == null || c.isTrigger) continue;
+                c.isTrigger = true;
+                fixedCount++;
+            }
+
+            if (cols.Length == 0)
             {
                 var box = root.AddComponent<BoxCollider2D>();
                 box.size = new Vector2(2.5f, 2.5f);
                 box.isTrigger = true;
                 sb.AppendLine("      ⚠ 原本没有 Collider2D，补了一个 2.5×2.5 触发器");
+            }
+            else if (fixedCount > 0)
+            {
+                sb.AppendLine($"      把 {fixedCount} 个碰撞体改成触发器" +
+                              "（原本打不掉血）");
+            }
+            else
+            {
+                sb.AppendLine("      碰撞体已经是触发器 ✓");
+            }
+
+            // 触发事件需要至少一方有 Rigidbody2D
+            if (root.GetComponent<Rigidbody2D>() == null)
+            {
+                var rb = root.AddComponent<Rigidbody2D>();
+                rb.bodyType = RigidbodyType2D.Kinematic;
+                sb.AppendLine("      ⚠ 原本没有 Rigidbody2D，补了一个 Kinematic 的");
             }
 
             PrefabUtility.SaveAsPrefabAsset(root, path);

@@ -39,8 +39,9 @@ public class PlayerHealthBarUI : MonoBehaviour
     // ---------- 布局 ----------
     const float BarWidth = 280f;
     const float BarHeight = 28f;
-    const float MarginX = 26f;
-    const float MarginY = 22f;
+    // 边距放宽一点，避免任何窗口比例下贴边
+    const float MarginX = 34f;
+    const float MarginY = 30f;
 
     /// <summary>层级高于开场故事（500），永不被盖住</summary>
     const int SortingOrder = 1000;
@@ -108,7 +109,13 @@ public class PlayerHealthBarUI : MonoBehaviour
         CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1280f, 720f);
-        scaler.matchWidthOrHeight = 0.5f;
+        // **按宽度匹配**，不要 0.5。
+        //
+        // matchWidthOrHeight = 0.5 时，UI 缩放取宽高的几何平均 ——
+        // 窗口不是 16:9 时 HUD 会被放大或缩小。
+        // 玩家截图里左上角血条贴边、下面"生命"文字被裁掉就是这个原因。
+        // 按宽度匹配在常见窗口比例下最稳定，也让 HUD 大小可预测。
+        scaler.matchWidthOrHeight = 0f;
 
         canvasGo.AddComponent<GraphicRaycaster>();
 

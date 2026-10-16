@@ -41,8 +41,11 @@ public class TutorialCoach : MonoBehaviour
     const float BubbleHeight = 2.4f;
     const float BubbleFontSize = 3.6f;
 
-    /// <summary>气泡文字颜色：深棕黑，压在浅色气泡上</summary>
-    static readonly Color BubbleTextColor = new Color(0.09f, 0.06f, 0.04f);
+    /// <summary>气泡文字颜色：亮黄白。- 描边保证它在任何底色上都读得清</summary>
+    static readonly Color BubbleTextColor = new Color(1f, 0.96f, 0.80f);
+
+    /// <summary>文字描边颜色：近黑。和亮色字形成轮廓，不再依赖气泡底色</summary>
+    static readonly Color BubbleOutlineColor = new Color(0.02f, 0.02f, 0.04f);
 
     // ---------- 节奏 ----------
     /// <summary>一条文案停留多久（最后一条之后气泡收起）</summary>
@@ -154,15 +157,26 @@ public class TutorialCoach : MonoBehaviour
         bubbleBg = go.AddComponent<SpriteRenderer>();
         bubbleBg.sprite = SolidSprite.White;
         // 不透明一点，避免和背景混在一起看不清
-        // **亮底深字** —— 在深色游戏背景上这是对比最强的组合。
+        // **深底 + 亮字 + 深色描边**。
         //
-        // 之前试过"近黑底 + 亮黄字"，但玩家截图显示文字渲染出来是暗的
-        // （TMP 的着色在这种情况下不可靠）。
-        // 换成浅色底 + 纯黑粗体字，无论 TMP 怎么处理颜色都读得清。
-        bubbleBg.color = new Color(1f, 0.97f, 0.88f, 0.97f);
+        // 玩家截图证明前两版都不行：
+        //   第一版：深底 + 米白字 → 两者都亮，糊在一起
+        //   第二版：浅底 + 深字   → 我把底改成浅米色、字改成深棕黑，
+        //                          结果字和底几乎同色，**整个气泡看起来是空的**
+        //
+        // 根因是"赌文字颜色和底色一深一浅"这件事本身不稳 ——
+        // 改一个忘了另一个就废。
+        //
+        // 现在用**描边**：亮色字 + 深色轮廓，不管压在什么底色上都读得清。
+        // 描边在 BuildBubble 里设置。
+        bubbleBg.color = new Color(0.04f, 0.055f, 0.11f, 0.97f);
         bubbleBg.sortingOrder = 149;
 
         go.transform.localScale = new Vector3(BubbleWidth, BubbleHeight, 1f);
+
+        // 气泡放在点的**左侧**（点在玩家右上，气泡再往左就不会跑出屏幕）。
+        // 位置在这里设一次 —— 父物体是 coach 本身，会跟着玩家走。
+        go.transform.localPosition = new Vector3(-BubbleWidth * 0.62f, 0.15f, 0f);
 
         // 文字
         var textGo = new GameObject("Text");
@@ -170,21 +184,31 @@ public class TutorialCoach : MonoBehaviour
         // 文字作为气泡的**子物体** —— 位置和缩放都跟着气泡走，不用每帧手动对齐。
         // （原来挂在气泡外面靠每帧算坐标，字体一放大就不再居中。）
         textGo.transform.SetParent(go.transform, false);
-        // 稍微收窄一点，给文字留出左右边距 —— 不然长句子会顶到气泡边上
         textGo.transform.localPosition = new Vector3(0f, 0f, -0.1f);
-        textGo.transform.localScale = new Vector3(1f / BubbleWidth, 1f / BubbleHeight, 1f) * 0.92f;
 
-        // 父级有**非等比缩放**（气泡是 7.6×2.1 的长条），
-        // 文字直接继承会被拉扁 —— 所以反向抵消掉，只保留位置。
-        textGo.transform.localScale = new Vector3(1f / BubbleWidth, 1f / BubbleHeight, 1f);
+        // 父级有**非等比缩放**（气泡是长条），文字直接继承会被拉扁 ——
+        // 反向抵消掉，只保留位置。再乘 0.92 给左右留边距，避免顶到气泡边上。
+        //
+        // （这里原来写了两遍 localScale，后一遍把前一遍覆盖了 —— 属于手误。）
+        textGo.transform.localScale =
+            new Vector3(1f / BubbleWidth, 1f / BubbleHeight, 1f) * 0.92f;
 
         bubbleText = textGo.AddComponent<TextMeshPro>();
         bubbleText.fontSize = BubbleFontSize;
         bubbleText.alignment = TextAlignmentOptions.Center;
-        // 深色字 + 粗体，压在浅色气泡上
         bubbleText.color = BubbleTextColor;
         bubbleText.fontStyle = FontStyles.Bold;
         bubbleText.enableWordWrapping = true;
+
+        // ---- **描边** ----
+        //
+        // 亮色字 + 深色轮廓。这样**不管压在什么底色上都读得清**。
+        //
+        // 前两版都是在"赌文字和底色一深一浅"：
+        //   第一版：深底 + 米白字 → 两者都亮，糊在一起
+        //   第二版：浅底 + 深字   → 改底的时候忘了字，结果同色，气泡看起来是空的
+        // 描边把这件事变成"不依赖底色"，就不会再互相牵扯。
+        AddOutline(textGo, BubbleOutlineColor, 0.22f);
 
         // **自动缩小字号**：句子长了就自动变小，永远不会超出气泡。
         // 玩家反馈"文字容易出到气泡外面" —— 光靠手调字号治不了，
@@ -195,6 +219,33 @@ public class TutorialCoach : MonoBehaviour
 
         bubble = go.transform;
         SetBubbleVisible(false);
+    }
+
+    /// <summary>
+    /// 给文字加描边。
+    ///
+    /// TMP 的描边走材质的 `_OutlineWidth` / `_OutlineColor` ——
+    /// **每个用到的物体需要自己的一个材质实例**，所以这里用 `For` 复制一份，
+    /// 不能直接改共享材质（那会把场景里所有 TMP 都改掉）。
+    ///
+    /// 描边宽度是**按字号比例**的（0.2 ≈ 字号的 20%），
+    /// 太小看不出轮廓，太大会把笔画糊在一起。
+    /// </summary>
+    static void AddOutline(GameObject target, Color outlineColor, float width)
+    {
+        var tmp = target.GetComponent<TextMeshPro>();
+        if (tmp == null) return;
+
+        // 复制一份材质，避免影响其他 TMP
+        Material mat = new Material(tmp.fontSharedMaterial);
+        mat.EnableKeyword("OUTLINE_ON");
+        mat.SetColor("_OutlineColor", outlineColor);
+        mat.SetFloat("_OutlineWidth", width);
+
+        tmp.fontMaterial = mat;
+
+        // 描边会让字形整体变粗，稍微收一点字距更耐看
+        tmp.characterSpacing = -1f;
     }
 
     void SetBubbleVisible(bool v)
@@ -235,12 +286,13 @@ public class TutorialCoach : MonoBehaviour
                                           Time.unscaledDeltaTime * 8f);
         }
 
-        if (bubble != null)
-        {
-            // 气泡放在点的**左侧**（点在玩家右上，气泡再往左就不会跑出屏幕）
-            bubble.localPosition = new Vector3(-BubbleWidth * 0.62f, 0.15f, 0f);
-            bubble.localScale = new Vector3(BubbleWidth, BubbleHeight, 1f);
-        }
+        // 气泡的 localPosition / localScale 在 BuildBubble 里设一次就够了 ——
+        // 它的父物体就是这个 coach 对象（本身跟着玩家走），所以不需要每帧重设。
+        //
+        // 原来这里每帧重设一遍，看起来无害，其实是"文字出到气泡外面"的成因之一：
+        // 文字的反向缩放是按 BubbleWidth / BubbleHeight 算的，
+        // 而这里每帧把气泡 scale 写回同一组值，两者就一直在互相拉扯。
+        // 同一份数据在两处维护 —— 改一处忘一处就出错。
 
         CheckTriggers();
         TickDisplay();
