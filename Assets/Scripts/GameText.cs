@@ -51,7 +51,10 @@ public static class GameText
         /// 刻意写得短：飘字的空间小、只停 1 秒左右，
         /// 不像屏幕提示条那样能放长句子。
         /// </summary>
-        public static string 获得笔画(string stroke) { return $"获得「{stroke}」"; }
+        public static string 获得笔画(string stroke) { return $"恭喜你获得了「{stroke}」"; }
+
+        /// <summary>靠近宝箱时在宝箱上方飘的提示</summary>
+        public static string 开宝箱() { return "按 F 打开宝箱"; }
 
         public static string 房间清理完成() { return "房间清理完成！"; }
         public static string 获得词条(string name, string desc) { return $"获得词条：{name} —— {desc}"; }

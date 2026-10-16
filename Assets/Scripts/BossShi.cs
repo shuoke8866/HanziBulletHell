@@ -26,8 +26,19 @@ public class BossShi : MonoBehaviour, IDamageable
     private Room currentRoom;
     private bool isDead = false;
 
+    /// <summary>
+    /// 这个 BOSS 显示的汉字。统一走 BossGlyph 渲染。
+    /// </summary>
+    public string glyphChar = "士";
+
     void Start()
     {
+        if (GetComponent<BossGlyph>() == null)
+        {
+            var bg = gameObject.AddComponent<BossGlyph>();
+            bg.character = glyphChar;
+        }
+
         currentHealth = maxHealth;
         player = PlayerRef.Transform;
         // BOSS 入场演出：强烈的镜头震动 + 金色爆发，配合 HP 条的"压迫感"

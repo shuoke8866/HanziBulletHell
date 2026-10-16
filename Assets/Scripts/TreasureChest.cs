@@ -34,20 +34,31 @@ public class TreasureChest : MonoBehaviour
     // 给玩家一个提示（按 F 打开）
     void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.CompareTag("Player") && !isOpened)
-        {
-            playerNearby = true;
-            GameLog.Info("接近宝箱！按 F 打开");
-        }
+        if (!other.CompareTag("Player") || isOpened) return;
+
+        playerNearby = true;
+        GameLog.Info("接近宝箱！按 F 打开");
+
+        // 在**宝箱上方**飘一行"按 F 打开宝箱"（玩家要求）。
+        // 锚在宝箱上而不是玩家头上 —— 提示指向的是"这个箱子"。
+        tip = FloatingTip.ShowAt(GameText.Toast.开宝箱(), PromptColor, transform, 1.2f);
     }
 
     void OnTriggerExit2D(Collider2D other)
     {
-        if (other.CompareTag("Player"))
-        {
-            playerNearby = false;
-        }
+        if (!other.CompareTag("Player")) return;
+
+        playerNearby = false;
+
+        // 走开就把提示收掉（不然玩家跑到别的房间还会看到"按 F"）
+        FloatingTip.Clear(tip);
     }
+
+    /// <summary>当前显示的靠近提示（走开或开箱时清掉）</summary>
+    private FloatingTip.Handle tip;
+
+    /// <summary>提示颜色：暖黄，和宝箱的金色呼应</summary>
+    static readonly Color PromptColor = new Color(1f, 0.92f, 0.55f);
 
     void Update()
     {
@@ -64,15 +75,15 @@ public class TreasureChest : MonoBehaviour
 
         Sfx.Play(Sfx.Id.Boon, 0.45f);
         Fx.PickupPop(transform.position, new Color(1f, 0.9f, 0.5f));
+
+        FloatingTip.Clear(tip);      // 收掉"按 F"的提示
+        tip = null;
+
         GameLog.Info("宝箱打开！获得笔画：" + dropStrokeType);
 
         // 玩家**头顶**飘一行字，告诉他捡到了什么。
         // 锚在玩家身上而不是宝箱上 —— 玩家的视线在自己角色上，不在箱子上。
-        FloatingTip.Show(GameText.Toast.获得笔画(StrokeUtil.NameOf(dropStrokeType)),
-                         StrokeUtil.ColorOf(dropStrokeType));
-
-        // 玩家头顶飘一行字，告诉他捡到了什么。
-        // 宝箱位置和玩家位置可能差一点，所以锚在**玩家**头上而不是宝箱上。
+        // 连续开箱时 Show 会立刻替换上一条（玩家要求）。
         FloatingTip.Show(GameText.Toast.获得笔画(StrokeUtil.NameOf(dropStrokeType)),
                          StrokeUtil.ColorOf(dropStrokeType));
 

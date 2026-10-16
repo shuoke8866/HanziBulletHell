@@ -32,8 +32,22 @@ public class BossGuan : MonoBehaviour, IDamageable
     private float nextRingTime;
     private float nextSummonTime;
 
+    /// <summary>
+    /// 这个 BOSS 显示的汉字。统一走 BossGlyph 渲染，
+    /// 不再依赖预制体里手拼的图形（那是复制预制体留下的残渣，
+    /// 而且贴图引用早就失效了）。
+    /// </summary>
+    public string glyphChar = "官";
+
     void Start()
     {
+        // 字形：和普通敌人同一套渲染，保证显示的就是这个字
+        if (GetComponent<BossGlyph>() == null)
+        {
+            var bg = gameObject.AddComponent<BossGlyph>();
+            bg.character = glyphChar;
+        }
+
         currentHealth = maxHealth;
         player = PlayerRef.Transform;
         // BOSS 入场演出：强烈的镜头震动 + 金色爆发，配合 HP 条的"压迫感"

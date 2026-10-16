@@ -57,8 +57,22 @@ public class BossHuang : MonoBehaviour, IDamageable
 
     public bool IsEnraged { get { return enraged; } }
 
+    /// <summary>
+    /// 这个 BOSS 显示的汉字。挂在 BossGlyph 上统一渲染，
+    /// 不再依赖预制体里手拼的图形（那些是复制预制体时留下的残渣，
+    /// 而且贴图引用早就失效了 —— 第三关 BOSS 顶着「官」的脸就是这个原因）。
+    /// </summary>
+    public string glyphChar = "皇";
+
     void Start()
     {
+        // 字形：用和普通敌人同一套渲染，保证显示的就是这个字
+        if (GetComponent<BossGlyph>() == null)
+        {
+            var bg = gameObject.AddComponent<BossGlyph>();
+            bg.character = glyphChar;
+        }
+
         currentHealth = maxHealth;
         player = PlayerRef.Transform;
         // BOSS 入场演出：强烈的镜头震动 + 金色爆发，配合 HP 条的"压迫感"

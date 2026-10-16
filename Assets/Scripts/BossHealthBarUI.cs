@@ -243,33 +243,53 @@ public class BossHealthBarUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 找场上活着的 BOSS。
+    /// 找场上**真正出现（激活）**的 BOSS。
     ///
-    /// `FindObjectsOfType(type, true)` 的第二个参数 = **包含未激活的对象**。
-    /// 有些 BOSS 预制体在场景里是停用的（只在进房时由 Room 启用），
-    /// 不传 true 就永远找不到它们 —— 这也是旧版"BOSS 血条不显现"的原因之一。
+    /// ## 两个关键条件，缺一个血条就会"一直占着"
+    ///
+    /// 玩家反馈"血条应该等 BOSS 出现再显示，而不是一直占着上面的红条"。
+    ///
+    /// 之前有两个毛病叠在一起：
+    ///   1. 传了 `includeInactive: true` —— 于是**场景里停用的 BOSS 预制体**
+    ///      也被当成"场上有 BOSS"，血条一进关卡就亮着
+    ///   2. 没检查 `activeInHierarchy` —— 停用的对象血量字段是预制体上的初值
+    ///      （比如 1100），看起来"还活着"，其实玩家根本还没见到它
+    ///
+    /// 现在只认**在场景里激活着的** BOSS。Room 在玩家进房时才 Instantiate/启用它，
+    /// 所以血条也会跟着在那一刻才出现。
     /// </summary>
     static Component FindBoss()
     {
         foreach (BossHuang b in Object.FindObjectsOfType<BossHuang>(true))
-            if (b.MaxHealth > 0 && b.CurrentHealth > 0) return b;
+            if (IsSpawned(b)) return b;
 
         foreach (BossGuan b in Object.FindObjectsOfType<BossGuan>(true))
-            if (b.MaxHealth > 0 && b.CurrentHealth > 0) return b;
+            if (IsSpawned(b)) return b;
 
         foreach (BossShi b in Object.FindObjectsOfType<BossShi>(true))
-            if (b.MaxHealth > 0 && b.CurrentHealth > 0) return b;
+            if (IsSpawned(b)) return b;
 
         return null;
     }
 
-    static bool IsAlive(Component c)
+    /// <summary>这个 BOSS 是不是"已经出现在场上且还活着"</summary>
+    static bool IsSpawned(Component c)
     {
         if (c == null) return false;
+
+        // ① 必须在场景里**处于激活状态** —— 躺在场景里的停用预制体不算出现
+        if (!c.gameObject.activeInHierarchy) return false;
 
         IDamageable d = c as IDamageable;
         if (d == null) return false;
 
+        // ② 血量为正
         return d.CurrentHealth > 0 && d.MaxHealth > 0;
+    }
+
+    /// <summary>旧名字保留，行为同上</summary>
+    static bool IsAlive(Component c)
+    {
+        return IsSpawned(c);
     }
 }
