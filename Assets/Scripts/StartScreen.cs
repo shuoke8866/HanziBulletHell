@@ -59,6 +59,17 @@ public class StartScreen : MonoBehaviour
         UIBuild.AnchorTop(title.rectTransform, -420f, 1500f, 130f);
 
         MakeStartButton(full);
+
+        // ---- 版权声明 ----
+        //
+        // 放在标题画面底部。作用有两个：
+        //   1. 任何录屏 / 截图 / 搬运都会带着这行字（最低成本的水印）
+        //   2. 明确表态"保留所有权利"，而不是默默开源
+        //
+        // 颜色刻意压暗（0.45 灰）：玩家不会去注意它，但截图里看得清。
+        var copyright = UIBuild.Text(full, "Copyright", GameText.Panel.版权声明(),
+            22f, TextAlignmentOptions.Center, new Color(0.62f, 0.64f, 0.70f));
+        UIBuild.AnchorBottom(copyright.rectTransform, 26f, 900f, 34f);
     }
 
     void MakeStartButton(RectTransform parent)

@@ -110,6 +110,17 @@ public static class GameText
     public static class Panel
     {
         public static string 开局标题() { return "选一支笔画，开始"; }
+
+        /// <summary>
+        /// 标题画面底部的版权声明。
+        ///
+        /// 作用：任何录屏 / 截图 / 搬运都会带着这行字 —— 最低成本的"水印"。
+        /// 年份动态取，跨年不用改代码。
+        /// </summary>
+        public static string 版权声明()
+        {
+            return $"© {System.DateTime.Now.Year} shuoke8866　保留所有权利";
+        }
         public static string 开局说明() { return "哦～很大胆的选择呢"; }
 
         /// <summary>

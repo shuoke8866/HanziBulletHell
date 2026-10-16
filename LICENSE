@@ -1,38 +1,60 @@
-MIT License
+Copyright (c) 2026 shuoke8866. All rights reserved.
+版权所有 (c) 2026 shuoke8866　保留所有权利
 
-Copyright (c) 2026 shuoke8866
+================================================================================
+  中文
+================================================================================
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+本仓库为个人作品集项目。源代码、美术素材、剧情文案、关卡设计及其他一切内容，
+版权均归作者（shuoke8866）所有。
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+**未经作者事先书面许可，任何人不得：**
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+  1. 复制、转载、镜像本项目的源代码或素材；
+  2. 修改、改编、演绎本项目；
+  3. 将本项目或其任何部分用于商业用途（包括但不限于销售、出租、
+     作为付费产品或服务的组成部分）；
+  4. 移除或修改本文件中的版权声明。
 
----
+**你可以：**
 
-## 第三方资源许可 / Third-party notices
+  · 通过作者提供的链接游玩本项目的在线版本（用于了解作者的能力）；
+  · 在注明出处并链接回本仓库的前提下，引用少量代码片段用于
+    技术讨论、教学或评论；
+  · 在招聘、评审等场景中查看、试玩本项目。
 
-### Noto Sans SC
-- 文件：`Assets/Fonts/NotoSansSC-Regular.otf`
-- 许可：SIL Open Font License 1.1 (OFL-1.1)
-- 版权：Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.
-- OFL 允许自由使用、修改与再分发（包括商用），要求保留本许可声明。
+**第三方内容：**
 
-### TextMesh Pro
-- 许可：Unity Companion License（随 Unity 包提供）
+  本项目使用了若干第三方资源，版权归各自作者所有，遵守各自的许可协议。
+  完整清单见 CREDITS.md。
 
-### 音频
-- `Assets/Audio/` 下的音乐仅用于学习与作品演示，版权归原作者所有。
-  如需商用请自行替换为已授权素材。
+================================================================================
+  English
+================================================================================
+
+Copyright (c) 2026 shuoke8866. All rights reserved.
+
+This repository (the "Project") is a personal portfolio project. All source
+code, art assets, narrative text, level design, and other content are the
+property of the author (shuoke8866).
+
+No part of this Project may be reproduced, distributed, modified, adapted, or
+used for any commercial purpose without the prior written permission of the
+author. Copyright notices must not be removed or altered.
+
+You MAY:
+  - Play the online build via the link provided by the author;
+  - Quote small code excerpts for technical discussion, teaching, or review,
+    provided that clear attribution and a link back to this repository are given;
+  - View and evaluate this Project in recruiting or review contexts.
+
+THIRD-PARTY CONTENT:
+  See CREDITS.md for the full list. All third-party assets remain the property
+  of their respective authors and are used under their own licenses.
+
+================================================================================
+  联系方式 / Contact
+================================================================================
+
+如需授权，请通过 GitHub 联系：https://github.com/shuoke8866
+For licensing inquiries, please reach out via GitHub.

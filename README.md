@@ -194,7 +194,8 @@ Assets/
 |---|---|
 | **Noto Sans SC** | [SIL Open Font License 1.1](https://scripts.sil.org/OFL) —— 允许自由再分发 |
 | TextMesh Pro | Unity 官方包 |
-| 代码 | 见 [LICENSE](LICENSE) |
+| 音乐 / 音效 | 见 [CREDITS.md](CREDITS.md)（部分待确认来源） |
+| **本项目代码与素材** | **[保留所有权利](LICENSE)** —— 非开源许可，未经书面许可不得使用 |
 
 > 本项目**不包含**任何专有字体。早期版本使用过 SimSun，已因再分发许可问题移除。
 
