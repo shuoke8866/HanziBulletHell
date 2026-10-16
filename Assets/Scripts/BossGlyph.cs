@@ -88,6 +88,28 @@ public class BossGlyph : MonoBehaviour
         glyph = go.AddComponent<HanziRenderer>();
         glyph.textureSize = 96;
         glyph.pixelsPerUnit = 32f;
+
+        // ---- 必须显式指定字库 ----
+        //
+        // 玩家反馈「第二层的官居然变成一了」。根因：
+        //   HanziRenderer.glyphSet 的默认值是**玩家字库**（SetPlayer），
+        //   而玩家字库里没有「官」（有「皇」「士」，偏偏缺这一个）。
+        //
+        // HanziRenderer.SetCharacter 遇到字库里没有的字时，行为是
+        // **打一条警告然后保持当前显示** —— 于是 BOSS 顶着上一个字（「一」）。
+        //
+        // 指定敌人字库后，三个 BOSS 的字都在库里（士 / 官 / 皇）。
+        glyph.glyphSet = HanziRenderer.SetEnemy;
+
+        // 缺字时**明确报错**，不要静默显示成别的字
+        if (!HanziRenderer.IsAllowed(character, HanziRenderer.SetEnemy))
+        {
+            Debug.LogError(
+                $"[BOSS 字形] 敌人字库里没有「{character}」，" +
+                "这个 BOSS 会显示成别的字。请把这个字加进 " +
+                "EnemyGlyphs.EnemyGlyphNames，或给 BossGlyph.character 换一个字。");
+        }
+
         glyph.SetCharacter(character);
         glyph.SetStrokeColor(color);
     }

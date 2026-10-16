@@ -493,24 +493,34 @@ public static class Level3Builder
         room.enemySpawnPoints.Add(go.transform);
     }
 
+    /// <summary>
+    /// 把 BOSS 挂到房间里。
+    ///
+    /// ## 关键：引用【预制体资产】，不要在场景里实例化
+    ///
+    /// 玩家反馈「第三关 BOSS 会莫名其妙在别的房间就生成，然后最后一个房间
+    /// 还是会生成 BOSS」。实测（调真实的 StartNextWave 数生成数量）：
+    ///
+    ///     调用前场上敌人 = 1      ← 场景里已经站着一个 BossHuang
+    ///     调用后场上敌人 = 2
+    ///         BossHuang(Clone)   ← 房间刷出来的
+    ///         BossHuang          ← 直接摆在场景里的那个
+    ///
+    /// 根因：这里原来用 `PrefabUtility.InstantiatePrefab` 把 BOSS
+    /// **实例化到了场景里**。于是场景里有一个「真身」，房间刷怪时又克隆一个。
+    ///
+    /// Level1 / Level2 的 BOSS 房引用的是**外部预制体资产**，所以没这个问题。
+    /// 这里改成一样的做法：`room.enemyPrefabs.Add(prefab)`，
+    /// 场景里不再有 BOSS 实例 —— 只有房间进人时才生成一只。
+    /// </summary>
     static void AddBoss(Room room)
     {
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Boss_Huang.prefab");
         if (prefab == null) { Debug.LogWarning("[第三层] 找不到 Boss_Huang.prefab"); return; }
 
-        GameObject go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-        go.name = "BossHuang";
-
-        // **必须保持激活！** 不能像传送门那样 SetActive(false)。
-        //
-        // 踩过的坑（玩家反馈"第三关关底 BOSS 不生成"）：
-        // Room.SpawnOne 走的是 Instantiate(prefab) —— 如果预制体是停用的，
-        // **实例化出来的克隆也是停用的**，于是 Enemy/Boss 的 Start() 不跑、
-        // 房间也永远"清不掉"，BOSS 等于不存在。
-        //
-        // 传送门可以停用（它由 Room.ActivatePortal 在清房时启用），
-        // 但 BOSS 不行 —— 它得先活着才能被打死。
-        room.enemyPrefabs.Add(go);
+        // **加的是预制体资产本身，不是它的场景实例。**
+        // Room.SpawnOne 会用 Instantiate(prefab) 生成 —— 谁进来才生成谁。
+        room.enemyPrefabs.Add(prefab);
     }
 
     static void AddPortal(Room bossRoom, Vector2 pos)

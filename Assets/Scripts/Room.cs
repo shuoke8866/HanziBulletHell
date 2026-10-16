@@ -298,6 +298,22 @@ public class Room : MonoBehaviour
     /// <summary>下一波的预警时长（秒）。0 = 不预警</summary>
     public float waveTelegraph = 0.7f;
 
+    /// <summary>
+    /// 这个预制体是不是 BOSS。
+    ///
+    /// 判据用**有没有 BOSS 脚本**，而不是看名字 ——
+    /// 名字是给人看的，脚本才是实际行为（`Boss_Shi 1` 这种名字里带空格和数字，
+    /// 靠字符串匹配很容易漏）。
+    /// </summary>
+    static bool IsBossPrefab(GameObject prefab)
+    {
+        if (prefab == null) return false;
+
+        return prefab.GetComponent<BossShi>() != null
+            || prefab.GetComponent<BossGuan>() != null
+            || prefab.GetComponent<BossHuang>() != null;
+    }
+
     int GetBaseEnemyCount()
     {
         if (enemySpawnPoints.Count > 0 && enemyPrefabs.Count > 0) return enemySpawnPoints.Count;
@@ -309,6 +325,26 @@ public class Room : MonoBehaviour
     void SpawnOne(int index)
     {
         Vector3 pos = GetSpawnPosition(index);
+
+        // 0) **类型守卫：BOSS 只能出现在 BOSS 房**
+        //
+        // 玩家反馈"第三关 BOSS 会莫名其妙在别的房间就生成，然后最后一个房间
+        // 还是会生成 BOSS"。加这道守卫有两个作用：
+        //   · 万一数据配错了（非 BOSS 房挂了 BOSS 预制体），不会真的刷出来
+        //   · **明确报出来**，而不是静默地多刷一只 BOSS
+        //
+        // 之前的做法是"配了什么就刷什么"，配错只会表现为"莫名其妙多一个 BOSS"，
+        // 排查时完全看不出是哪间房、哪个预制体的问题。
+        if (roomType != RoomType.Boss && index < enemyPrefabs.Count && IsBossPrefab(enemyPrefabs[index]))
+        {
+            Debug.LogError(
+                $"[刷怪] 房间「{name}」的 roomType={roomType}（不是 Boss 房），" +
+                $"但它的 enemyPrefabs[{index}] 是 BOSS 预制体「{enemyPrefabs[index].name}」。\n" +
+                "已跳过这只 —— 否则会出现'同一个 BOSS 刷两次'。\n" +
+                "修法：要么把这间房的 roomType 改成 Boss，要么把它 enemyPrefabs 里的 " +
+                "BOSS 预制体换成普通小怪。");
+            return;
+        }
 
         // 1) 固定 id（数据驱动）
         if (!string.IsNullOrEmpty(singleDefId))
