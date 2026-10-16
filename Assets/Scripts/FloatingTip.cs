@@ -31,7 +31,8 @@ public static class FloatingTip
     /// <summary>常驻提示的句柄（用来单独清掉某一条）</summary>
     public class Handle
     {
-        internal GameObject go;
+        /// <summary>这条提示的对象（调用方可以改它的位置/缩放）</summary>
+        public GameObject go;
     }
 
     static GameObject current;

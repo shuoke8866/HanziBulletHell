@@ -20,12 +20,18 @@ public static class TextScaleVerify
         // ---- 1) 教程文字 ----
         sb.AppendLine("--- 教程文字 ---");
 
-        var go = new GameObject("VerifyDot");
-        go.transform.localScale = Vector3.one * 0.34f;      // 模拟提示点
+        // 模拟 TutorialCoach 的真实结构：
+        //   coach (scale 1)  → 文字挂这里（和实际代码一致）
+        //   coach → dot (scale 0.34)  ← 只是视觉上的提示点，文字不挂它下面
+        var coach = new GameObject("VerifyCoach");
+
+        var dot = new GameObject("VerifyDot");
+        dot.transform.SetParent(coach.transform, false);
+        dot.transform.localScale = Vector3.one * 0.34f;
 
         const string text = "测试用的一行教程文字";
         FloatingTip.Handle h = FloatingTip.ShowAtOffset(
-            text, Color.white, go.transform,
+            text, Color.white, coach.transform,
             new Vector3(-0.35f, 0.42f, -0.1f), 1.0f,
             float.PositiveInfinity, faceCamera: false);
 
@@ -37,17 +43,23 @@ public static class TextScaleVerify
             {
                 var tmp = tmpGo.GetComponent<TMPro.TextMeshPro>();
                 sb.AppendLine($"  文字对象: {tmpGo.name}");
-                sb.AppendLine($"      fontSize  = {tmp.fontSize}");
+                sb.AppendLine($"      fontSize   = {tmp.fontSize}");
                 sb.AppendLine($"      localScale = {tmpGo.transform.localScale}");
-                sb.AppendLine($"      **实际世界高度 ≈ " +
-                              $"{tmp.fontSize * tmpGo.transform.localScale.y:0.##}**");
+                sb.AppendLine($"      **lossyScale = {tmpGo.transform.lossyScale}**   ← 世界缩放（含所有父级）");
+                sb.AppendLine($"      **实际字号 ≈ {tmp.fontSize * tmpGo.transform.lossyScale.y:0.##}**" +
+                              $"   ← 这个才是屏幕上看到的");
+
+                if (Mathf.Abs(tmpGo.transform.lossyScale.y - 1f) > 0.01f)
+                    sb.AppendLine("      x **世界缩放不是 1** —— 父级在缩放它，字号会被乘掉！");
+                else
+                    sb.AppendLine("      ✓ 世界缩放 = 1，字号所见即所得");
 
                 var fc = tmpGo.GetComponent<FaceCamera>();
                 sb.AppendLine($"      FaceCamera = {(fc == null ? "无 ✓（不会覆盖缩放）" : "有 x（会覆盖缩放）")}");
             }
             FloatingTip.Clear(h);
         }
-        Object.DestroyImmediate(go);
+        Object.DestroyImmediate(coach);
         sb.AppendLine();
 
         // ---- 2) 三个 BOSS 的字在不在字库里 ----

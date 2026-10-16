@@ -182,6 +182,13 @@ public class TutorialCoach : MonoBehaviour
                                           Time.unscaledDeltaTime * 8f);
         }
 
+        // 文字挂在 coach 下面（不是圆点），所以手动跟随圆点的世界位置。
+        // 这样文字不受圆点缩放影响，字号才是所见即所得。
+        if (dot != null && textHandle != null && textHandle.go != null)
+        {
+            textHandle.go.transform.position = dot.position + TextOffset;
+        }
+
         CheckTriggers();
         TickDisplay();
     }
@@ -370,7 +377,19 @@ public class TutorialCoach : MonoBehaviour
         // 我把 TextScale 从 0.62 改成 1.0，字号却一点没变，就是这个原因。
         //
         // 关掉 FaceCamera 之后 TextScale 才是真正生效的字号。
-        textHandle = FloatingTip.ShowAtOffset(text, TextColor, dot, TextOffset, TextScale,
+        // **锚点是 coach 自己，不是圆点。**
+        //
+        // 玩家反馈「教程字还是小」。根因是**父级缩放**：
+        //   文字挂在圆点下面，圆点 localScale = 0.34（说话时 0.425）
+        //   → 文字的实际世界缩放 = 0.34 × 1.0 = 0.34
+        //   → 实际字号 = 4.6 × 0.34 ≈ 1.56
+        //
+        // 上次只验证了文字自己的 localScale = 1.0，**没算父级**，
+        // 所以表现是「改了却没用」。
+        //
+        // 现在挂在 coach 名下（localScale = 1，整条链路没有缩放），
+        // 位置在 LateUpdate 里跟随圆点。
+        textHandle = FloatingTip.ShowAtOffset(text, TextColor, transform, TextOffset, TextScale,
                                               float.PositiveInfinity, faceCamera: false);
     }
 
