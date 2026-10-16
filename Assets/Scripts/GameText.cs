@@ -112,6 +112,26 @@ public static class GameText
         public static string 开局标题() { return "选一支笔画，开始"; }
         public static string 开局说明() { return "哦～很大胆的选择呢"; }
 
+        /// <summary>
+        /// 每个笔画在**开局六选一**里显示的特征句（玩家提供的文案）。
+        ///
+        /// 放在这里而不是硬编码进 UI —— 以后改文案不用碰 UI 代码。
+        /// 没写的笔画会给一句中性说明，不会留空。
+        /// </summary>
+        public static string 笔画特点(StrokeType st)
+        {
+            switch (st)
+            {
+                case StrokeType.Heng:  return "平平无奇的笔画，但是非常好用的合成材料";
+                case StrokeType.Shu:   return "在发射时提供护盾，这可能是你最重要的自保手段哦";
+                case StrokeType.Dian:  return "好小的笔画哦，或许在后期会起到关键作用";
+                case StrokeType.Pie:   return "弹道偏左的刺客";
+                case StrokeType.Na:    return "弹道偏右的战士";
+                case StrokeType.Zhe:   return "额……弹幕挺好看的……";
+                default:               return "一种笔画";
+            }
+        }
+
         public static string 选字标题() { return "这几个字组成一样欸，你更想要哪个"; }
 
         public static string 背包当前汉字(string name) { return $"当前汉字「{name}」"; }

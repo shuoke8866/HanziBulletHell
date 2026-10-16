@@ -24,13 +24,21 @@ public class OpeningStrokeUI : MonoBehaviour
 {
     [Header("外观")]
     public float cardW = 190f;
-    public float cardH = 190f;
+    // 卡片高度从 190 减到 150 —— **给下面的特征句腾出空间**。
+    // 特征句挂在卡片下边缘外面，卡片不矮一点整块面板会超出屏幕。
+    public float cardH = 150f;
     public float gap = 18f;
 
     private GameObject panel;
     private readonly List<Image> cardFrames = new List<Image>();
     private readonly List<Image> cardGlyphs = new List<Image>();
     private readonly List<TextMeshProUGUI> cardLabels = new List<TextMeshProUGUI>();
+
+    /// <summary>每张卡下面的特征句</summary>
+    private readonly List<TextMeshProUGUI> cardFeatures = new List<TextMeshProUGUI>();
+
+    /// <summary>副标题（选完之后才填内容）</summary>
+    private TextMeshProUGUI subText;
     private readonly Dictionary<string, Sprite> glyphCache = new Dictionary<string, Sprite>();
 
     private bool open;
@@ -97,7 +105,8 @@ public class OpeningStrokeUI : MonoBehaviour
         int n = GameData.StarterChoices.Length;
         float rowW = n * cardW + (n - 1) * gap;
         float panelW = rowW + 80f;
-        float panelH = cardH + 200f;
+        // 面板高度 = 标题 + 副标题 + 卡片 + **特征句区** + 底部提示
+        float panelH = cardH + 290f;
 
         panel = new GameObject("OpeningStrokePanel");
         if (canvas != null) panel.transform.SetParent(canvas.transform, false);
@@ -121,7 +130,14 @@ public class OpeningStrokeUI : MonoBehaviour
         TextMeshProUGUI sub = MakeText(panel.transform, "Sub", 20f,
             TextAlignmentOptions.Center, new Color(0.75f, 0.82f, 0.95f));
         AnchorTop(sub.rectTransform, 0f, -62f, panelW - 40f, 30f);
-        sub.text = GameText.Panel.开局说明();
+
+        // **开局时先不显示这行字** —— 玩家要求它「选完后才出现」。
+        //
+        // 原来是 Build() 里就填上，等于一进来就在说话。
+        // 而「哦～很大胆的选择呢」本来就是**对选择本身的回应**，
+        // 出现在选择之前逻辑上就不对。
+        sub.text = "";
+        subText = sub;
 
         // ---- 六张卡 ----
         float startX = -rowW * 0.5f + cardW * 0.5f;
@@ -183,6 +199,22 @@ public class OpeningStrokeUI : MonoBehaviour
             lbl.text = $"<size=26>[{i + 1}] {StrokeUtil.NameOf(st)}</size>\n" +
                        $"<size=70%>起手字「{startHanzi}」</size>";
             cardLabels.Add(lbl);
+
+            // ---- 这个笔画的特点（玩家提供的文案）----
+            //
+            // 放在卡片**下边缘外面**，而不是挤进卡里 ——
+            // 卡里已经有编号 / 笔画名 / 起手字 / 字形四样东西，再塞会挤成一团。
+            TextMeshProUGUI feat = MakeText(card.transform, "Feature", 17f,
+                TextAlignmentOptions.Top, new Color(0.72f, 0.78f, 0.88f));
+            RectTransform frt = feat.rectTransform;
+            frt.anchorMin = new Vector2(0f, 0f);
+            frt.anchorMax = new Vector2(1f, 0f);
+            frt.pivot = new Vector2(0.5f, 1f);      // 挂在卡片下边缘，往下长
+            frt.anchoredPosition = new Vector2(0f, -6f);
+            frt.sizeDelta = new Vector2(-16f, 68f); // 左右各留 8 内边距
+            feat.enableWordWrapping = true;
+            feat.text = GameText.Panel.笔画特点(st);
+            cardFeatures.Add(feat);
         }
 
         // ---- 底部提示 ----
@@ -247,6 +279,9 @@ public class OpeningStrokeUI : MonoBehaviour
 
     void Choose(int index)
     {
+        // 玩家要求：这句话**选完之后才出现**
+        if (subText != null) subText.text = GameText.Panel.开局说明();
+
         if (index < 0 || index >= GameData.StarterChoices.Length) return;
 
         StrokeType st = GameData.StarterChoices[index];

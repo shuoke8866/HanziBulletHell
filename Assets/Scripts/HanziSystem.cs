@@ -1163,7 +1163,15 @@ public class HanziSystem : MonoBehaviour
         // 当前字占用的笔画可能在池子里缺额（例如开局），补齐
         EnsurePoolCoversCurrentStrokes();
 
-        GameToast.Show($"「{currentHanziName}」  {matched.description}", new Color(1f, 0.95f, 0.6f));
+        // 【已移除】原来这里在屏幕**顶部**弹一条，形如：
+        //     「米」  含横竖撇捺的斩击，范围最大
+        //
+        // 玩家要求删掉这条讲「合成了什么字、有什么弹幕效果」的提示。
+        //
+        // **玩家头上飘的那条不在此列** —— 「恭喜你获得了「横」」
+        // 在 StrokePickup 里用 FloatingTip 实现，保留不动。
+        //
+        // 信息不丢：下面那行 GameLog 仍然把汉字和描述写进日志。
 
         GameLog.Info($"获得笔画！当前汉字：「{currentHanziName}」- {matched.description}");
     }
