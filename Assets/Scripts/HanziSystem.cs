@@ -456,8 +456,8 @@ public class HanziSystem : MonoBehaviour
 
         AddHanzi("先",
             new List<StrokeType> { StrokeType.Pie, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng, StrokeType.Pie, StrokeType.Zhe },
-            new List<string> { "diagonal", "pierce" },
-            7, 11f, "先：7发斜向穿透");
+            new List<string> { "diagonal", "vshape" },
+            10, 19f, "先：7发斜向穿透", 1f);
 
         AddHanzi("尖",
             new List<StrokeType> { StrokeType.Shu, StrokeType.Dian, StrokeType.Dian, StrokeType.Heng, StrokeType.Pie, StrokeType.Na },
@@ -519,8 +519,8 @@ public class HanziSystem : MonoBehaviour
 
         AddHanzi("刃",
             new List<StrokeType> { StrokeType.Zhe, StrokeType.Pie, StrokeType.Dian },
-            new List<string> { "pierce", "straight" },
-            4, 13.5f, "刃：4发高速穿刺");
+            new List<string> { "wave", "straight" },
+            6, 13.5f, "刃：4发高速穿刺", 1f);
 
         AddHanzi("犬",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Pie, StrokeType.Na, StrokeType.Dian },
