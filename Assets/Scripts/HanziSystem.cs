@@ -504,6 +504,51 @@ public class HanziSystem : MonoBehaviour
             new List<string> { "ring", "cross", "wave" },
             10, 10f, "胃：10发环状十字波浪");
 
+        AddHanzi("夫",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Pie, StrokeType.Na },
+            new List<string> { "vshape", "pierce" },
+            5, 12f, "夫：5发分叉穿透");
+
+        AddHanzi("有",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Pie, StrokeType.Zhe, StrokeType.Heng, StrokeType.Heng, StrokeType.Heng },
+            new List<string> { "ring", "parallel" },
+            7, 10f, "有：7发环形平行");
+
+        AddHanzi("分",
+            new List<StrokeType> { StrokeType.Pie, StrokeType.Na, StrokeType.Zhe, StrokeType.Pie },
+            new List<string> { "scatter", "vshape" },
+            5, 11.5f, "分：5发分叉散射");
+
+        AddHanzi("刃",
+            new List<StrokeType> { StrokeType.Zhe, StrokeType.Pie, StrokeType.Dian },
+            new List<string> { "pierce", "straight" },
+            4, 13.5f, "刃：4发高速穿刺");
+
+        AddHanzi("犬",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Pie, StrokeType.Na, StrokeType.Dian },
+            new List<string> { "spiral", "scatter" },
+            5, 12f, "犬：5发螺旋散射");
+
+        AddHanzi("井",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Pie, StrokeType.Shu },
+            new List<string> { "cross", "parallel" },
+            5, 11f, "井：5发井字交叉");
+
+        AddHanzi("古",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Heng },
+            new List<string> { "ring", "cross" },
+            6, 10.5f, "古：6发环形十字");
+
+        AddHanzi("右",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Pie, StrokeType.Zhe, StrokeType.Heng, StrokeType.Heng },
+            new List<string> { "diagonal", "ring" },
+            6, 10.5f, "右：6发斜向环形");
+
+        AddHanzi("左",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Pie, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
+            new List<string> { "diagonal", "parallel" },
+            6, 10.5f, "左：6发斜向平行");
+
         // ===== 新增结束 =====
     }
     // 简化添加方法
