@@ -479,10 +479,6 @@ public class HanziSystem : MonoBehaviour
             new List<string> { "pierce", "parallel", "straight" },
             8, 12.5f, "利：8发高速平行穿透");
 
-        AddHanzi("見",
-            new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Heng, StrokeType.Heng, StrokeType.Pie, StrokeType.Zhe },
-            new List<string> { "ring", "cross", "pierce" },
-            8, 10f, "見：8发环状十字穿透");
 
         AddHanzi("豆",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Dian, StrokeType.Pie, StrokeType.Heng },
@@ -503,6 +499,8 @@ public class HanziSystem : MonoBehaviour
             new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng, StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Heng },
             new List<string> { "ring", "cross", "wave" },
             10, 10f, "胃：10发环状十字波浪");
+
+        // ===== 新增 9 字弹幕 =====
 
         AddHanzi("夫",
             new List<StrokeType> { StrokeType.Heng, StrokeType.Heng, StrokeType.Pie, StrokeType.Na },
@@ -548,6 +546,51 @@ public class HanziSystem : MonoBehaviour
             new List<StrokeType> { StrokeType.Heng, StrokeType.Pie, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
             new List<string> { "diagonal", "parallel" },
             6, 10.5f, "左：6发斜向平行");
+
+        // ===== 补齐缺失的弹幕定义 =====
+        //
+        // 这 8 个字原本只有字形、没有弹幕定义 ——
+        // 玩家拼出来会「打不出子弹」。这是隐藏 bug，一并补上。
+
+        AddHanzi("了",
+            new List<StrokeType> { StrokeType.Zhe, StrokeType.Shu },
+            new List<string> { "straight" },
+            2, 12f, "了：2发直线");
+
+        AddHanzi("山",
+            new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Shu },
+            new List<string> { "vshape", "shotgun" },
+            4, 11f, "山：4发三向霰弹");
+
+        AddHanzi("川",
+            new List<StrokeType> { StrokeType.Pie, StrokeType.Shu, StrokeType.Shu },
+            new List<string> { "parallel", "pierce" },
+            3, 12.5f, "川：3发平行穿透");
+
+        AddHanzi("小",
+            new List<StrokeType> { StrokeType.Shu, StrokeType.Dian, StrokeType.Dian },
+            new List<string> { "scatter", "ring" },
+            3, 12f, "小：3发聚拢散射");
+
+        AddHanzi("少",
+            new List<StrokeType> { StrokeType.Shu, StrokeType.Dian, StrokeType.Dian, StrokeType.Pie },
+            new List<string> { "vshape", "scatter" },
+            4, 11.5f, "少：4发斜向散开");
+
+        AddHanzi("五",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng },
+            new List<string> { "cross", "parallel" },
+            4, 11f, "五：4发十字平行");
+
+        AddHanzi("正",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Heng, StrokeType.Shu },
+            new List<string> { "parallel", "straight" },
+            4, 11.5f, "正：4发整齐平行");
+
+        AddHanzi("兵",
+            new List<StrokeType> { StrokeType.Pie, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng, StrokeType.Pie, StrokeType.Na },
+            new List<string> { "scatter", "shotgun", "pierce" },
+            7, 10.5f, "兵：7发霰弹穿透");
 
         // ===== 新增结束 =====
     }
