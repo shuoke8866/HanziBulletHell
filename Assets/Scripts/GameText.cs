@@ -348,22 +348,11 @@ public static class GameText
     {
         return new[]
         {
-            // 字幕序号是 **0 起**，对应 教学步骤() 的下标。
-            //
-            // 对齐规则：**每间房的最后一条字幕播完**，才开那间房出去的门。
-            //
-            // 实际下表（用 教学步骤() 数出来的）：
-            //   下标 0,1        Room0_Doubt     最后一条 = 1  → Door_0to1
-            //   下标 2          Room1_Start     只有 1 条 = 2  → Door_1to2
-            //   下标 3,4        Room2_Collect   最后一条 = 4  → Door_2to3
-            //   下标 5,6,7,8    Room3_Swap      最后一条 = 8  → Door_3to4
-            //   下标 9,10       Room4_Boss      终点，不需要开门
-            //
-            // 用 Tools/字幕 × 房间开门 协同工具 改这张表。
-            new 门规则(1, "Door_0to1", 1.0f),
-            new 门规则(2, "Door_1to2", 1.0f),
-            new 门规则(4, "Door_2to3", 1.0f),
-            new 门规则(8, "Door_3to4", 1.0f),
+            // 字幕序号, 门名, 延迟（由「字幕 × 房间开门 协同工具」生成）
+            new 门规则(1, "Door_0to1", 1f),
+            new 门规则(2, "Door_1to2", 1f),
+            new 门规则(3, "Door_2to3", 1f),
+            new 门规则(8, "Door_3to4", 1f),
         };
     }
 

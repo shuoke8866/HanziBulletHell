@@ -416,6 +416,95 @@ public class HanziSystem : MonoBehaviour
                                    StrokeType.Shu, StrokeType.Heng },
             new List<string> { "ring", "cross" },
             6, 9.5f, "由：6发环状十字");
+
+        // ===== 新增 15 字弹幕 =====
+        // 弹数按画数基准（3画4发 / 4画5发 / 5画6发 / 6画7发 / 7画8发），
+        // 再按形状特色微调。标签取自已有词汇（cross/pierce/ring/…）。
+
+        
+
+        AddHanzi("才",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Dian },
+            new List<string> { "pierce", "straight" },
+            3, 13f, "才：3发直线穿透");
+
+        
+
+        
+
+        
+
+        AddHanzi("求",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Dian, StrokeType.Dian, StrokeType.Pie, StrokeType.Na },
+            new List<string> { "ring", "pierce", "parallel" },
+            6, 10.5f, "求：6发环形穿透");
+
+        AddHanzi("永",
+            new List<StrokeType> { StrokeType.Dian, StrokeType.Zhe, StrokeType.Zhe, StrokeType.Pie, StrokeType.Na },
+            new List<string> { "spiral", "omni" },
+            6, 10f, "永：6发全方位螺旋");
+
+        AddHanzi("乐",
+            new List<StrokeType> { StrokeType.Pie, StrokeType.Zhe, StrokeType.Shu, StrokeType.Dian, StrokeType.Dian },
+            new List<string> { "ring", "wave" },
+            6, 10.5f, "乐：6发环形波浪");
+
+        AddHanzi("光",
+            new List<StrokeType> { StrokeType.Shu, StrokeType.Dian, StrokeType.Dian, StrokeType.Heng, StrokeType.Pie, StrokeType.Zhe },
+            new List<string> { "omni", "scatter" },
+            7, 10f, "光：7发全方位散射");
+
+        AddHanzi("先",
+            new List<StrokeType> { StrokeType.Pie, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng, StrokeType.Pie, StrokeType.Zhe },
+            new List<string> { "diagonal", "pierce" },
+            7, 11f, "先：7发斜向穿透");
+
+        AddHanzi("尖",
+            new List<StrokeType> { StrokeType.Shu, StrokeType.Dian, StrokeType.Dian, StrokeType.Heng, StrokeType.Pie, StrokeType.Na },
+            new List<string> { "vshape", "pierce" },
+            7, 12f, "尖：7发锐角穿透");
+
+        AddHanzi("尘",
+            new List<StrokeType> { StrokeType.Shu, StrokeType.Dian, StrokeType.Dian, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
+            new List<string> { "shotgun", "scatter" },
+            7, 10.5f, "尘：7发霰弹扩散");
+
+        AddHanzi("我",
+            new List<StrokeType> { StrokeType.Pie, StrokeType.Heng, StrokeType.Shu, StrokeType.Dian, StrokeType.Zhe, StrokeType.Pie, StrokeType.Dian },
+            new List<string> { "diagonal", "spiral", "pierce" },
+            8, 11f, "我：8发斜向螺旋穿透");
+
+        AddHanzi("利",
+            new List<StrokeType> { StrokeType.Pie, StrokeType.Heng, StrokeType.Shu, StrokeType.Pie, StrokeType.Na, StrokeType.Shu, StrokeType.Shu },
+            new List<string> { "pierce", "parallel", "straight" },
+            8, 12.5f, "利：8发高速平行穿透");
+
+        AddHanzi("見",
+            new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Heng, StrokeType.Heng, StrokeType.Pie, StrokeType.Zhe },
+            new List<string> { "ring", "cross", "pierce" },
+            8, 10f, "見：8发环状十字穿透");
+
+        AddHanzi("豆",
+            new List<StrokeType> { StrokeType.Heng, StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Dian, StrokeType.Pie, StrokeType.Heng },
+            new List<string> { "ring", "parallel" },
+            8, 10f, "豆：8发环形平行");
+
+        AddHanzi("坐",
+            new List<StrokeType> { StrokeType.Pie, StrokeType.Dian, StrokeType.Pie, StrokeType.Dian, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng },
+            new List<string> { "vshape", "ring" },
+            8, 10.5f, "坐：8发上下合围");
+
+        AddHanzi("具",
+            new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Heng, StrokeType.Heng, StrokeType.Heng, StrokeType.Pie, StrokeType.Na },
+            new List<string> { "parallel", "scatter" },
+            9, 10f, "具：9发平行散射");
+
+        AddHanzi("胃",
+            new List<StrokeType> { StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Shu, StrokeType.Heng, StrokeType.Shu, StrokeType.Zhe, StrokeType.Heng, StrokeType.Heng },
+            new List<string> { "ring", "cross", "wave" },
+            10, 10f, "胃：10发环状十字波浪");
+
+        // ===== 新增结束 =====
     }
     // 简化添加方法
     // 注意：不再显式传伤害 —— 单发伤害统一由"笔画数"推导，
