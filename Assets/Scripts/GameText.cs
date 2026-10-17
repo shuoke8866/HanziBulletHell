@@ -308,6 +308,65 @@ public static class GameText
         }
     }
 
+    /// <summary>
+    /// 一条「字幕 → 门」规则。
+    ///
+    /// 玩家要的工具就是编辑这张表：规定说完哪句话之后开哪扇门。
+    /// </summary>
+    public struct 门规则
+    {
+        /// <summary>第几条字幕（0 开始，对应 教学步骤() 的下标）</summary>
+        public int 字幕序号;
+
+        /// <summary>要打开的门对象名（场景里的 Door 组件上的 GameObject 名）</summary>
+        public string 门名;
+
+        /// <summary>等多久再开（秒）。0.5~1.5 的比较自然。</summary>
+        public float 延迟;
+
+        public 门规则(int idx, string door, float delay)
+        {
+            字幕序号 = idx;
+            门名 = door;
+            延迟 = delay;
+        }
+    }
+
+    /// <summary>
+    /// 字幕 → 门 的规则表。
+    ///
+    /// **这是玩家要的那张表**：每条规则说"第几条字幕播完后开哪扇门"。
+    /// 用 Tools/字幕房间开门协同工具 编辑，不用手改这里。
+    ///
+    /// 默认规则（对接现在的 5 房间布局）：
+    ///   第 1 条说完（Room0 最后一句「先去把它们收起来」）→ 开 Door_0to1
+    ///   第 3 条说完（Room1 最后一句「都是这六种拼出来的」）→ 开 Door_1to2
+    ///   第 5 条说完（Room2 最后一句「意外收获？」）      → 开 Door_2to3
+    ///   第 9 条说完（Room3 最后一句「实力越强？」）      → 开 Door_3to4
+    /// </summary>
+    public static 门规则[] 门规则表()
+    {
+        return new[]
+        {
+            // 字幕序号是 **0 起**，对应 教学步骤() 的下标。
+            //
+            // 对齐规则：**每间房的最后一条字幕播完**，才开那间房出去的门。
+            //
+            // 实际下表（用 教学步骤() 数出来的）：
+            //   下标 0,1        Room0_Doubt     最后一条 = 1  → Door_0to1
+            //   下标 2          Room1_Start     只有 1 条 = 2  → Door_1to2
+            //   下标 3,4        Room2_Collect   最后一条 = 4  → Door_2to3
+            //   下标 5,6,7,8    Room3_Swap      最后一条 = 8  → Door_3to4
+            //   下标 9,10       Room4_Boss      终点，不需要开门
+            //
+            // 用 Tools/字幕 × 房间开门 协同工具 改这张表。
+            new 门规则(1, "Door_0to1", 1.0f),
+            new 门规则(2, "Door_1to2", 1.0f),
+            new 门规则(4, "Door_2to3", 1.0f),
+            new 门规则(8, "Door_3to4", 1.0f),
+        };
+    }
+
     public static CoachStep[] 教学步骤()
     {
         return new[]

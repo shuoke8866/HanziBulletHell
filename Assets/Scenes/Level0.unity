@@ -790,7 +790,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   doorSprite: {fileID: 200806737}
   doorCollider: {fileID: 200806736}
-  isOpen: 1
+  isOpen: 0
 --- !u!61 &200806736
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -1339,7 +1339,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   doorSprite: {fileID: 344722532}
   doorCollider: {fileID: 344722531}
-  isOpen: 1
+  isOpen: 0
 --- !u!61 &344722531
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -1498,7 +1498,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   doorSprite: {fileID: 424165915}
   doorCollider: {fileID: 424165914}
-  isOpen: 1
+  isOpen: 0
 --- !u!61 &424165914
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -10246,7 +10246,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   doorSprite: {fileID: 2137255377}
   doorCollider: {fileID: 2137255376}
-  isOpen: 1
+  isOpen: 0
 --- !u!61 &2137255376
 BoxCollider2D:
   m_ObjectHideFlags: 0

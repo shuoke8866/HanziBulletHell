@@ -200,6 +200,16 @@ public class TutorialCoach : MonoBehaviour
     /// 用**玩家位置**判断，而不是「门属于哪间房」——
     /// 玩家在哪间房里，就该听哪间房的话。
     /// </summary>
+    /// <summary>
+    /// 给场景里每扇门挂上拦截条件，**并立刻全部关上**。
+    ///
+    /// ⚠ 关键：原来只挂条件、没关门 ——
+    /// 而场景里所有门 isOpen: 1，Door.Start() 一上来就把自己打开了。
+    /// 等这里挂上 HoldOpen 时，门早就是开的，之后也没人关它
+    /// → **门控从来没生效过**。
+    ///
+    /// 所以这里必须主动 Close() 一次。
+    /// </summary>
     void RegisterDoorGates()
     {
         int n = 0;
@@ -209,10 +219,11 @@ public class TutorialCoach : MonoBehaviour
             if (d == null) continue;
 
             d.HoldOpen = ShouldHoldDoors;
+            d.Close();          // ★ 立刻关上（否则门一直是开的）
             n++;
         }
 
-        GameLog.Info($"[教程] 已给 {n} 扇门挂上「教学未完先别开」的条件");
+        GameLog.Info($"[教程] 已给 {n} 扇门挂门控并全部关上");
     }
 
     /// <summary>
@@ -476,40 +487,126 @@ public class TutorialCoach : MonoBehaviour
         ShowLine(lines[currentLine]);
     }
 
+    /// <summary>
+    /// 一条字幕说完时调用。
+    ///
+    /// 执行顺序：
+    ///   1. 按「字幕 → 门」规则表开门（玩家在协同工具里配的）
+    ///   2. 这间房还有没说完的 → 接着播，**先不开门**
+    ///   3. 全说完了 → 标记房间完成（兜底放行）
+    /// </summary>
     void EndStep()
     {
-        // 这一步说完了 → 把**玩家当前所在的这间房**标记为说完。
-        //
-        // 不是全部放行，而是只放行这一间 —— 玩家要的是逐房间推进：
-        // 第 1 间说完开第 1 道门，第 2 间说完开第 2 道，以此类推。
-        // 这间房还有没说完的 → 先接着说，**先不要开门**
-        if (_roomQueue.Count > 0)
-        {
-            currentStep = -1;
-            currentLine = 0;
-            HideLine();
-
-            PlayNextInQueue();
-            return;
-        }
-
-        Room here = RoomAt(PlayerRef.Transform);
-        if (here != null)
-        {
-            // **过 1 秒再开门**（玩家要求的节奏）。
-            // 直接开会给人一种「话还没落音门就开了」的突兀感，
-            // 留 1 秒让玩家读完最后一句。
-            pendingOpenRoom = here.name;
-            CancelInvoke(nameof(FinishRoom));
-            Invoke(nameof(FinishRoom), 1.0f);
-        }
+        int justFinished = currentStep;
 
         currentStep = -1;
         currentLine = 0;
         HideLine();
+
+        // ---- 1. 按玩家配置的规则开门 ----
+        //
+        // 规则表长这样：第 N 条字幕说完 → 延迟 X 秒 → 开某扇门。
+        // 用 Tools/字幕 × 房间开门 协同工具 编辑。
+        //
+        // 注意放在**队列判断之前**：规则是按「具体某一条字幕」配的，
+        // 和「这间房还有没有没说的」是两件独立的事。
+        ApplyDoorRules(justFinished);
+
+        // ---- 2. 这间房还没说完 → 接着说 ----
+        if (_roomQueue.Count > 0)
+        {
+            PlayNextInQueue();
+            return;
+        }
+
+        // ---- 3. 整间房说完 → 兜底放行 ----
+        Room here = RoomAt(PlayerRef.Transform);
+        if (here != null)
+        {
+            pendingOpenRoom = here.name;
+            CancelInvoke(nameof(FinishRoom));
+            Invoke(nameof(FinishRoom), 1.0f);
+        }
     }
 
     /// <summary>延迟 1 秒后真正放行那间房的门</summary>
+    /// <summary>
+    /// 执行「字幕 → 门」规则：刚才播完的那条字幕如果配了开门规则，
+    /// 就延迟一小会儿把指定的门打开。
+    ///
+    /// 规则表在 GameText.门规则表() 里，用协同工具编辑。
+    /// </summary>
+    void ApplyDoorRules(int stepIndex)
+    {
+        if (!GameData.inTutorial) return;
+
+        GameText.门规则[] rules = GameText.门规则表();
+
+        // 自检：规则里写的字幕序号必须落在 教学步骤() 范围内，
+        // 否则那条规则永远不会触发（而且没人会知道为什么门不开）。
+        if (rules != null)
+        {
+            int total = steps != null ? steps.Length : 0;
+
+            foreach (GameText.门规则 r in rules)
+            {
+                if (r.字幕序号 < 0 || r.字幕序号 >= total)
+                    Debug.LogError(
+                        $"[教程] 规则表里有越界的字幕序号 {r.字幕序号}" +
+                        $"（本关共 {total} 条字幕，合法范围 0~{total - 1}）。" +
+                        $"这条规则（开「{r.门名}」）永远不会触发。");
+            }
+        }
+
+        if (rules == null) return;
+
+        foreach (GameText.门规则 r in rules)
+        {
+            if (r.字幕序号 != stepIndex) continue;
+
+            string doorName = r.门名;
+            float delay = Mathf.Max(0f, r.延迟);
+
+            GameLog.Info($"[教程] 第 {stepIndex + 1} 条字幕说完 → {delay:0.#} 秒后开「{doorName}」");
+
+            if (delay <= 0.01f) OpenDoorByName(doorName);
+            else
+            {
+                CancelInvoke(nameof(_pendingDoorOpen));
+                _pendingDoorName = doorName;
+                Invoke(nameof(_pendingDoorOpen), delay);
+            }
+        }
+    }
+
+    string _pendingDoorName;
+
+    void _pendingDoorOpen()
+    {
+        OpenDoorByName(_pendingDoorName);
+        _pendingDoorName = null;
+    }
+
+    /// <summary>按名字打开一扇门（找不到会明确报错）</summary>
+    void OpenDoorByName(string doorName)
+    {
+        if (string.IsNullOrEmpty(doorName)) return;
+
+        foreach (Door d in Object.FindObjectsOfType<Door>(true))
+        {
+            if (d == null || d.name != doorName) continue;
+
+            // 规则表里点名要开的门 → 解除拦截再开
+            d.HoldOpen = null;
+            d.Open();
+            GameLog.Info($"[教程] 已打开「{doorName}」");
+            return;
+        }
+
+        Debug.LogError($"[教程] 门规则里写了「{doorName}」，但场景里找不到这扇门。" +
+                       "检查 Tools/字幕房间开门协同工具 里的门名。");
+    }
+
     void FinishRoom()
     {
         if (string.IsNullOrEmpty(pendingOpenRoom)) return;
