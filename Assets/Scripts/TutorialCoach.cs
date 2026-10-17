@@ -86,9 +86,7 @@ public class TutorialCoach : MonoBehaviour
 
     // ---------- 触发用的记录 ----------
     Vector3 startPos;
-    bool movedFired, shotFired, strokeFired, bagFired, swapFired, bossFired, bossKillFired;
     readonly HashSet<string> done = new HashSet<string>();
-    float killCheckTimer;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void AutoCreate()
@@ -141,7 +139,10 @@ public class TutorialCoach : MonoBehaviour
 
         BuildDot();
 
-        ShowStep(0, true);      // 一进教程层就把第一条说了
+        // 不再在这里播第一条 —— 教程改成**按房间播**：
+        // 玩家真正走进某个房间时，CheckRoomEntry 会触发那间房的字幕。
+        // （原来这里无条件播第 0 条，所以「第一条总是出现在出生房」，
+        //   和玩家实际所在房间无关 —— 这就是玩家说的「房间错了」。）
     }
     /// <summary>
     /// 教学层第一间房的教学做完之前，先别放玩家走。
@@ -157,6 +158,12 @@ public class TutorialCoach : MonoBehaviour
     /// 需求只有一句话，实现也该只有一件事。
     /// </summary>
     public static bool HoldDoorsUntilTaught;
+
+    /// <summary>玩家上一次所在的房间（用来检测刚进了一间新房）</summary>
+    Room lastRoom;
+
+    /// <summary>已经因进房间播过的房间（每间房只播一次）</summary>
+    readonly HashSet<Room> roomsAnnounced = new HashSet<Room>();
 
 
     // ============================================================
@@ -242,6 +249,7 @@ public class TutorialCoach : MonoBehaviour
             textHandle.go.transform.position = dot.position + TextOffset;
         }
 
+        CheckRoomEntry();
         CheckTriggers();
         TickDisplay();
     }
@@ -250,80 +258,75 @@ public class TutorialCoach : MonoBehaviour
     //  触发检测
     // ============================================================
 
+    /// <summary>
+    /// 检测玩家刚进了哪间房，并触发对应的 InRoom 字幕。
+    ///
+    /// 这是玩家要求的「按房间播字幕」：哪条字幕在哪个房间播，
+    /// 由 GameText.教学步骤() 里每条步骤的 room 字段决定 ——
+    /// 改文案和改房间都在字幕编辑器里做，不用碰代码。
+    /// </summary>
+    void CheckRoomEntry()
+    {
+        Room here = RoomAt(PlayerRef.Transform);
+        if (here == lastRoom) return;        // 没换房间
+
+        lastRoom = here;
+
+        // 走出房间（here == null）不算进入，不播
+        if (here == null) return;
+
+        if (!roomsAnnounced.Add(here)) return;   // 这间房已经播过
+
+        TryFireRoom(here.name);
+    }
+
+    /// <summary>某个 Transform 现在在哪间房里（不在任何房间就返回 null）</summary>
+    static Room RoomAt(Transform who)
+    {
+        if (who == null) return null;
+
+        foreach (Room r in Object.FindObjectsOfType<Room>())
+        {
+            var box = r.GetComponent<Collider2D>();
+            if (box == null) continue;
+            if (box.bounds.Contains(who.position)) return r;
+        }
+        return null;
+    }
+
+    /// <summary>按房间名触发一条 InRoom 字幕</summary>
+    void TryFireRoom(string roomName)
+    {
+        if (steps == null || string.IsNullOrEmpty(roomName)) return;
+
+        for (int i = 0; i < steps.Length; i++)
+        {
+            if (steps[i].trigger != GameText.CoachTrigger.InRoom) continue;
+            if (steps[i].room != roomName) continue;
+
+            string key = i + ":room:" + roomName;
+            if (done.Contains(key)) continue;
+
+            done.Add(key);
+            ShowStep(i, false);
+            GameLog.Info($"[教程] 进入「{roomName}」，播放第 {i + 1} 条字幕");
+            return;
+        }
+    }
+
+    /// <summary>
+    /// 旧的事件触发器（Moved / FirstShot / GotStroke / ...）。
+    ///
+    /// **现在不再使用** —— 教程改成按房间播之后，步骤里一条都没用这些 trigger，
+    /// 继续保留这套检测只会误触发（比如「一移动就播 Moved 那条」，
+    /// 而那条现在根本不存在，只会走到 TryFire 里空转）。
+    ///
+    /// 保留这个空方法是为了以后想加「按键教一次」之类的**一次性提示**时
+    /// 有个地方放，不用重新接 LateUpdate。
+    /// </summary>
     void CheckTriggers()
     {
-        Transform player = PlayerRef.Transform;
-        if (player == null) return;
-
-        // 移动
-        if (!movedFired && Vector2.Distance(player.position, startPos) > 1.5f)
-        {
-            movedFired = true;
-
-            // 开场房的"疑虑"先说完，再教笔画的事 ——
-            // 两条文案挤在一起会互相打断，而且叙事顺序也不对。
-            // 16 秒 ≈ 疑虑那 4 条文案（每条 3.4 秒 + 间隔）刚好走完。
-            TryFire(GameText.CoachTrigger.Doubt);
-            StartCoroutine(FireDelayed(GameText.CoachTrigger.Moved, 16f));
-        }
-
-        // 开枪（方向键）
-        if (!shotFired &&
-            (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow) ||
-             Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.RightArrow)))
-        {
-            shotFired = true;
-            TryFire(GameText.CoachTrigger.FirstShot);
-        }
-
-        // 拿到笔画
-        if (!strokeFired && GameData.strokesCollected > 0)
-        {
-            strokeFired = true;
-            TryFire(GameText.CoachTrigger.GotStroke);
-        }
-
-        // 开背包
-        if (!bagFired && Input.GetKeyDown(KeyCode.E))
-        {
-            bagFired = true;
-            TryFire(GameText.CoachTrigger.OpenedBag);
-        }
-
-        // 换字成功（formedHanzi 里有记录）
-        if (!swapFired && GameData.formedHanzi != null && GameData.formedHanzi.Count >= 2)
-        {
-            swapFired = true;
-            TryFire(GameText.CoachTrigger.SwappedHanzi);
-        }
-
-        // 笔画数（每帧检查，因为它是"达到 N 画"而不是"事件"）
-        HanziSystem hs = PlayerRef.GameObject != null
-            ? PlayerRef.GameObject.GetComponent<HanziSystem>() : null;
-        int strokeCount = hs != null && hs.CurrentHanziDef != null && hs.CurrentHanziDef.strokes != null
-            ? hs.CurrentHanziDef.strokes.Count : 0;
-
-        if (strokeCount > 0)
-            TryFire(GameText.CoachTrigger.StrokeCount, strokeCount);
-
-        // BOSS 房 / BOSS 死亡（每隔一会儿查一次就够了，不用每帧扫全场）
-        killCheckTimer += Time.unscaledDeltaTime;
-        if (killCheckTimer > 0.4f)
-        {
-            killCheckTimer = 0f;
-
-            if (!bossFired && InBossRoom(player.position))
-            {
-                bossFired = true;
-                TryFire(GameText.CoachTrigger.EnteredBoss);
-            }
-
-            if (!bossKillFired && GameData.bossesKilled > 0)
-            {
-                bossKillFired = true;
-                TryFire(GameText.CoachTrigger.BossKilled);
-            }
-        }
+        // 目前所有教程步骤都是 InRoom 触发，见 CheckRoomEntry()。
     }
 
     static bool InBossRoom(Vector3 pos)
@@ -362,11 +365,6 @@ public class TutorialCoach : MonoBehaviour
     }
 
     /// <summary>等一会儿再弹某一步 —— 用来把两段叙事错开，避免互相打断</summary>
-    System.Collections.IEnumerator FireDelayed(GameText.CoachTrigger trigger, float delay)
-    {
-        yield return new WaitForSecondsRealtime(delay);
-        TryFire(trigger);
-    }
 
     // ============================================================
     //  显示节奏

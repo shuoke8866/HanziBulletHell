@@ -265,6 +265,14 @@ public static class GameText
         SwappedHanzi,
         EnteredBoss,
         BossKilled,
+
+        /// <summary>
+        /// 玩家进入 CoachStep.room 指定的房间时触发。
+        ///
+        /// 这是玩家要求的「按房间播字幕」—— 哪条字幕在哪个房间，
+        /// 完全由 CoachStep.room 决定，不用改代码。
+        /// </summary>
+        InRoom,
     }
 
     public struct CoachStep
@@ -273,14 +281,30 @@ public static class GameText
         public int num;              // StrokeCount 用：需要几画
         public string[] lines;
 
+        /// <summary>
+        /// 在哪个房间播（只在 trigger == InRoom 时有意义）。
+        /// 填**房间对象名**，比如 Room2_Collect。
+        /// 一进那间房就播这条，和玩家在哪、做了什么无关。
+        /// </summary>
+        public string room;
+
         public CoachStep(CoachTrigger t, params string[] ls)
         {
-            trigger = t; num = 0; lines = ls;
+            trigger = t; num = 0; lines = ls; room = null;
         }
 
         public CoachStep(CoachTrigger t, int n, params string[] ls)
         {
-            trigger = t; num = n; lines = ls;
+            trigger = t; num = n; lines = ls; room = null;
+        }
+
+        /// <summary>在指定房间播（InRoom 专用）。用法：new CoachStep("Room2_Collect", "...")</summary>
+        public CoachStep(string roomName, params string[] ls)
+        {
+            trigger = CoachTrigger.InRoom;
+            num = 0;
+            lines = ls;
+            room = roomName;
         }
     }
 
@@ -292,45 +316,50 @@ public static class GameText
             //
             // 这一段是新加的：背景故事看完之后，玩家落在一个空房里，
             // 小点在这里"出现"，并表达主角的疑虑，然后指向笔画房。
-            new CoachStep(CoachTrigger.OnStart,
+            // 起点房
+            new CoachStep("Room0_Doubt",
                 "……",
                 "这里是哪里？我为什么会在这里？"),
 
-            new CoachStep(CoachTrigger.Doubt,
+            new CoachStep("Room0_Doubt",
                 "（一个小小的墨点从你身上浮起，悬在你身旁）",
                 "喂，你能听懂我说话吗？",
-                "……看来是能的。那就跟我来吧。",
+                "先跟我过来吧",
                 "前面那间屋子里散落着许多笔画 —— 先去把它们收起来。"),
 
             // ---- 进入笔画房之后 ----
-            new CoachStep(CoachTrigger.Moved,
+            // 笔画展示房
+            new CoachStep("Room1_Start",
                 "地上这一排是汉字的基本笔画，共六种：横、竖、撇、捺、点、折",
                 "在这个世界内的汉字都是这六种拼出来的"),
 
-            new CoachStep(CoachTrigger.FirstShot,
+            // 收集房
+            new CoachStep("Room2_Collect",
                 "试着通过键盘上的 ↑ ↓ ← → 来控制射击方向吧"),
 
-            new CoachStep(CoachTrigger.GotStroke,
+            new CoachStep("Room2_Collect",
                 "打倒一些特殊的敌人或许会有意外收获？"),
 
-            new CoachStep(CoachTrigger.StrokeCount, 3,
+            // 换字房
+            new CoachStep("Room3_Swap",
                 "随着笔画增多，你可以按 E 打开背包进行更换"),
 
-            new CoachStep(CoachTrigger.OpenedBag,
+            new CoachStep("Room3_Swap",
                 "在背包页面你可以通过 A / D 翻页，里面是你现在能拼出来的所有字"),
 
-            new CoachStep(CoachTrigger.SwappedHanzi,
+            new CoachStep("Room3_Swap",
                 "通过数字键切换到你想要的汉字吧",
                 "想换回来也可以哦，笔画不会丢，随时能换到目前能组成的所有汉字"),
 
-            new CoachStep(CoachTrigger.StrokeCount, 5,
+            new CoachStep("Room3_Swap",
                 "越复杂的汉字或许实力越强？"),
 
-            new CoachStep(CoachTrigger.EnteredBoss,
+            // BOSS 房
+            new CoachStep("Room4_Boss",
                 "前面是。。？帝国的走狗？好在他落单了",
                 "打败他，让我们传送到世界中"),
 
-            new CoachStep(CoachTrigger.BossKilled,
+            new CoachStep("Room4_Boss",
                 "可恶，受到时空乱流影响，我们得从头开始了"),
         };
     }

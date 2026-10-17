@@ -40,6 +40,12 @@ public class SubtitleEditorWindow : EditorWindow
         public string original;     // 载入时的原文案（用来判断有没有改过）
         public bool isArray;        // 教程那种 string[] 的条目
         public int arrayIndex;
+
+        /// <summary>这条字幕属于哪个房间（只在教程步骤里有意义，其余为 null）</summary>
+        public string room;
+
+        /// <summary>源码里这一行房间名的原文（保存时用它定位替换）</summary>
+        public string roomOriginal;
     }
 
     readonly List<Entry> entries = new List<Entry>();
@@ -121,7 +127,117 @@ public class SubtitleEditorWindow : EditorWindow
             }
         }
 
+        // 解析教程步骤的房间归属（new CoachStep("房间名", ...) 这种写法）
+        ParseRooms(src);
+
         Debug.Log($"[字幕] 已载入 {entries.Count} 条文案");
+    }
+
+    // ============================================================
+    //  房间归属
+    // ============================================================
+
+    /// <summary>
+    /// 解析教程步骤里每条字幕属于哪个房间。
+    ///
+    /// 认两种写法：
+    ///     new CoachStep("Room2_Collect", "文案")       ← 推荐，按房间播
+    ///     new CoachStep(CoachTrigger.Xxx, "文案")       ← 旧写法，没有房间
+    ///
+    /// 做法：找出所有 `new CoachStep(` 的位置，看它后面第一个字符串字面量
+    /// 是不是以 Room 开头；是就把「该步骤后面到下一次 new CoachStep 之间」
+    /// 的全部文案条目都标上这个房间。
+    /// </summary>
+    void ParseRooms(string src)
+    {
+        // 找所有步骤起点
+        var stepStarts = new List<int>();
+        int at = 0;
+        while ((at = src.IndexOf("new CoachStep(", at, System.StringComparison.Ordinal)) >= 0)
+        {
+            stepStarts.Add(at);
+            at += 4;
+        }
+
+        if (stepStarts.Count == 0) return;
+
+        int marked = 0;
+
+        for (int i = 0; i < stepStarts.Count; i++)
+        {
+            int from = stepStarts[i];
+            int to = (i + 1 < stepStarts.Count) ? stepStarts[i + 1] : src.Length;
+
+            // 这一步骤块内的第一个字面量
+            var lm = System.Text.RegularExpressions.Regex.Match(
+                src.Substring(from, to - from), "\"((?:[^\"\\\\]|\\\\.)*)\"");
+
+            if (!lm.Success) continue;
+
+            string first = lm.Groups[1].Value;
+            if (!first.StartsWith("Room")) continue;      // 不是按房间播的步骤
+
+            // 把这一块里所有文案条目标上房间
+            foreach (Entry e in entries)
+            {
+                if (e.group != "CoachStep" && e.group != "(顶层)")
+                {
+                    // 教程步骤在 GameText 顶层（不在某个 static class 里），
+                    // 所以 group 一般是 (顶层)。这里不做强约束。
+                }
+
+                if (e.text == first) { e.room = first; e.roomOriginal = first; marked++; }
+            }
+        }
+
+        Debug.Log($"[字幕] 已识别 {marked} 条带房间的字幕");
+    }
+
+    /// <summary>
+    /// 收集项目里所有房间名，给下拉框用。
+    ///
+    /// 从**场景文件**里扫（Room 对象名），而不是硬编码 ——
+    /// 以后你改房间名、加房间，下拉框会自动跟着变。
+    /// </summary>
+    static List<string> CollectRoomNames()
+    {
+        var names = new List<string>();
+
+        string[] scenes = Directory.GetFiles("Assets/Scenes", "*.unity");
+
+        foreach (string sc in scenes)
+        {
+            string[] lines;
+            try { lines = File.ReadAllLines(sc); }
+            catch { continue; }
+
+            foreach (string line in lines)
+            {
+                string s = line.Trim();
+                if (!s.StartsWith("m_Name: Room")) continue;
+
+                string nm = s.Substring("m_Name: ".Length).Trim();
+                if (nm.Length == 0) continue;
+                if (names.Contains(nm)) continue;
+
+                names.Add(nm);
+            }
+        }
+
+        names.Sort();
+        return names;
+    }
+
+    /// <summary>房间名缓存（避免每帧扫场景文件）</summary>
+    List<string> roomNames;
+
+    List<string> RoomNames
+    {
+        get
+        {
+            if (roomNames == null) roomNames = CollectRoomNames();
+            return roomNames;
+        }
     }
 
     // ============================================================
@@ -157,6 +273,9 @@ public class SubtitleEditorWindow : EditorWindow
 
             EditorGUILayout.LabelField(e.key, GUILayout.Width(150f));
 
+            // 教程步骤：显示房间下拉框
+            DrawRoomPicker(e);
+
             EditorGUI.BeginChangeCheck();
             string v = EditorGUILayout.TextField(e.text);
             if (EditorGUI.EndChangeCheck())
@@ -176,6 +295,43 @@ public class SubtitleEditorWindow : EditorWindow
         EditorGUILayout.EndScrollView();
 
         DrawPreview();
+    }
+
+    /// <summary>
+    /// 房间下拉框。只有「按房间播」的教程步骤才会显示。
+    ///
+    /// 玩家要的就是这个：**选择这条字幕在哪个房间输出**。
+    /// </summary>
+    void DrawRoomPicker(Entry e)
+    {
+        bool isRoomStep = e.roomOriginal != null;
+
+        // 不是按房间播的条目（Toast / Boss / Panel 等）→ 不给房间框，但留同样的宽度
+        if (!isRoomStep)
+        {
+            GUILayout.Space(170f);
+            return;
+        }
+
+        List<string> opts = RoomNames;
+        int cur = opts.IndexOf(e.room);
+
+        // 当前房间名不在列表里（比如房间被改名了）→ 放在最后一项，避免丢数据
+        bool orphan = cur < 0 && !string.IsNullOrEmpty(e.room);
+        if (orphan) opts = new List<string>(opts) { e.room };
+
+        int shown = orphan ? opts.Count - 1 : Mathf.Max(0, cur);
+
+        EditorGUI.BeginChangeCheck();
+        int picked = EditorGUILayout.Popup(shown, opts.ToArray(), GUILayout.Width(170f));
+        if (EditorGUI.EndChangeCheck())
+        {
+            e.room = opts[picked];
+            dirty = true;
+        }
+
+        if (orphan)
+            EditorGUILayout.LabelField("⚠", GUILayout.Width(20f));
     }
 
     void DrawToolbar()
@@ -263,6 +419,7 @@ public class SubtitleEditorWindow : EditorWindow
 
         int replaced = 0;
         int missed = 0;
+        int named = 0;
 
         foreach (Entry e in entries)
         {
@@ -282,7 +439,25 @@ public class SubtitleEditorWindow : EditorWindow
         File.WriteAllText(SourcePath, src, new UTF8Encoding(false));
         AssetDatabase.Refresh();
 
+        // 写回房间名
+        foreach (Entry e in entries)
+        {
+            if (e.roomOriginal == null || e.room == e.roomOriginal) continue;
+
+            string needle = "new CoachStep(\"" + e.roomOriginal + "\"";
+            int idx = src.IndexOf(needle, System.StringComparison.Ordinal);
+            if (idx < 0) { missed++; continue; }
+
+            string repl = "new CoachStep(\"" + e.room + "\"";
+            src = src.Substring(0, idx) + repl + src.Substring(idx + needle.Length);
+            named++;
+        }
+
+        File.WriteAllText(SourcePath, src, new UTF8Encoding(false));
+        AssetDatabase.Refresh();
+
         foreach (Entry e in entries) e.original = e.text;
+        foreach (Entry e in entries) e.roomOriginal = e.room;
         dirty = false;
 
         Debug.Log($"[字幕] 已保存：替换 {replaced} 条" +
