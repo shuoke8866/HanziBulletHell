@@ -134,6 +134,9 @@ public class TutorialCoach : MonoBehaviour
         startPos = player.position;
 
         // 门控：说完话之前不给开门（见 Door.cs 的 HoldOpen）
+        // 逐房间门控：开局所有房间都「没说」→ 门全拦着
+        finishedRooms.Clear();
+        pendingOpenRoom = null;
         HoldDoorsUntilTaught = true;
         RegisterDoorGates();
 
@@ -158,6 +161,22 @@ public class TutorialCoach : MonoBehaviour
     /// 需求只有一句话，实现也该只有一件事。
     /// </summary>
     public static bool HoldDoorsUntilTaught;
+
+    /// <summary>
+    /// 已经「说完话」的房间名。**每间房各有一道门控。**
+    ///
+    /// 玩家要的规则（逐房间推进）：
+    ///   第 1 间房播完最后一句话 → 过 1 秒开门 → 可以进第 2 间
+    ///   第 2 间房播完 → 开门 → 进第 3 间
+    ///   以此类推。
+    ///
+    /// 所以不能用「一把总闸」（HoldDoorsUntilTaught），那样一进
+    /// 第 1 间房说完就全开了。
+    /// </summary>
+    static readonly HashSet<string> finishedRooms = new HashSet<string>();
+
+    /// <summary>说完了、但还在等开门的那间房（用于 1 秒延迟）</summary>
+    static string pendingOpenRoom;
 
     /// <summary>玩家上一次所在的房间（用来检测刚进了一间新房）</summary>
     Room lastRoom;
@@ -196,12 +215,32 @@ public class TutorialCoach : MonoBehaviour
         GameLog.Info($"[教程] 已给 {n} 扇门挂上「教学未完先别开」的条件");
     }
 
-    /// <summary>现在要不要拦着门不让开</summary>
-    /// <summary>现在要不要拦着门。**正式关卡里恒为 false。**</summary>
+    /// <summary>
+    /// 现在要不要拦着门。
+    ///
+    /// **逐房间判定**：玩家当前所在的那间房说完了，就放行。
+    /// 正式关卡永远返回 false（那些门没挂这个委托）。
+    /// </summary>
     static bool ShouldHoldDoors()
     {
         if (!GameData.inTutorial) return false;   // 正式关卡：不拦
-        return HoldDoorsUntilTaught;
+
+        Room here = RoomAt(PlayerRef.Transform);
+        if (here == null) return false;           // 站在门外，不拦
+
+        return !finishedRooms.Contains(here.name);
+    }
+
+    /// <summary>这间房是否配过字幕（没配的房间不该拦门）</summary>
+    bool RoomHasSteps(string roomName)
+    {
+        if (steps == null) return false;
+
+        foreach (GameText.CoachStep s in steps)
+            if (s.trigger == GameText.CoachTrigger.InRoom && s.room == roomName)
+                return true;
+
+        return false;
     }
 
     void BuildDot()
@@ -277,6 +316,14 @@ public class TutorialCoach : MonoBehaviour
 
         if (!roomsAnnounced.Add(here)) return;   // 这间房已经播过
 
+        // 这间房如果**没配字幕**，别拦着玩家 —— 直接标记说完，门正常开。
+        // 否则玩家会被一道永远打不开的门卡住（因为不会有 EndStep 来放行）。
+        if (!RoomHasSteps(here.name))
+        {
+            finishedRooms.Add(here.name);
+            return;
+        }
+
         TryFireRoom(here.name);
     }
 
@@ -295,9 +342,20 @@ public class TutorialCoach : MonoBehaviour
     }
 
     /// <summary>按房间名触发一条 InRoom 字幕</summary>
+    /// <summary>
+    /// 触发某间房的全部字幕 —— **按顺序连着播**。
+    ///
+    /// 之前这里找到第一条就 return，导致同一房间的多条步骤
+    /// 只播第一条（Room0_Doubt 有 2 条、Room3_Swap 有 4 条都不会播完）。
+    ///
+    /// 现在改成排队：把这间房所有步骤按顺序塞进 _queue，
+    /// 前一条说完自动接下一条。
+    /// </summary>
     void TryFireRoom(string roomName)
     {
         if (steps == null || string.IsNullOrEmpty(roomName)) return;
+
+        _roomQueue.Clear();
 
         for (int i = 0; i < steps.Length; i++)
         {
@@ -308,10 +366,26 @@ public class TutorialCoach : MonoBehaviour
             if (done.Contains(key)) continue;
 
             done.Add(key);
-            ShowStep(i, false);
-            GameLog.Info($"[教程] 进入「{roomName}」，播放第 {i + 1} 条字幕");
-            return;
+            _roomQueue.Enqueue(i);
         }
+
+        GameLog.Info($"[教程] 进入「{roomName}」，排入 {_roomQueue.Count} 条字幕");
+
+        PlayNextInQueue();
+    }
+
+    /// <summary>本房间待播的步骤</summary>
+    readonly Queue<int> _roomQueue = new Queue<int>();
+
+    /// <summary>播放队列里的下一条（队列空就什么都不做）</summary>
+    void PlayNextInQueue()
+    {
+        if (_roomQueue.Count == 0) return;
+
+        int idx = _roomQueue.Dequeue();
+        if (idx < 0 || idx >= steps.Length) return;
+
+        ShowStep(idx, true);   // immediate: 同一房间的多条要连着播，不要被间隔卡掉
     }
 
     /// <summary>
@@ -404,12 +478,56 @@ public class TutorialCoach : MonoBehaviour
 
     void EndStep()
     {
-        // 这一步说完了 → 玩家当前所在的房间「话已说完」，对应的门可以开了
-        HoldDoorsUntilTaught = false;   // 教学做完了，放玩家走
+        // 这一步说完了 → 把**玩家当前所在的这间房**标记为说完。
+        //
+        // 不是全部放行，而是只放行这一间 —— 玩家要的是逐房间推进：
+        // 第 1 间说完开第 1 道门，第 2 间说完开第 2 道，以此类推。
+        // 这间房还有没说完的 → 先接着说，**先不要开门**
+        if (_roomQueue.Count > 0)
+        {
+            currentStep = -1;
+            currentLine = 0;
+            HideLine();
+
+            PlayNextInQueue();
+            return;
+        }
+
+        Room here = RoomAt(PlayerRef.Transform);
+        if (here != null)
+        {
+            // **过 1 秒再开门**（玩家要求的节奏）。
+            // 直接开会给人一种「话还没落音门就开了」的突兀感，
+            // 留 1 秒让玩家读完最后一句。
+            pendingOpenRoom = here.name;
+            CancelInvoke(nameof(FinishRoom));
+            Invoke(nameof(FinishRoom), 1.0f);
+        }
 
         currentStep = -1;
         currentLine = 0;
         HideLine();
+    }
+
+    /// <summary>延迟 1 秒后真正放行那间房的门</summary>
+    void FinishRoom()
+    {
+        if (string.IsNullOrEmpty(pendingOpenRoom)) return;
+
+        finishedRooms.Add(pendingOpenRoom);
+        GameLog.Info($"[教程] 「{pendingOpenRoom}」说完，门已放行");
+
+        // 主动开一次门：Door 只在 pendingOpen 时每帧检查，
+        // 现在立刻通知它条件变了，玩家不用再等一帧。
+        foreach (Door d in Object.FindObjectsOfType<Door>(true))
+        {
+            if (d == null) continue;
+            if (d.isOpen) continue;
+            if (d.HoldOpen != null && d.HoldOpen()) continue;
+            d.Open();
+        }
+
+        pendingOpenRoom = null;
     }
 
     /// <summary>
