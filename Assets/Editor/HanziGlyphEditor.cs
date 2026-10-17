@@ -40,6 +40,9 @@ public class HanziGlyphEditor : EditorWindow
     // ---------------- 状态 ----------------
     List<string> glyphs = new List<string>();
 
+    /// <summary>异常只报一次，避免每帧刷屏</summary>
+    bool guiErrorLogged;
+
     /// <summary>当前编辑哪套字库：player = 玩家，enemy = 敌人</summary>
     string glyphSet = HanziRenderer.SetPlayer;
 
@@ -107,19 +110,56 @@ public class HanziGlyphEditor : EditorWindow
     {
         // 敌人字库是"标称字表"驱动的 —— 它一开始是空的，
         // 但编辑器要能列出"可以画哪些字"，所以用 EnemyGlyphNames 而不是"已画的字"
-        glyphs = glyphSet == HanziRenderer.SetEnemy
-            ? new List<string>(HanziRenderer.EnemyGlyphNames)
-            : HanziRenderer.AllGlyphsSorted();
+        try
+        {
+            glyphs = glyphSet == HanziRenderer.SetEnemy
+                ? new List<string>(HanziRenderer.EnemyGlyphNames)
+                : HanziRenderer.AllGlyphsSorted();
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError("[字形编辑器] 读取字形库失败：\n" + e);
+            glyphs = new List<string>();
+            return;
+        }
 
-        if (glyphs.Count == 0) return;
+        if (glyphs == null || glyphs.Count == 0)
+        {
+            selected = 0;
+            strokes = new List<HanziRenderer.StrokeInfo>();
+            selectedStroke = -1;
+            return;
+        }
+
+        // **一定要夹取** —— 切换字库（玩家/敌人）后字数会变，selected 可能越界。
+        // 越界会让后面 glyphs[selected] 抛 IndexOutOfRange，
+        // 而异常会跳过 GUI 的 End 调用 → Unity 报
+        // "Invalid GUILayout state ... Verify that all layout Begin/End calls match"。
         selected = Mathf.Clamp(selected, 0, glyphs.Count - 1);
         LoadGlyph();
+    }
+
+    /// <summary>
+    /// 当前选中的字。**越界时自动夹取，绝不抛异常。**
+    ///
+    /// 所有原本写 `glyphs[selected]` 的地方都改用它 ——
+    /// 那是最容易在"切换字库 / 增删字之后"炸掉的一处，
+    /// 一旦炸掉就会跳过 GUI 的 End 调用，导致布局失衡报错。
+    /// </summary>
+    string CurrentChar
+    {
+        get
+        {
+            if (glyphs == null || glyphs.Count == 0) return "";
+            int i = Mathf.Clamp(selected, 0, glyphs.Count - 1);
+            return glyphs[i];
+        }
     }
 
     void LoadGlyph()
     {
         if (glyphs.Count == 0) return;
-        strokes = HanziRenderer.DebugStrokes(glyphs[selected], glyphSet);
+        strokes = HanziRenderer.DebugStrokes(CurrentChar, glyphSet);
         if (strokes == null) strokes = new List<HanziRenderer.StrokeInfo>();
         selectedStroke = strokes.Count > 0 ? 0 : -1;
         dragStroke = -1; dragPoint = -1;
@@ -131,16 +171,45 @@ public class HanziGlyphEditor : EditorWindow
 
     void OnGUI()
     {
-        if (glyphs.Count == 0)
+        if (glyphs == null || glyphs.Count == 0)
         {
             EditorGUILayout.HelpBox("字形库为空。检查 HanziRenderer.BuildDefinitions()。", MessageType.Error);
             return;
         }
 
+        // ============================================================
+        //  try/finally 保证 BeginHorizontal 一定被 End
+        // ============================================================
+        //
+        // 踩过的坑：Unity 报
+        //     GUI Error: Invalid GUILayout state ...
+        //     Verify that all layout Begin/End calls match
+        //
+        // 静态看代码所有 Begin/End 都是配对的，**问题在于运行时抛异常**：
+        // 切换字库（玩家/敌人）时会 ReloadGlyphList()，glyphs 被重建，
+        // 如果 selected 越界，后面 DrawCanvas 里 CurrentChar 就抛
+        // IndexOutOfRange —— 异常直接跳过了 EndHorizontal。
+        //
+        // 现在即使中间抛异常，也会先 End 再抛，布局不会残废。
         EditorGUILayout.BeginHorizontal();
-        DrawLeftPanel();
-        DrawCanvas();
-        EditorGUILayout.EndHorizontal();
+        try
+        {
+            DrawLeftPanel();
+            DrawCanvas();
+        }
+        catch (System.Exception e)
+        {
+            // 打印一次就好，别每帧刷屏
+            if (!guiErrorLogged)
+            {
+                guiErrorLogged = true;
+                Debug.LogError("[字形编辑器] 绘制时抛异常（布局已兜底，不会再报 GUILayout state）：\n" + e);
+            }
+        }
+        finally
+        {
+            EditorGUILayout.EndHorizontal();
+        }
     }
 
     void DrawLeftPanel()
@@ -710,7 +779,7 @@ public class HanziGlyphEditor : EditorWindow
         string info = selectedStroke >= 0 && selectedStroke < strokes.Count
             ? $"选中笔画 {selectedStroke}（{s.kind}，{s.Count} 点）"
             : "未选中笔画";
-        EditorGUILayout.LabelField($"当前字：{glyphs[selected]}    {info}", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField($"当前字：{CurrentChar}    {info}", EditorStyles.miniLabel);
 
         EditorGUILayout.EndVertical();
     }
@@ -1134,7 +1203,7 @@ public class HanziGlyphEditor : EditorWindow
     string BuildCode()
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"        // {glyphs[selected]}");
+        sb.AppendLine($"        // {CurrentChar}");
 
         foreach (var s in strokes)
         {
@@ -1178,25 +1247,25 @@ public class HanziGlyphEditor : EditorWindow
             }
         }
 
-        sb.Append($"        Save(\"{glyphs[selected]}\");");
+        sb.Append($"        Save(\"{CurrentChar}\");");
         return sb.ToString();
     }
 
     void CopyCode()
     {
         EditorGUIUtility.systemCopyBuffer = BuildCode();
-        status = $"「{glyphs[selected]}」的代码已复制。注意：含 3 点以上的笔画会用 P(...) 写法，" +
+        status = $"「{CurrentChar}」的代码已复制。注意：含 3 点以上的笔画会用 P(...) 写法，" +
                  "需要 HanziRenderer 里有对应的 P 构造器（已提供）。";
     }
 
     void ApplyToRuntime()
     {
-        if (HanziRenderer.ApplyStrokes(glyphs[selected], strokes, glyphSet))
+        if (HanziRenderer.ApplyStrokes(CurrentChar, strokes, glyphSet))
         {
             foreach (var r in Object.FindObjectsOfType<HanziRenderer>())
                 r.SetCharacter(r.character);
 
-            status = $"「{glyphs[selected]}」已在运行时生效（场景里的字会立刻变）。";
+            status = $"「{CurrentChar}」已在运行时生效（场景里的字会立刻变）。";
             Repaint();
         }
     }
@@ -1221,7 +1290,7 @@ public class HanziGlyphEditor : EditorWindow
 
     void WriteToSource()
     {
-        string ch = glyphs[selected];
+        string ch = CurrentChar;
         string full = System.IO.Path.Combine(
             System.IO.Directory.GetParent(Application.dataPath).FullName,
             SourceFileFor(glyphSet));
