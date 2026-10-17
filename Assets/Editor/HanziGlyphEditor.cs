@@ -82,6 +82,18 @@ public class HanziGlyphEditor : EditorWindow
     void OnEnable() { ReloadGlyphList(); }
 
     /// <summary>
+    /// 窗口重新获得焦点时刷新。
+    ///
+    /// 场景：窗口一直开着 → 我在源码里加了字 → 切回这个窗口。
+    /// 没有这个回调的话，看到的还是旧列表。
+    /// </summary>
+    void OnFocus()
+    {
+        ReloadGlyphList();
+        Repaint();
+    }
+
+    /// <summary>
     /// 从别的窗口跳过来时，直接选中指定的字。
     ///
     /// 敌人定义器里点"打开字形编辑器"会调它 —— 让人不用自己在下拉里翻。
@@ -222,6 +234,17 @@ public class HanziGlyphEditor : EditorWindow
         // 改敌人的字绝不会影响玩家操控的汉字。
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("字库", EditorStyles.boldLabel, GUILayout.Width(34f));
+
+        // 「重新载入字库」——
+        //
+        // 窗口一直开着时，源码里加了字不会自动刷新（OnEnable 只跑一次）。
+        // 加这个按钮可以随时手动重读，不用关掉窗口再开。
+        if (GUILayout.Button("↻", GUILayout.Width(24f)))
+        {
+            HanziRenderer.ClearAllCaches();
+            ReloadGlyphList();
+            Repaint();
+        }
 
         bool wasPlayer = glyphSet == HanziRenderer.SetPlayer;
         if (GUILayout.Toggle(wasPlayer, "  玩家  ", "Button", GUILayout.Width(80f)) != wasPlayer
